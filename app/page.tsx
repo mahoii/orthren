@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, DragEvent, FormEvent, useMemo, useState } from "react";
+import { ChangeEvent, DragEvent, FormEvent, ReactNode, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { GeneratePaResponse } from "@/lib/types";
 
@@ -9,6 +9,29 @@ const progressSteps = [
   "Analyzing medical necessity...",
   "Building narrative...",
   "Generating document..."
+];
+
+const commonOrthopedicCptCodes = [
+  { code: "27447", description: "Total knee arthroplasty" },
+  { code: "27130", description: "Total hip arthroplasty" },
+  { code: "27236", description: "ORIF femoral neck fracture" },
+  { code: "27244", description: "ORIF intertrochanteric fracture" },
+  { code: "29827", description: "Rotator cuff repair arthroscopic" },
+  { code: "29826", description: "Shoulder arthroscopy decompression" },
+  { code: "29881", description: "Knee arthroscopy meniscectomy" },
+  { code: "29880", description: "Knee arthroscopy meniscectomy both" },
+  { code: "27187", description: "Prophylactic femur nailing" },
+  { code: "22612", description: "Lumbar spinal fusion" },
+  { code: "22630", description: "Lumbar interbody fusion" },
+  { code: "63047", description: "Lumbar laminectomy" },
+  { code: "27370", description: "Knee arthroplasty revision" },
+  { code: "27134", description: "Hip arthroplasty revision" },
+  { code: "29823", description: "Shoulder arthroscopy debridement" },
+  { code: "29824", description: "Distal clavicle excision" },
+  { code: "27759", description: "Tibia ORIF" },
+  { code: "25600", description: "Closed radius fracture treatment" },
+  { code: "23472", description: "Total shoulder arthroplasty" },
+  { code: "27695", description: "Ankle ligament repair" }
 ];
 
 export default function UploadPage() {
@@ -26,6 +49,8 @@ export default function UploadPage() {
     () => Boolean(file && cptCode.trim() && payerName.trim() && providerName.trim()),
     [cptCode, file, payerName, providerName]
   );
+
+  const cptWarning = useMemo(() => getCptWarning(cptCode), [cptCode]);
 
   const progressPercent = ((activeStep + 1) / progressSteps.length) * 100;
 
@@ -159,7 +184,21 @@ export default function UploadPage() {
                 onChange={setCptCode}
                 placeholder="e.g. 29827"
                 disabled={isLoading}
-              />
+              >
+                {cptWarning ? (
+                  <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+                    <p>
+                      CPT code {cptWarning.enteredCode} was not recognized as a common orthopedic surgical code. Please
+                      verify before continuing.
+                    </p>
+                    {cptWarning.closestMatch ? (
+                      <p className="mt-1 font-medium">
+                        Closest match: CPT {cptWarning.closestMatch.code} - {cptWarning.closestMatch.description}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </Field>
               <Field
                 label="Insurance payer name"
                 value={payerName}
@@ -226,9 +265,10 @@ type FieldProps = {
   onChange: (value: string) => void;
   placeholder: string;
   disabled: boolean;
+  children?: ReactNode;
 };
 
-function Field({ label, value, onChange, placeholder, disabled }: FieldProps) {
+function Field({ label, value, onChange, placeholder, disabled, children }: FieldProps) {
   return (
     <label className="block">
       <span className="text-sm font-semibold text-slate-700">{label}</span>
@@ -239,6 +279,56 @@ function Field({ label, value, onChange, placeholder, disabled }: FieldProps) {
         disabled={disabled}
         className="mt-2 w-full rounded-md border border-clinical-line px-3 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-clinical-blue focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
       />
+      {children}
     </label>
   );
+}
+
+function getCptWarning(code: string) {
+  const enteredCode = code.trim();
+  const normalizedCode = normalizeCptCode(enteredCode);
+
+  if (!enteredCode || commonOrthopedicCptCodes.some((commonCode) => commonCode.code === normalizedCode)) {
+    return null;
+  }
+
+  return {
+    enteredCode,
+    closestMatch: normalizedCode ? findClosestCptCode(normalizedCode) : null
+  };
+}
+
+function normalizeCptCode(code: string) {
+  return code.replace(/\D/g, "");
+}
+
+function findClosestCptCode(code: string) {
+  return commonOrthopedicCptCodes.reduce((closest, candidate) => {
+    const candidateDistance = getLevenshteinDistance(code, candidate.code);
+    const closestDistance = getLevenshteinDistance(code, closest.code);
+
+    return candidateDistance < closestDistance ? candidate : closest;
+  }, commonOrthopedicCptCodes[0]);
+}
+
+function getLevenshteinDistance(firstValue: string, secondValue: string) {
+  const rows = Array.from({ length: firstValue.length + 1 }, (_, firstIndex) =>
+    Array.from({ length: secondValue.length + 1 }, (_, secondIndex) =>
+      firstIndex === 0 ? secondIndex : secondIndex === 0 ? firstIndex : 0
+    )
+  );
+
+  for (let firstIndex = 1; firstIndex <= firstValue.length; firstIndex += 1) {
+    for (let secondIndex = 1; secondIndex <= secondValue.length; secondIndex += 1) {
+      const substitutionCost = firstValue[firstIndex - 1] === secondValue[secondIndex - 1] ? 0 : 1;
+
+      rows[firstIndex][secondIndex] = Math.min(
+        rows[firstIndex - 1][secondIndex] + 1,
+        rows[firstIndex][secondIndex - 1] + 1,
+        rows[firstIndex - 1][secondIndex - 1] + substitutionCost
+      );
+    }
+  }
+
+  return rows[firstValue.length][secondValue.length];
 }
