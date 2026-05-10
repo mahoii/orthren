@@ -30,3 +30,4 @@
  GET / 500 in 4621ms
  ✓ Compiled /_error in 4.4s (765 modules)
  GET / 500 in 966ms
+ ✓ Compiled in 940ms (489 modules)
