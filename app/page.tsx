@@ -1,0 +1,244 @@
+"use client";
+
+import { ChangeEvent, DragEvent, FormEvent, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import type { GeneratePaResponse } from "@/lib/types";
+
+const progressSteps = [
+  "Extracting chart data...",
+  "Analyzing medical necessity...",
+  "Building narrative...",
+  "Generating document..."
+];
+
+export default function UploadPage() {
+  const router = useRouter();
+  const [file, setFile] = useState<File | null>(null);
+  const [cptCode, setCptCode] = useState("");
+  const [payerName, setPayerName] = useState("");
+  const [providerName, setProviderName] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [activeStep, setActiveStep] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  const hasRequiredFields = useMemo(
+    () => Boolean(file && cptCode.trim() && payerName.trim() && providerName.trim()),
+    [cptCode, file, payerName, providerName]
+  );
+
+  const progressPercent = ((activeStep + 1) / progressSteps.length) * 100;
+
+  function selectPdf(selectedFile: File | undefined) {
+    setError(null);
+
+    if (!selectedFile) {
+      return;
+    }
+
+    if (selectedFile.type !== "application/pdf" && !selectedFile.name.toLowerCase().endsWith(".pdf")) {
+      setError("Please upload a PDF chart.");
+      return;
+    }
+
+    setFile(selectedFile);
+  }
+
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    selectPdf(event.target.files?.[0]);
+  }
+
+  function handleDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    setIsDragging(false);
+    selectPdf(event.dataTransfer.files?.[0]);
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (isLoading) {
+      return;
+    }
+
+    if (!file) {
+      setError("Upload a patient chart PDF before generating the packet.");
+      return;
+    }
+
+    if (!cptCode.trim() || !payerName.trim() || !providerName.trim()) {
+      setError("Complete all request details before generating the packet.");
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setActiveStep(0);
+
+    const progressTimer = window.setInterval(() => {
+      setActiveStep((current) => Math.min(current + 1, progressSteps.length - 1));
+    }, 1800);
+
+    try {
+      const formData = new FormData();
+      formData.append("chart", file);
+      formData.append("cptCode", cptCode.trim());
+      formData.append("payerName", payerName.trim());
+      formData.append("providerName", providerName.trim());
+
+      const response = await fetch("/api/generate-pa", {
+        method: "POST",
+        body: formData
+      });
+
+      const payload = (await response.json()) as GeneratePaResponse | { error?: string };
+
+      if (!response.ok) {
+        throw new Error("error" in payload && payload.error ? payload.error : "Unable to generate PA packet.");
+      }
+
+      sessionStorage.setItem(
+        "pa-review-data",
+        JSON.stringify({
+          ...(payload as GeneratePaResponse),
+          cptCode: cptCode.trim(),
+          payerName: payerName.trim(),
+          providerName: providerName.trim()
+        })
+      );
+      router.push("/review");
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Unable to generate PA packet.");
+    } finally {
+      window.clearInterval(progressTimer);
+      setIsLoading(false);
+    }
+  }
+
+  return (
+    <main className="min-h-[calc(100vh-3.5rem)] bg-[#F8F9FB]">
+      <section className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-5xl flex-col justify-center px-6 py-10">
+        <div className="mb-8">
+          <p className="text-sm font-semibold uppercase tracking-wide text-clinical-blue">Orthopedic PA Builder</p>
+          <h1 className="mt-3 text-3xl font-semibold text-clinical-navy md:text-4xl">
+            Generate a payer-ready prior authorization packet.
+          </h1>
+          <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
+            Upload the chart, enter the request details, and review the AI-assisted draft before exporting the final packet.
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="grid gap-7 lg:grid-cols-[1.1fr_0.9fr]">
+          <label
+            onDragOver={(event) => {
+              event.preventDefault();
+              setIsDragging(true);
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            className={`flex min-h-80 cursor-pointer flex-col items-center justify-center rounded-lg border px-8 text-center transition duration-200 hover:shadow-[0_16px_40px_rgba(30,58,95,0.10)] ${
+              isDragging ? "border-clinical-navy bg-blue-50 shadow-[0_16px_40px_rgba(30,58,95,0.10)]" : "border-[#CBD5E1] bg-white"
+            }`}
+          >
+            <input className="sr-only" type="file" accept="application/pdf,.pdf" onChange={handleFileChange} />
+            <span className="rounded-full bg-clinical-navy px-4 py-2 text-sm font-semibold text-white shadow-sm">
+              PDF chart upload
+            </span>
+            <span className="mt-5 text-xl font-semibold text-clinical-navy">
+              {file ? file.name : "Drag and drop the patient chart here"}
+            </span>
+            <span className="mt-3 text-sm text-slate-500">or click to browse for a PDF file</span>
+            {file ? <span className="mt-4 text-sm text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</span> : null}
+          </label>
+
+          <div className="rounded-lg border border-clinical-line bg-white p-6 shadow-sm">
+            <div className="space-y-5">
+              <Field
+                label="Procedure CPT code"
+                value={cptCode}
+                onChange={setCptCode}
+                placeholder="e.g. 29827"
+                disabled={isLoading}
+              />
+              <Field
+                label="Insurance payer name"
+                value={payerName}
+                onChange={setPayerName}
+                placeholder="e.g. Aetna"
+                disabled={isLoading}
+              />
+              <Field
+                label="Requesting provider name"
+                value={providerName}
+                onChange={setProviderName}
+                placeholder="e.g. Jane Smith, MD"
+                disabled={isLoading}
+              />
+            </div>
+
+            {error ? (
+              <div className="mt-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+            ) : null}
+
+            {isLoading ? (
+              <div className="mt-6 rounded-md border border-clinical-line bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-clinical-navy">Generating packet</p>
+                <div className="mt-4 space-y-3">
+                  {progressSteps.map((step, index) => (
+                    <div key={step} className="flex items-center gap-3 text-sm">
+                      <span
+                        className={`h-2.5 w-2.5 rounded-full ${
+                          index <= activeStep ? "bg-clinical-blue" : "bg-slate-300"
+                        }`}
+                      />
+                      <span className={index <= activeStep ? "text-slate-800" : "text-slate-400"}>{step}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            <button
+              type="submit"
+              disabled={!hasRequiredFields}
+              className="mt-6 w-full rounded-md bg-clinical-navy px-5 py-3 text-sm font-semibold text-white transition hover:bg-clinical-blue disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+            >
+              {isLoading ? "Generating..." : "Generate PA Packet"}
+            </button>
+            {isLoading ? (
+              <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
+                <div
+                  className="h-full rounded-full bg-clinical-navy transition-[width] duration-500"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            ) : null}
+          </div>
+        </form>
+      </section>
+    </main>
+  );
+}
+
+type FieldProps = {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  disabled: boolean;
+};
+
+function Field({ label, value, onChange, placeholder, disabled }: FieldProps) {
+  return (
+    <label className="block">
+      <span className="text-sm font-semibold text-slate-700">{label}</span>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        disabled={disabled}
+        className="mt-2 w-full rounded-md border border-clinical-line px-3 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-clinical-blue focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
+      />
+    </label>
+  );
+}

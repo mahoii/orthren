@@ -1,0 +1,32 @@
+  ▲ Next.js 14.2.4
+  - Local:        http://127.0.0.1:3002
+  - Network:      http://127.0.0.1:3002
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 2.4s
+ ○ Compiling / ...
+ ✓ Compiled / in 1756ms (460 modules)
+ GET / 200 in 1983ms
+ ✓ Compiled in 325ms (237 modules)
+ GET / 200 in 42ms
+ ✓ Compiled in 822ms (460 modules)
+ GET / 200 in 155ms
+ GET / 200 in 169ms
+ GET / 200 in 78ms
+ ○ Compiling /api/generate-pa ...
+ ✓ Compiled /api/generate-pa in 691ms (69 modules)
+ POST /api/generate-pa 200 in 5989ms
+ ○ Compiling /review ...
+ ✓ Compiled /review in 669ms (533 modules)
+ GET /review 200 in 325ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 579ms (536 modules)
+ GET /_next/static/css/app/layout.css?v=1778444742969 404 in 216ms
+ GET /_next/static/chunks/main-app.js?v=1778444742969 404 in 62ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 55ms
+ ✓ Compiled / in 318ms (294 modules)
+ ○ Compiling /_error ...
+ GET / 500 in 4621ms
+ ✓ Compiled /_error in 4.4s (765 modules)
+ GET / 500 in 966ms
