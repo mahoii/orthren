@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import pdfParse from "pdf-parse";
+import mammoth from "mammoth";
 import { sanitizeLetterPlaceholders } from "@/lib/letter-placeholders";
 import type { ExtractedChartData } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const maxUploadSizeBytes = 10 * 1024 * 1024;
 
 type RequestDetails = {
   cptCode: string;
@@ -48,14 +51,18 @@ export async function POST(request: Request) {
     const practiceName = stringField(formData.get("practiceName")) || "Orthopedic Practice";
 
     if (!(chart instanceof File)) {
-      return NextResponse.json({ error: "Upload a PDF chart before generating the packet." }, { status: 400 });
+      return NextResponse.json({ error: "Upload a chart file before generating the packet." }, { status: 400 });
+    }
+
+    if (chart.size > maxUploadSizeBytes) {
+      return NextResponse.json({ error: "File too large. Please upload a file under 10MB." }, { status: 400 });
     }
 
     if (!cptCode || !payerName || !providerName) {
       return NextResponse.json({ error: "CPT code, payer name, and provider name are required." }, { status: 400 });
     }
 
-    const chartText = await extractPdfText(chart);
+    const chartText = await extractChartText(chart);
     const requestDetails = { cptCode, payerName, providerName, practiceName };
     const extracted = await extractChartData(chartText, requestDetails);
     const letter = await generateLetter(extracted, requestDetails);
@@ -95,6 +102,46 @@ async function extractPdfText(chart: File) {
 
     throw new Error("We could not read this PDF. Please upload a clear, text-based patient chart PDF.");
   }
+}
+
+async function extractDocxText(chart: File) {
+  const isDocx =
+    chart.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    chart.name.toLowerCase().endsWith(".docx");
+
+  if (!isDocx) {
+    throw new Error("Only PDF and DOCX files are supported");
+  }
+
+  try {
+    const buffer = Buffer.from(await chart.arrayBuffer());
+    const result = await mammoth.extractRawText({ buffer });
+    return result.value.trim();
+  } catch {
+    throw new Error(
+      "Could not read the DOCX file. Please ensure it is not password protected and try again."
+    );
+  }
+}
+
+async function extractChartText(chart: File) {
+  const lowerName = chart.name.toLowerCase();
+  const isPdf = chart.type === "application/pdf" || lowerName.endsWith(".pdf");
+  const isDocx =
+    chart.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    lowerName.endsWith(".docx");
+
+  if (!isPdf && !isDocx) {
+    throw new Error("Only PDF and DOCX files are supported");
+  }
+
+  const text = isPdf ? await extractPdfText(chart) : await extractDocxText(chart);
+
+  if (text.length < 100) {
+    throw new Error("The uploaded file appears to be empty or unreadable. Please try a different file.");
+  }
+
+  return text;
 }
 
 async function extractChartData(

@@ -11,6 +11,8 @@ const progressSteps = [
   "Generating document..."
 ];
 
+const maxUploadSizeBytes = 10 * 1024 * 1024;
+
 const commonOrthopedicCptCodes = [
   { code: "27447", description: "Total knee arthroplasty" },
   { code: "27130", description: "Total hip arthroplasty" },
@@ -55,15 +57,26 @@ export default function UploadPage() {
 
   const progressPercent = ((activeStep + 1) / progressSteps.length) * 100;
 
-  function selectPdf(selectedFile: File | undefined) {
+  function selectChartFile(selectedFile: File | undefined) {
     setError(null);
 
     if (!selectedFile) {
       return;
     }
 
-    if (selectedFile.type !== "application/pdf" && !selectedFile.name.toLowerCase().endsWith(".pdf")) {
-      setError("Please upload a PDF chart.");
+    const lowerName = selectedFile.name.toLowerCase();
+    const isPdf = selectedFile.type === "application/pdf" || lowerName.endsWith(".pdf");
+    const isDocx =
+      selectedFile.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      lowerName.endsWith(".docx");
+
+    if (!isPdf && !isDocx) {
+      setError("Only PDF and DOCX files are supported");
+      return;
+    }
+
+    if (selectedFile.size > maxUploadSizeBytes) {
+      setError("File too large. Please upload a file under 10MB.");
       return;
     }
 
@@ -71,13 +84,13 @@ export default function UploadPage() {
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    selectPdf(event.target.files?.[0]);
+    selectChartFile(event.target.files?.[0]);
   }
 
   function handleDrop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault();
     setIsDragging(false);
-    selectPdf(event.dataTransfer.files?.[0]);
+    selectChartFile(event.dataTransfer.files?.[0]);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -88,7 +101,7 @@ export default function UploadPage() {
     }
 
     if (!file) {
-      setError("Upload a patient chart PDF before generating the packet.");
+      setError("Upload a patient chart file before generating the packet.");
       return;
     }
 
@@ -168,14 +181,19 @@ export default function UploadPage() {
               isDragging ? "border-clinical-navy bg-blue-50 shadow-[0_16px_40px_rgba(30,58,95,0.10)]" : "border-[#CBD5E1] bg-white"
             }`}
           >
-            <input className="sr-only" type="file" accept="application/pdf,.pdf" onChange={handleFileChange} />
+            <input
+              className="sr-only"
+              type="file"
+              accept="application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              onChange={handleFileChange}
+            />
             <span className="rounded-full bg-clinical-navy px-4 py-2 text-sm font-semibold text-white shadow-sm">
-              PDF chart upload
+              Chart upload
             </span>
             <span className="mt-5 text-xl font-semibold text-clinical-navy">
               {file ? file.name : "Drag and drop the patient chart here"}
             </span>
-            <span className="mt-3 text-sm text-slate-500">or click to browse for a PDF file</span>
+            <span className="mt-3 text-sm text-slate-500">or click to browse - PDF or DOCX supported</span>
             {file ? <span className="mt-4 text-sm text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</span> : null}
           </label>
 
