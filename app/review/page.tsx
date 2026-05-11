@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import type { ExtractedChartData, GeneratePaResponse } from "@/lib/types";
+import type { ExtractedChartData, ExtractedChartDataWithValidation, GeneratePaResponse } from "@/lib/types";
 
 type ReviewData = GeneratePaResponse & {
   cptCode: string;
@@ -11,11 +11,91 @@ type ReviewData = GeneratePaResponse & {
   practiceName?: string;
 };
 
+type PaStrengthFactorKey = keyof ExtractedChartData["pa_strength"];
+
+type ManualFix = {
+  value: string;
+  resolved: boolean;
+  source: "manual" | "ai";
+};
+
+type ManualFixes = Partial<Record<PaStrengthFactorKey, ManualFix>>;
+
+type Suggestions = Partial<Record<PaStrengthFactorKey, string>>;
+
+type SuggestionLoading = Partial<Record<PaStrengthFactorKey, boolean>>;
+
+const paStrengthWeights: Record<PaStrengthFactorKey, number> = {
+  diagnosis_codes: 10,
+  conservative_treatments_named: 20,
+  conservative_treatment_duration: 10,
+  imaging_findings: 15,
+  functional_limitations: 15,
+  surgical_approach: 10,
+  cpt_code_valid: 10,
+  symptom_duration: 10
+};
+
+const paStrengthFactors: Array<{
+  key: PaStrengthFactorKey;
+  label: string;
+  placeholder: string;
+}> = [
+  {
+    key: "diagnosis_codes",
+    label: "Diagnosis Codes",
+    placeholder: "e.g. M17.11, M16.12"
+  },
+  {
+    key: "conservative_treatments_named",
+    label: "Conservative Treatments Named",
+    placeholder: "e.g. Physical therapy, NSAIDs"
+  },
+  {
+    key: "conservative_treatment_duration",
+    label: "Conservative Treatment Duration",
+    placeholder: "e.g. 8 weeks of PT"
+  },
+  {
+    key: "imaging_findings",
+    label: "Imaging Findings",
+    placeholder: "e.g. MRI: full thickness tear"
+  },
+  {
+    key: "functional_limitations",
+    label: "Functional Limitations",
+    placeholder: "e.g. cannot climb stairs"
+  },
+  {
+    key: "surgical_approach",
+    label: "Surgical Approach",
+    placeholder: "e.g. arthroscopic"
+  },
+  {
+    key: "cpt_code_valid",
+    label: "CPT Code Valid",
+    placeholder: "e.g. 29827"
+  },
+  {
+    key: "symptom_duration",
+    label: "Symptom Duration",
+    placeholder: "e.g. 6 months"
+  }
+];
+
 export default function ReviewPage() {
   const [data, setData] = useState<ReviewData | null>(null);
   const [letter, setLetter] = useState("");
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isScoreExpanded, setIsScoreExpanded] = useState(false);
+  const [manualFixes, setManualFixes] = useState<ManualFixes>({});
+  const [suggestions, setSuggestions] = useState<Suggestions>({});
+  const [isSuggesting, setIsSuggesting] = useState<SuggestionLoading>({});
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [animatedScorePercent, setAnimatedScorePercent] = useState(0);
+  const hasAnimatedScoreRef = useRef(false);
 
   useEffect(() => {
     const stored = sessionStorage.getItem("pa-review-data");
@@ -34,6 +114,146 @@ export default function ReviewPage() {
   }, []);
 
   const missingFields = useMemo(() => (data ? findMissingFields(data.extracted) : []), [data]);
+  const basePaStrength = data?.extracted.pa_strength;
+  const paScore = useMemo(() => computePaStrengthScore(basePaStrength, manualFixes), [basePaStrength, manualFixes]);
+  const paScorePercent = Math.min(100, Math.max(0, (paScore / 10) * 100));
+  const paScoreColor = getScoreColor(paScore);
+  const paScoreDescriptor = getScoreDescriptor(paScore);
+  const scoreLabel = `${paScore.toFixed(1)} / 10`;
+
+  useEffect(() => {
+    if (!data) {
+      return;
+    }
+
+    if (!hasAnimatedScoreRef.current) {
+      setAnimatedScorePercent(0);
+      const timeout = window.setTimeout(() => {
+        setAnimatedScorePercent(paScorePercent);
+        hasAnimatedScoreRef.current = true;
+      }, 40);
+
+      return () => window.clearTimeout(timeout);
+    }
+
+    setAnimatedScorePercent(paScorePercent);
+  }, [data, paScorePercent]);
+
+  useEffect(() => {
+    if (!toast) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setToast(null), 2400);
+    return () => window.clearTimeout(timeout);
+  }, [toast]);
+
+  function updateManualFix(key: PaStrengthFactorKey, value: string, source: ManualFix["source"] = "manual") {
+    const trimmed = value.trim();
+    setManualFixes((current) => ({
+      ...current,
+      [key]: {
+        value,
+        resolved: Boolean(trimmed),
+        source
+      }
+    }));
+  }
+
+  async function handleSuggestFix(key: PaStrengthFactorKey, label: string) {
+    if (!data || isSuggesting[key]) {
+      return;
+    }
+
+    setIsSuggesting((current) => ({ ...current, [key]: true }));
+    setSuggestions((current) => ({ ...current, [key]: "" }));
+
+    try {
+      const response = await fetch("/api/suggest-fix", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          extracted: data.extracted,
+          factor: label
+        })
+      });
+
+      const payload = (await response.json()) as { suggestion?: string; error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to generate a suggestion.");
+      }
+
+      setSuggestions((current) => ({ ...current, [key]: payload.suggestion ?? "" }));
+    } catch (error) {
+      setSuggestions((current) => ({ ...current, [key]: "" }));
+      setToast(error instanceof Error ? error.message : "Unable to generate a suggestion.");
+    } finally {
+      setIsSuggesting((current) => ({ ...current, [key]: false }));
+    }
+  }
+
+  function handleApplySuggestion(key: PaStrengthFactorKey) {
+    const suggestion = suggestions[key];
+    if (!suggestion) {
+      return;
+    }
+
+    updateManualFix(key, suggestion, "ai");
+    setSuggestions((current) => ({ ...current, [key]: "" }));
+  }
+
+  function handleDismissSuggestion(key: PaStrengthFactorKey) {
+    setSuggestions((current) => ({ ...current, [key]: "" }));
+  }
+
+  async function handleRegenerateLetter() {
+    if (!data || isRegenerating) {
+      return;
+    }
+
+    setIsRegenerating(true);
+    try {
+      const { updatedExtracted, updatedRequestDetails } = buildUpdatedPayload(data, manualFixes);
+      const response = await fetch("/api/regenerate-letter", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          extracted: updatedExtracted,
+          requestDetails: updatedRequestDetails
+        })
+      });
+
+      const payload = (await response.json()) as { letter?: string; error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to regenerate the letter.");
+      }
+
+      if (payload.letter) {
+        setLetter(payload.letter);
+      }
+
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              extracted: updatedExtracted,
+              cptCode: updatedRequestDetails.cptCode
+            }
+          : current
+      );
+      setToast("Letter regenerated with your updates");
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Unable to regenerate the letter.");
+    } finally {
+      setIsRegenerating(false);
+    }
+  }
 
   async function handleDownload() {
     if (!data) {
@@ -101,6 +321,11 @@ export default function ReviewPage() {
 
   return (
     <main className="min-h-[calc(100vh-3.5rem)] bg-[#F8F9FB]">
+      {toast ? (
+        <div className="fixed right-6 top-6 z-50 rounded-md border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-lg">
+          {toast}
+        </div>
+      ) : null}
       <header className="border-b border-clinical-line bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-5 md:flex-row md:items-center md:justify-between">
           <div>
@@ -127,6 +352,143 @@ export default function ReviewPage() {
 
       <div className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[360px_1fr]">
         <aside className="space-y-6 rounded-lg border border-[#E2E8F0] bg-white p-5">
+          <section className="rounded-lg border border-slate-200 bg-slate-50/80 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">PA Strength Score</p>
+                <p className={`mt-2 text-3xl font-semibold ${getScoreTextClass(paScore)}`}>{scoreLabel}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsScoreExpanded((current) => !current)}
+                className="mt-1 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-slate-300"
+                aria-expanded={isScoreExpanded}
+                aria-label="Toggle PA strength breakdown"
+              >
+                <svg
+                  className={`h-4 w-4 transition-transform duration-200 ${isScoreExpanded ? "rotate-180" : "rotate-0"}`}
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path d="M5 8l5 5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+            <div className="mt-4">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                <div
+                  className={`h-full rounded-full transition-[width] duration-[800ms] ${getScoreBarClass(paScore)}`}
+                  style={{ width: `${animatedScorePercent}%` }}
+                />
+              </div>
+              <p className="mt-2 text-sm font-medium text-slate-600">{paScoreDescriptor}</p>
+            </div>
+            <div
+              className={`mt-4 overflow-hidden transition-all duration-200 ease-in-out ${
+                isScoreExpanded ? "max-h-[1400px] opacity-100" : "max-h-0 opacity-0"
+              }`}
+            >
+              <div className="space-y-3 pt-2">
+                {paStrengthFactors.map((factor) => {
+                  const baseScore = basePaStrength?.[factor.key]?.score ?? 0;
+                  const baseNote = basePaStrength?.[factor.key]?.note ?? "";
+                  const manualFix = manualFixes[factor.key];
+                  const isManualResolved = Boolean(manualFix?.resolved);
+                  const hasSuggestion = Boolean(suggestions[factor.key]);
+                  const displayNote = baseNote || "No note provided.";
+
+                  return (
+                    <div key={factor.key} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                      <div className="flex gap-3">
+                        <span
+                          className={`mt-0.5 flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold ${
+                            isManualResolved
+                              ? "border-blue-200 bg-blue-50 text-blue-600"
+                              : baseScore === 1
+                                ? "border-green-200 bg-green-50 text-green-600"
+                                : "border-red-200 bg-red-50 text-red-600"
+                          }`}
+                        >
+                          {isManualResolved ? (
+                            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
+                              <path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                            </svg>
+                          ) : baseScore === 1 ? (
+                            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
+                              <path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                            </svg>
+                          ) : (
+                            <span aria-hidden="true">!</span>
+                          )}
+                        </span>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm font-semibold text-slate-800">{factor.label}</p>
+                            <span className="text-xs font-semibold text-slate-500">{isManualResolved ? "Resolved" : baseScore === 1 ? "OK" : "Missing"}</span>
+                          </div>
+                          <p className="mt-1 text-sm text-slate-600">{displayNote}</p>
+                          {baseScore === 0 ? (
+                            <div className="mt-3 space-y-2">
+                              <input
+                                value={manualFix?.value ?? ""}
+                                onChange={(event) => updateManualFix(factor.key, event.target.value)}
+                                placeholder={factor.placeholder}
+                                className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-clinical-blue focus:ring-2 focus:ring-blue-100"
+                              />
+                              <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSuggestFix(factor.key, factor.label)}
+                                  disabled={Boolean(isSuggesting[factor.key])}
+                                  className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-800 disabled:cursor-not-allowed disabled:text-slate-400"
+                                >
+                                  {isSuggesting[factor.key] ? "Suggesting..." : "Suggest fix"}
+                                </button>
+                                {isManualResolved ? (
+                                  <span className="text-xs font-semibold text-blue-600">Marked resolved</span>
+                                ) : null}
+                              </div>
+                              {hasSuggestion ? (
+                                <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                                  <p className="font-medium">Suggestion</p>
+                                  <p className="mt-1">{suggestions[factor.key]}</p>
+                                  <div className="mt-2 flex gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleApplySuggestion(factor.key)}
+                                      className="rounded-md bg-clinical-navy px-3 py-1 text-xs font-semibold text-white hover:bg-clinical-blue"
+                                    >
+                                      Apply
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDismissSuggestion(factor.key)}
+                                      className="rounded-md border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300"
+                                    >
+                                      Dismiss
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                onClick={handleRegenerateLetter}
+                disabled={isRegenerating}
+                className="mt-4 w-full rounded-md bg-clinical-navy px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-clinical-blue disabled:bg-slate-300"
+              >
+                {isRegenerating ? "Regenerating..." : "Regenerate letter with fixes"}
+              </button>
+            </div>
+          </section>
           <section>
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-base font-semibold text-clinical-navy">Chart data we found</h2>
@@ -320,4 +682,186 @@ function findMissingFields(extracted: ExtractedChartData) {
 function buildDownloadName(patientName: string | null, cptCode: string) {
   const safePatient = (patientName ?? "patient").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
   return `${safePatient}-pa-packet-cpt-${cptCode}.docx`;
+}
+
+function computePaStrengthScore(base: ExtractedChartData["pa_strength"] | undefined, manualFixes: ManualFixes) {
+  let totalWeight = 0;
+  let weightedScore = 0;
+
+  Object.entries(paStrengthWeights).forEach(([key, weight]) => {
+    const factorKey = key as PaStrengthFactorKey;
+    const manual = manualFixes[factorKey];
+    const baseScore = base?.[factorKey]?.score ?? 0;
+    const score = manual?.resolved ? 1 : baseScore;
+    weightedScore += score * weight;
+    totalWeight += weight;
+  });
+
+  if (!totalWeight) {
+    return 0;
+  }
+
+  return (weightedScore / totalWeight) * 10;
+}
+
+function getScoreColor(score: number) {
+  if (score >= 8) {
+    return "green";
+  }
+
+  if (score >= 5) {
+    return "amber";
+  }
+
+  return "red";
+}
+
+function getScoreTextClass(score: number) {
+  const color = getScoreColor(score);
+  if (color === "green") {
+    return "text-[#16A34A]";
+  }
+  if (color === "amber") {
+    return "text-[#D97706]";
+  }
+  return "text-[#DC2626]";
+}
+
+function getScoreBarClass(score: number) {
+  const color = getScoreColor(score);
+  if (color === "green") {
+    return "bg-[#16A34A]";
+  }
+  if (color === "amber") {
+    return "bg-[#D97706]";
+  }
+  return "bg-[#DC2626]";
+}
+
+function getScoreDescriptor(score: number) {
+  if (score >= 9) {
+    return "Strong submission - ready to submit";
+  }
+  if (score >= 7) {
+    return "Good - minor improvements recommended";
+  }
+  if (score >= 5) {
+    return "Moderate risk - address warnings before submitting";
+  }
+  return "High denial risk - significant documentation gaps";
+}
+
+function buildUpdatedPayload(data: ReviewData, manualFixes: ManualFixes) {
+  const updatedExtracted = applyManualFixes(data.extracted, manualFixes);
+  const cptOverride = manualFixes.cpt_code_valid?.resolved
+    ? manualFixes.cpt_code_valid.value.trim()
+    : data.cptCode;
+
+  return {
+    updatedExtracted,
+    updatedRequestDetails: {
+      cptCode: cptOverride || data.cptCode,
+      payerName: data.payerName,
+      providerName: data.providerName,
+      practiceName: data.practiceName ?? "Orthopedic Practice"
+    }
+  };
+}
+
+function applyManualFixes(extracted: ExtractedChartDataWithValidation, manualFixes: ManualFixes) {
+  const updated: ExtractedChartDataWithValidation = {
+    ...extracted,
+    diagnosis_codes: [...extracted.diagnosis_codes],
+    functional_limitations: [...extracted.functional_limitations],
+    conservative_treatments_attempted: extracted.conservative_treatments_attempted.map((treatment) => ({
+      ...treatment
+    })),
+    imaging_findings: extracted.imaging_findings ? { ...extracted.imaging_findings } : null
+  };
+
+  const diagnosisFix = manualFixes.diagnosis_codes?.resolved ? manualFixes.diagnosis_codes.value : "";
+  if (diagnosisFix) {
+    updated.diagnosis_codes = splitListValues(diagnosisFix);
+  }
+
+  const treatmentsNamed = manualFixes.conservative_treatments_named?.resolved
+    ? manualFixes.conservative_treatments_named.value
+    : "";
+  if (treatmentsNamed) {
+    updated.conservative_treatments_attempted = splitListValues(treatmentsNamed).map((name) => ({
+      treatment: name,
+      duration: null,
+      outcome: null,
+      dates: null
+    }));
+  }
+
+  const treatmentDuration = manualFixes.conservative_treatment_duration?.resolved
+    ? manualFixes.conservative_treatment_duration.value.trim()
+    : "";
+  if (treatmentDuration) {
+    if (updated.conservative_treatments_attempted.length === 0) {
+      updated.conservative_treatments_attempted = [
+        {
+          treatment: "Conservative treatment",
+          duration: treatmentDuration,
+          outcome: null,
+          dates: null
+        }
+      ];
+    } else {
+      updated.conservative_treatments_attempted = updated.conservative_treatments_attempted.map((treatment) => ({
+        ...treatment,
+        duration: treatment.duration ?? treatmentDuration
+      }));
+    }
+  }
+
+  const imagingFix = manualFixes.imaging_findings?.resolved ? manualFixes.imaging_findings.value : "";
+  if (imagingFix) {
+    updated.imaging_findings = parseImagingInput(imagingFix);
+  }
+
+  const limitationsFix = manualFixes.functional_limitations?.resolved
+    ? manualFixes.functional_limitations.value
+    : "";
+  if (limitationsFix) {
+    updated.functional_limitations = splitListValues(limitationsFix);
+  }
+
+  const surgicalFix = manualFixes.surgical_approach?.resolved ? manualFixes.surgical_approach.value.trim() : "";
+  if (surgicalFix) {
+    updated.surgical_approach_if_mentioned = surgicalFix;
+  }
+
+  const symptomFix = manualFixes.symptom_duration?.resolved ? manualFixes.symptom_duration.value.trim() : "";
+  if (symptomFix) {
+    updated.symptom_duration = symptomFix;
+  }
+
+  return updated;
+}
+
+function splitListValues(value: string) {
+  return value
+    .split(/[,;\n]/g)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function parseImagingInput(value: string) {
+  const [modality, ...rest] = value.split(":");
+  const findings = rest.join(":").trim();
+
+  if (findings) {
+    return {
+      modality: modality.trim() || null,
+      key_findings: findings
+    };
+  }
+
+  return {
+    modality: null,
+    key_findings: value.trim() || null
+  };
 }

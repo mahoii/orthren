@@ -10,6 +10,22 @@ export type ImagingFindings = {
   key_findings: string | null;
 };
 
+export type PaStrengthFactor = {
+  score: 0 | 1;
+  note: string;
+};
+
+export type PaStrength = {
+  diagnosis_codes: PaStrengthFactor;
+  conservative_treatments_named: PaStrengthFactor;
+  conservative_treatment_duration: PaStrengthFactor;
+  imaging_findings: PaStrengthFactor;
+  functional_limitations: PaStrengthFactor;
+  surgical_approach: PaStrengthFactor;
+  cpt_code_valid: PaStrengthFactor;
+  symptom_duration: PaStrengthFactor;
+};
+
 export type ExtractedChartData = {
   patient_name: string | null;
   date_of_birth: string | null;
@@ -22,6 +38,7 @@ export type ExtractedChartData = {
   requested_procedure: string | null;
   surgical_approach_if_mentioned: string | null;
   denial_risk_flags: string[];
+  pa_strength: PaStrength;
 };
 
 export type ValidationBlock = {

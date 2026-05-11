@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import pdfParse from "pdf-parse";
 import mammoth from "mammoth";
 import { sanitizeLetterPlaceholders } from "@/lib/letter-placeholders";
-import type { ExtractedChartData } from "@/lib/types";
+import type { ExtractedChartData, PaStrength, PaStrengthFactor } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,7 +29,31 @@ dates: any specific dates mentioned for this treatment. Return null if not found
 
 Return a minimum of 1 treatment object. If no treatments are found at all, return a single object with treatment_name: Conservative treatment history not documented, duration: null, outcome: null, dates: null.
 
-For denial_risk_flags, provide SPECIFIC, ACTIONABLE flags based on actual gaps in the documentation. Examples of GOOD flags: "Only 4 weeks of PT documented before requesting surgery - payers typically require 6-12 weeks", "No imaging provided to confirm diagnosis despite reported pain", "Conservative care dates incomplete - unclear if treatments were concurrent or sequential", "Single corticosteroid injection on [date] with no documented follow-up imaging or repeat treatment". Examples of BAD flags (too generic, avoid): "insufficient documentation of medical necessity", "missing pre-operative medical evaluation", "inadequate conservative care". Focus on: specific treatment durations, missing imaging modalities, unclear timelines, single attempts at treatment with no follow-up, gaps between dates that suggest inadequate trial periods.`;
+For denial_risk_flags, provide SPECIFIC, ACTIONABLE flags based on actual gaps in the documentation. Examples of GOOD flags: "Only 4 weeks of PT documented before requesting surgery - payers typically require 6-12 weeks", "No imaging provided to confirm diagnosis despite reported pain", "Conservative care dates incomplete - unclear if treatments were concurrent or sequential", "Single corticosteroid injection on [date] with no documented follow-up imaging or repeat treatment". Examples of BAD flags (too generic, avoid): "insufficient documentation of medical necessity", "missing pre-operative medical evaluation", "inadequate conservative care". Focus on: specific treatment durations, missing imaging modalities, unclear timelines, single attempts at treatment with no follow-up, gaps between dates that suggest inadequate trial periods.
+
+After extracting all fields, evaluate the chart against these 8 factors and return a score object called pa_strength with the following structure. For each factor, return a score of 0 or 1 (0 = missing or insufficient, 1 = present and adequate), and a one-sentence plain English note explaining the score:
+json{
+  "pa_strength": {
+    "diagnosis_codes": { "score": 0, "note": "..." },
+    "conservative_treatments_named": { "score": 0, "note": "..." },
+    "conservative_treatment_duration": { "score": 0, "note": "..." },
+    "imaging_findings": { "score": 0, "note": "..." },
+    "functional_limitations": { "score": 0, "note": "..." },
+    "surgical_approach": { "score": 0, "note": "..." },
+    "cpt_code_valid": { "score": 0, "note": "..." },
+    "symptom_duration": { "score": 0, "note": "..." }
+  }
+}
+Weight the overall score as follows when calculating the final 1-10 score on the frontend:
+
+diagnosis_codes: 10%
+conservative_treatments_named: 20%
+conservative_treatment_duration: 10%
+imaging_findings: 15%
+functional_limitations: 15%
+surgical_approach: 10%
+cpt_code_valid: 10%
+symptom_duration: 10%`;
 
 const letterSystemPrompt =
   "You are a prior authorization specialist with 15 years of experience winning approvals for orthopedic procedures. Using the structured patient data provided, write a compelling Letter of Medical Necessity. The letter must: (1) Open with patient demographics and the specific procedure requested with CPT code. (2) Establish the clinical presentation - chief complaint, duration, severity, and specific functional limitations using the patient's own documented measurements where available. (3) Document conservative care chronologically - every treatment tried, how long, and why it failed. Payers require proof that surgery is a last resort. (4) Reference imaging findings using precise medical language that directly supports the surgical indication. (5) State the specific procedure with anatomical detail - laterality, approach, implants if applicable. (6) Close with a statement of medical necessity referencing the patient's inability to maintain activities of daily living. End with a signature block containing the requesting provider name, MD, and the practice name from the request details. Write in formal clinical language. Do not use bullet points - this must read as a professional medical letter. If source data is insufficient, state that physician review is required without using square brackets.";
@@ -168,7 +192,7 @@ async function generateLetter(
   extracted: ExtractedChartData,
   requestDetails: RequestDetails
 ) {
-  const { validation, ...chartDataOnly } = extracted as any;
+  const { validation, pa_strength, ...chartDataOnly } = extracted as any;
   const letter = await callGroq({
     system: letterSystemPrompt,
     prompt: `Structured patient data:
@@ -351,10 +375,34 @@ function normalizeChartData(
     requested_procedure: requestedProcedure,
     surgical_approach_if_mentioned: surgicalApproach,
     denial_risk_flags: stringArray(data.denial_risk_flags),
+    pa_strength: normalizePaStrength(data.pa_strength),
     validation: { hard_blocks, soft_warnings }
   };
 
   return normalized;
+}
+
+function normalizePaStrength(value: unknown): PaStrength {
+  const defaultFactor: PaStrengthFactor = { score: 0, note: "" };
+  const source = isObject(value) ? value : {};
+
+  const readFactor = (key: string): PaStrengthFactor => {
+    const factor = isObject(source[key]) ? source[key] : {};
+    const score = typeof factor.score === "number" && factor.score === 1 ? 1 : 0;
+    const note = typeof factor.note === "string" ? factor.note.trim() : "";
+    return { score, note };
+  };
+
+  return {
+    diagnosis_codes: readFactor("diagnosis_codes"),
+    conservative_treatments_named: readFactor("conservative_treatments_named"),
+    conservative_treatment_duration: readFactor("conservative_treatment_duration"),
+    imaging_findings: readFactor("imaging_findings"),
+    functional_limitations: readFactor("functional_limitations"),
+    surgical_approach: readFactor("surgical_approach"),
+    cpt_code_valid: readFactor("cpt_code_valid"),
+    symptom_duration: readFactor("symptom_duration")
+  };
 }
 
 function nullableString(value: unknown) {
