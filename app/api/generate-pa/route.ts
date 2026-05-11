@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
 import pdfParse from "pdf-parse";
+import { sanitizeLetterPlaceholders } from "@/lib/letter-placeholders";
 import type { ExtractedChartData } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+type RequestDetails = {
+  cptCode: string;
+  payerName: string;
+  providerName: string;
+  practiceName: string;
+};
 
 const extractionSystemPrompt =
   `You are a medical records analyst specializing in orthopedic prior authorization. Extract the following from the provided patient chart text and return ONLY valid JSON. Include these chart data keys: patient_name, date_of_birth, diagnosis_codes (array), primary_complaint, symptom_duration, functional_limitations (array of specific limitations mentioned), conservative_treatments_attempted (array), imaging_findings (object with modality and key findings), requested_procedure, surgical_approach_if_mentioned, denial_risk_flags (array of strings describing missing or weak elements that could cause denial). If information is not found, use null for strings and empty arrays for arrays, except conservative_treatments_attempted must follow the instruction below. After extracting all fields, also return a 'validation' object with hard_blocks and soft_warnings arrays. For hard_blocks, include any of these fields that are missing or null: patient_name, diagnosis_codes (if empty), requested_procedure. For soft_warnings, include any of these fields that are missing or null: surgical_approach_if_mentioned, imaging_findings, conservative_treatments_attempted (if empty), functional_limitations (if empty). Each block/warning object must have: {field, label, message}. Return the complete JSON including chart data and validation object.
@@ -19,7 +27,7 @@ dates: any specific dates mentioned for this treatment. Return null if not found
 Return a minimum of 1 treatment object. If no treatments are found at all, return a single object with treatment_name: Conservative treatment history not documented, duration: null, outcome: null, dates: null.`;
 
 const letterSystemPrompt =
-  "You are a prior authorization specialist with 15 years of experience winning approvals for orthopedic procedures. Using the structured patient data provided, write a compelling Letter of Medical Necessity. The letter must: (1) Open with patient demographics and the specific procedure requested with CPT code. (2) Establish the clinical presentation - chief complaint, duration, severity, and specific functional limitations using the patient's own documented measurements where available. (3) Document conservative care chronologically - every treatment tried, how long, and why it failed. Payers require proof that surgery is a last resort. (4) Reference imaging findings using precise medical language that directly supports the surgical indication. (5) State the specific procedure with anatomical detail - laterality, approach, implants if applicable. (6) Close with a statement of medical necessity referencing the patient's inability to maintain activities of daily living. Write in formal clinical language. Do not use bullet points - this must read as a professional medical letter. Flag any section where source data was insufficient with [REQUIRES PHYSICIAN REVIEW].";
+  "You are a prior authorization specialist with 15 years of experience winning approvals for orthopedic procedures. Using the structured patient data provided, write a compelling Letter of Medical Necessity. The letter must: (1) Open with patient demographics and the specific procedure requested with CPT code. (2) Establish the clinical presentation - chief complaint, duration, severity, and specific functional limitations using the patient's own documented measurements where available. (3) Document conservative care chronologically - every treatment tried, how long, and why it failed. Payers require proof that surgery is a last resort. (4) Reference imaging findings using precise medical language that directly supports the surgical indication. (5) State the specific procedure with anatomical detail - laterality, approach, implants if applicable. (6) Close with a statement of medical necessity referencing the patient's inability to maintain activities of daily living. End with a signature block containing the requesting provider name, MD, and the practice name from the request details. Write in formal clinical language. Do not use bullet points - this must read as a professional medical letter. If source data is insufficient, state that physician review is required without using square brackets.";
 
 export async function POST(request: Request) {
   try {
@@ -35,6 +43,7 @@ export async function POST(request: Request) {
     const cptCode = stringField(formData.get("cptCode"));
     const payerName = stringField(formData.get("payerName"));
     const providerName = stringField(formData.get("providerName"));
+    const practiceName = stringField(formData.get("practiceName")) || "Orthopedic Practice";
 
     if (!(chart instanceof File)) {
       return NextResponse.json({ error: "Upload a PDF chart before generating the packet." }, { status: 400 });
@@ -45,8 +54,9 @@ export async function POST(request: Request) {
     }
 
     const chartText = await extractPdfText(chart);
-    const extracted = await extractChartData(chartText, { cptCode, payerName, providerName });
-    const letter = await generateLetter(extracted, { cptCode, payerName, providerName });
+    const requestDetails = { cptCode, payerName, providerName, practiceName };
+    const extracted = await extractChartData(chartText, requestDetails);
+    const letter = await generateLetter(extracted, requestDetails);
 
     return NextResponse.json({ extracted, letter });
   } catch (error) {
@@ -87,7 +97,7 @@ async function extractPdfText(chart: File) {
 
 async function extractChartData(
   chartText: string,
-  requestDetails: { cptCode: string; payerName: string; providerName: string }
+  requestDetails: RequestDetails
 ) {
   const content = await callGroq({
     system: extractionSystemPrompt,
@@ -95,6 +105,7 @@ async function extractChartData(
 CPT code: ${requestDetails.cptCode}
 Insurance payer: ${requestDetails.payerName}
 Requesting provider: ${requestDetails.providerName}
+Practice name: ${requestDetails.practiceName}
 
 Patient chart text:
 ${chartText}`
@@ -106,10 +117,10 @@ ${chartText}`
 
 async function generateLetter(
   extracted: ExtractedChartData,
-  requestDetails: { cptCode: string; payerName: string; providerName: string }
+  requestDetails: RequestDetails
 ) {
   const { validation, ...chartDataOnly } = extracted as any;
-  return callGroq({
+  const letter = await callGroq({
     system: letterSystemPrompt,
     prompt: `Structured patient data:
 ${JSON.stringify(chartDataOnly, null, 2)}
@@ -117,7 +128,17 @@ ${JSON.stringify(chartDataOnly, null, 2)}
 Request details:
 CPT code: ${requestDetails.cptCode}
 Insurance payer: ${requestDetails.payerName}
-Requesting provider: ${requestDetails.providerName}`
+Requesting provider: ${requestDetails.providerName}
+Practice name: ${requestDetails.practiceName}`
+  });
+
+  return sanitizeLetterPlaceholders(letter, {
+    patientName: extracted.patient_name,
+    payerName: requestDetails.payerName,
+    providerName: requestDetails.providerName,
+    practiceName: requestDetails.practiceName,
+    cptCode: requestDetails.cptCode,
+    requestedProcedure: extracted.requested_procedure
   });
 }
 
@@ -187,7 +208,7 @@ function parseJsonObject(content: string) {
 
 function normalizeChartData(
   data: Record<string, unknown>,
-  requestDetails: { cptCode: string; payerName: string; providerName: string }
+  requestDetails: RequestDetails
 ): ExtractedChartData & { validation: any } {
   const imaging = isObject(data.imaging_findings) ? data.imaging_findings : null;
   const patientName = nullableString(data.patient_name);

@@ -8,6 +8,7 @@ type ReviewData = GeneratePaResponse & {
   cptCode: string;
   payerName: string;
   providerName: string;
+  practiceName?: string;
 };
 
 export default function ReviewPage() {
@@ -53,7 +54,8 @@ export default function ReviewPage() {
           letter,
           cptCode: data.cptCode,
           payerName: data.payerName,
-          providerName: data.providerName
+          providerName: data.providerName,
+          practiceName: data.practiceName
         })
       });
 

@@ -40,6 +40,7 @@ export default function UploadPage() {
   const [cptCode, setCptCode] = useState("");
   const [payerName, setPayerName] = useState("");
   const [providerName, setProviderName] = useState("");
+  const [practiceName, setPracticeName] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
@@ -110,6 +111,7 @@ export default function UploadPage() {
       formData.append("cptCode", cptCode.trim());
       formData.append("payerName", payerName.trim());
       formData.append("providerName", providerName.trim());
+      formData.append("practiceName", practiceName.trim());
 
       const response = await fetch("/api/generate-pa", {
         method: "POST",
@@ -128,7 +130,8 @@ export default function UploadPage() {
           ...(payload as GeneratePaResponse),
           cptCode: cptCode.trim(),
           payerName: payerName.trim(),
-          providerName: providerName.trim()
+          providerName: providerName.trim(),
+          practiceName: practiceName.trim()
         })
       );
       router.push("/review");
@@ -213,6 +216,14 @@ export default function UploadPage() {
                 placeholder="e.g. Jane Smith, MD"
                 disabled={isLoading}
               />
+              <Field
+                label="Practice name"
+                value={practiceName}
+                onChange={setPracticeName}
+                placeholder="e.g. NYU Langone Orthopedics"
+                disabled={isLoading}
+                optional
+              />
             </div>
 
             {error ? (
@@ -266,12 +277,20 @@ type FieldProps = {
   placeholder: string;
   disabled: boolean;
   children?: ReactNode;
+  optional?: boolean;
 };
 
-function Field({ label, value, onChange, placeholder, disabled, children }: FieldProps) {
+function Field({ label, value, onChange, placeholder, disabled, children, optional }: FieldProps) {
   return (
     <label className="block">
-      <span className="text-sm font-semibold text-slate-700">{label}</span>
+      <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+        {label}
+        {optional ? (
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+            Optional
+          </span>
+        ) : null}
+      </span>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}

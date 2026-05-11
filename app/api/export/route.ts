@@ -9,6 +9,7 @@ import {
   Paragraph,
   TextRun
 } from "docx";
+import { formatLetterDate, sanitizeLetterPlaceholders } from "@/lib/letter-placeholders";
 import type { ExtractedChartData } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -34,13 +35,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Letter, extracted chart data, and CPT code are required." }, { status: 400 });
     }
 
-    const patientName = body.extracted.patient_name ?? "[REQUIRES PHYSICIAN REVIEW]";
+    const patientName = body.extracted.patient_name ?? "Patient name not documented";
     const practiceName = body.practiceName?.trim() || "Orthopedic Practice";
-    const generatedDate = new Intl.DateTimeFormat("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric"
-    }).format(new Date());
+    const generatedDate = formatLetterDate(new Date());
+    const providerName = body.providerName?.trim() || "Requesting provider not documented";
+    const payerName = body.payerName?.trim() || "Payer not specified";
+    const sanitizedLetter = sanitizeLetterPlaceholders(body.letter, {
+      patientName: body.extracted.patient_name,
+      payerName,
+      providerName,
+      practiceName,
+      cptCode: body.cptCode,
+      requestedProcedure: body.extracted.requested_procedure
+    });
 
     const document = new Document({
       sections: [
@@ -54,11 +61,11 @@ export async function POST(request: Request) {
               patientName,
               generatedDate,
               cptCode: body.cptCode,
-              providerName: body.providerName ?? "[REQUIRES PHYSICIAN REVIEW]",
-              payerName: body.payerName ?? "[REQUIRES PHYSICIAN REVIEW]"
+              providerName,
+              payerName
             }),
             new Paragraph({ children: [new PageBreak()] }),
-            ...letterParagraphs(body.letter),
+            ...letterParagraphs(sanitizedLetter),
             new Paragraph({ children: [new PageBreak()] }),
             ...checklistPage()
           ]
@@ -149,7 +156,7 @@ function checklistPage() {
       (item) =>
         new Paragraph({
           spacing: { after: 240 },
-          children: [new TextRun({ text: `[ ] ${item}`, size: 24 })]
+          children: [new TextRun({ text: `Pending: ${item}`, size: 24 })]
         })
     )
   ];
