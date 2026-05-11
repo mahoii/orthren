@@ -2,6 +2,7 @@ export type ConservativeTreatment = {
   treatment: string | null;
   duration: string | null;
   outcome: string | null;
+  dates: string | null;
 };
 
 export type ImagingFindings = {

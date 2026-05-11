@@ -238,6 +238,7 @@ function Treatments({ treatments }: { treatments: ExtractedChartData["conservati
                 <p className="font-semibold italic text-slate-400">Unknown Treatment</p>
               )}
               <p className="text-slate-600">Duration: {treatment.duration ?? "Not found"}</p>
+              <p className="text-slate-600">Dates: {treatment.dates ?? "Not found"}</p>
               <div className="mt-1 flex items-center gap-2 text-slate-600">
                 <span>Outcome:</span>
                 <OutcomeBadge outcome={treatment.outcome} />
