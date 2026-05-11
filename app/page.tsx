@@ -195,8 +195,17 @@ export default function UploadPage() {
                       verify before continuing.
                     </p>
                     {cptWarning.closestMatch ? (
-                      <p className="mt-1 font-medium">
-                        Closest match: CPT {cptWarning.closestMatch.code} - {cptWarning.closestMatch.description}
+                      <p className="mt-1 flex items-center gap-3 font-medium">
+                        <span>
+                          Closest match: CPT {cptWarning.closestMatch.code} - {cptWarning.closestMatch.description}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setCptCode(cptWarning.closestMatch!.code)}
+                          className="ml-auto inline-flex items-center rounded-md bg-clinical-navy px-2 py-1 text-xs font-semibold text-white hover:bg-clinical-blue"
+                        >
+                          Use
+                        </button>
                       </p>
                     ) : null}
                   </div>
