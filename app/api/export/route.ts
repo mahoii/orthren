@@ -174,6 +174,11 @@ function disclaimerFooter() {
     children: [
       new Paragraph({
         alignment: AlignmentType.CENTER,
+        spacing: { after: 120 },
+        children: [new TextRun({ text: "Greenlit MD", size: 18, bold: true })]
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
         children: [new TextRun({ text: disclaimer, size: 18, italics: true })]
       })
     ]
