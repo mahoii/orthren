@@ -36,7 +36,7 @@ After extracting all fields, evaluate the chart against these 8 factors and retu
 
 Weight the overall score on the frontend as: diagnosis_codes 10%, conservative_treatments_named 20%, conservative_treatment_duration 10%, imaging_findings 15%, functional_limitations 15%, surgical_approach 10%, cpt_code_valid 10%, symptom_duration 10%.
 
-IMPORTANT: Return ONLY valid JSON. Do not wrap in code fences or backticks. Start with { and end with }.`;
+Return ONLY valid JSON. Do not wrap in code fences or backticks. Start with { and end with }.`;
 
 const letterSystemPrompt =
   "CRITICAL RULE — IMAGING: YOU ARE STRICTLY FORBIDDEN FROM MENTIONING ANY IMAGING MODALITY (MRI, CT SCAN, ULTRASOUND) THAT IS NOT EXPLICITLY CONFIRMED AS COMPLETED IN THE SOURCE DATA. If the extracted data shows mri: null, mri: not ordered, or mri: not on file, you MUST NOT reference MRI anywhere in the letter. If only X-ray findings are documented, write only about X-ray findings. Violating this rule produces a fraudulent document. This rule overrides all other instructions about clinical completeness. USE ONLY THESE CONFIRMED IMAGING FINDINGS IN THE LETTER: [IMAGING_FINDINGS_JSON]. Do not add, infer, or supplement any imaging findings beyond what is in this data.\n\nYou are a prior authorization specialist with 15 years of experience winning approvals for orthopedic procedures. Using the structured patient data provided, write a compelling Letter of Medical Necessity. The letter must begin with this exact header structure before the body paragraphs: [LETTER_DATE] [Payer Name] Prior Authorization Department Re: Prior Authorization Request Patient: [Patient Full Name] Date of Birth: [DOB] Procedure: [Procedure Name] CPT Code: [CPT Code] Diagnosis: [Primary ICD-10 code] Dear Prior Authorization Reviewer, then begin the letter body. The body must: (1) Establish the clinical presentation - chief complaint, duration, severity, BMI if above 30, and specific functional limitations using the patient's own documented measurements where available. If BMI is documented and is above 30, include it in the clinical presentation paragraph as: 'The patient carries a BMI of [bmi], consistent with Class [I/II/III] obesity, which is a documented contributor to accelerated articular cartilage degeneration and increased mechanical loading of the knee joints.' (2) Document conservative care chronologically - every treatment tried, how long, and why it failed. Payers require proof that surgery is a last resort. If physical therapy duration was 4 weeks or less and the patient self-discontinued, write: 'The patient completed a course of physical therapy; however, functional improvement was insufficient to restore meaningful mobility, and therapy was ultimately discontinued without achieving treatment goals.' Never use the phrase self-discontinued. Never frame self-discontinuation as patient non-compliance. (3) For imaging findings, you MUST only reference imaging studies that are explicitly documented in the extracted chart data. If a specific imaging modality (MRI, X-ray, CT) is listed as not ordered, not on file, or absent, you MUST NOT mention it in the letter. Instead, note only what IS documented. If no imaging is documented at all, write: 'Advanced imaging has been recommended to further evaluate the extent of joint degeneration.' Never invent or assume imaging that is not confirmed in the source data. When writing the imaging paragraph, use the exact findings from the extracted imaging_findings field. If Kellgren-Lawrence grading is present, write: 'Weight-bearing radiographs of the bilateral knees demonstrate Kellgren-Lawrence Grade [X] changes bilaterally, with [specific findings from chart].' Use the verbatim clinical values — never generalize or substitute. Always use the actual grading values and findings from the chart. (4) State the specific procedure with anatomical detail - laterality, approach, implants if applicable. If asa_classification is present, include in the surgical plan paragraph: 'Pre-operative evaluation has classified this patient as ASA [X], confirming surgical candidacy.' (5) Close with a statement of medical necessity referencing the patient's inability to maintain activities of daily living. Never use the phrase 'not documented', 'not on file', 'not recorded', 'are not recorded', 'is not recorded', 'duration and outcome are not', or 'exact duration and follow-up are not' in the generated letter. If information is missing for a specific treatment or finding, either omit that detail entirely from the narrative or use clinical language such as 'clinical response was noted' or 'treatment was discontinued.' The letter must read as a polished clinical document, not a data extraction report. The letter must end with exactly one signature block using this format: Sincerely, [Requesting Provider Name], MD [Practice Name] [Payer Prior Authorization Department]. Never repeat the signature block. Write in formal clinical language. Do not use bullet points. If source data is insufficient, state that physician review is required without using square brackets.";
@@ -155,7 +155,7 @@ async function extractChartData(
   chartText: string,
   requestDetails: RequestDetails
 ) {
-  const content = await callAnthropic({
+  const content = await callAnthropicWithRetry({
     system: extractionSystemPrompt,
     prompt: `Request details:
 CPT code: ${requestDetails.cptCode}
@@ -165,7 +165,7 @@ Practice name: ${requestDetails.practiceName}
 
 Patient chart text:
 ${chartText}`,
-    maxTokens: 1500,
+    maxTokens: 3000,
     useStructuredOutput: true
   });
 
@@ -199,7 +199,7 @@ async function generateLetter(
     .replace("[IMAGING_FINDINGS_JSON]", imagingFindingsJson);
 
   // Fix 3: Pass letter_date to prompt context
-  let letter = await callAnthropic({
+  let letter = await callAnthropicWithRetry({
     system: systemPromptWithContext,
     prompt: `Structured patient data:
 ${JSON.stringify(chartDataOnly, null, 2)}
@@ -390,7 +390,7 @@ const chartExtractionSchema = {
 async function callAnthropic({
   system,
   prompt,
-  maxTokens = 1500,
+  maxTokens = 2000,
   useStructuredOutput = false
 }: {
   system: string;
@@ -400,7 +400,7 @@ async function callAnthropic({
 }) {
   // Only allow valid Anthropic parameters
   const requestBody: Record<string, unknown> = {
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-6",
     max_tokens: maxTokens,
     system: system,
     messages: [
@@ -439,12 +439,12 @@ async function callAnthropic({
 }
 
 async function parseJsonObject(content: string) {
-  // Sanitize and parse JSON as required by Anthropic extraction
   try {
     const clean = content.replace(/```json|```/g, '').trim();
     return JSON.parse(clean) as Record<string, unknown>;
   } catch (err) {
-    console.error('JSON parse error:', err);
+    console.error('JSON parse error. Raw content received:');
+    console.error(content?.substring(0, 500));
     throw new Error('Failed to parse extraction response');
   }
 }
@@ -662,4 +662,21 @@ function partialNameMatch(first: string, second: string) {
   const normalizedFirst = first.toLowerCase();
   const normalizedSecond = second.toLowerCase();
   return normalizedFirst.includes(normalizedSecond) || normalizedSecond.includes(normalizedFirst);
+}
+
+async function callAnthropicWithRetry(params: Parameters<typeof callAnthropic>[0], retries = 2): Promise<string> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await callAnthropic(params);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '';
+      const isOverloaded = message.includes('overloaded_error') || message.includes('overloaded');
+      if (isOverloaded && attempt < retries) {
+        await new Promise((res) => setTimeout(res, 3000 * (attempt + 1)));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('Max retries exceeded');
 }

@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing chart context or factor name." }, { status: 400 });
     }
 
-    const content = await callAnthropic({
+    const content = await callAnthropicWithRetry({
       system: "You are a clinical documentation assistant.",
       prompt: `Based on this patient chart context: ${JSON.stringify(
         body.extracted
@@ -37,6 +37,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+  async function callAnthropicWithRetry(params: Parameters<typeof callAnthropic>[0], retries = 2): Promise<string> {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        return await callAnthropic(params);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : '';
+        const isOverloaded = message.includes('overloaded_error') || message.includes('overloaded');
+        if (isOverloaded && attempt < retries) {
+          await new Promise((res) => setTimeout(res, 3000 * (attempt + 1)));
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw new Error('Max retries exceeded');
+  }
 
 async function callAnthropic({
   system,
@@ -53,7 +70,7 @@ async function callAnthropic({
       "anthropic-version": "2023-06-01"
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 200,
       system,
       messages: [

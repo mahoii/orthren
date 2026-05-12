@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     }
 
     const { validation, pa_strength, ...chartDataOnly } = body.extracted as any;
-    const letter = await callAnthropic({
+    const letter = await callAnthropicWithRetry({
       system: letterSystemPrompt,
       prompt: `Structured patient data:
 ${JSON.stringify(chartDataOnly, null, 2)}
@@ -65,6 +65,23 @@ Practice name: ${body.requestDetails.practiceName}`,
   }
 }
 
+  async function callAnthropicWithRetry(params: Parameters<typeof callAnthropic>[0], retries = 2): Promise<string> {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        return await callAnthropic(params);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : '';
+        const isOverloaded = message.includes('overloaded_error') || message.includes('overloaded');
+        if (isOverloaded && attempt < retries) {
+          await new Promise((res) => setTimeout(res, 3000 * (attempt + 1)));
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw new Error('Max retries exceeded');
+  }
+
 async function callAnthropic({
   system,
   prompt,
@@ -75,9 +92,8 @@ async function callAnthropic({
   maxTokens?: number;
 }) {
   const requestBody = {
-    model: anthropicModel,
+    model: "claude-sonnet-4-6",
     max_tokens: maxTokens,
-    effort: "low",
     system: system,
     messages: [
       {
@@ -114,40 +130,4 @@ async function callAnthropic({
   }
 
   return text;
-    // Only allow valid Anthropic parameters
-    const requestBody = {
-      model: "claude-sonnet-4-20250514",
-      max_tokens: maxTokens,
-      system: system,
-      messages: [
-        {
-          role: "user",
-          content: prompt
-        }
-      ]
-    };
-
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify(requestBody)
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Anthropic API request failed. ${text}`);
-    }
-
-    const data = await response.json();
-    const text = data.content?.[0]?.text?.trim();
-
-    if (!text) {
-      throw new Error("Anthropic did not return a usable response.");
-    }
-
-    return text;
 }
