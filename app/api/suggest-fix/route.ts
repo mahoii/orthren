@@ -6,9 +6,9 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
-    if (!process.env.GROQ_API_KEY) {
+    if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
-        { error: "GROQ_API_KEY is not configured. Add it before generating a packet." },
+        { error: "ANTHROPIC_API_KEY is not configured. Add it before generating a packet." },
         { status: 500 }
       );
     }
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing chart context or factor name." }, { status: 400 });
     }
 
-    const content = await callGroq({
+    const content = await callAnthropic({
       system: "You are a clinical documentation assistant.",
       prompt: `Based on this patient chart context: ${JSON.stringify(
         body.extracted
@@ -36,27 +36,25 @@ export async function POST(request: Request) {
   }
 }
 
-async function callGroq({
+async function callAnthropic({
   system,
   prompt
 }: {
   system: string;
   prompt: string;
 }) {
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${process.env.GROQ_API_KEY}`
+      "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
+      "anthropic-version": "2023-06-01"
     },
     body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
+      model: process.env.ANTHROPIC_MODEL ?? "claude-3-5-sonnet-20241022",
       max_tokens: 200,
+      system,
       messages: [
-        {
-          role: "system",
-          content: system
-        },
         {
           role: "user",
           content: prompt
@@ -67,20 +65,18 @@ async function callGroq({
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Groq API request failed. ${text}`);
+    throw new Error(`Anthropic API request failed. ${text}`);
   }
 
   const data = (await response.json()) as {
-    choices?: Array<{
-      message?: {
-        content?: string;
-      };
+    content?: Array<{
+      text?: string;
     }>;
   };
-  const text = data.choices?.[0]?.message?.content?.trim();
+  const text = data.content?.[0]?.text?.trim();
 
   if (!text) {
-    throw new Error("Groq did not return a usable response.");
+    throw new Error("Anthropic did not return a usable response.");
   }
 
   return text;
