@@ -4,6 +4,8 @@ import type { ExtractedChartDataWithValidation } from "@/lib/types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const anthropicModel = "claude-sonnet-4-6";
+
 export async function POST(request: Request) {
   try {
     if (!process.env.ANTHROPIC_API_KEY) {
@@ -51,7 +53,7 @@ async function callAnthropic({
       "anthropic-version": "2023-06-01"
     },
     body: JSON.stringify({
-      model: process.env.ANTHROPIC_MODEL ?? "claude-3-5-sonnet-20241022",
+      model: "claude-sonnet-4-20250514",
       max_tokens: 200,
       system,
       messages: [
@@ -68,11 +70,7 @@ async function callAnthropic({
     throw new Error(`Anthropic API request failed. ${text}`);
   }
 
-  const data = (await response.json()) as {
-    content?: Array<{
-      text?: string;
-    }>;
-  };
+  const data = await response.json();
   const text = data.content?.[0]?.text?.trim();
 
   if (!text) {

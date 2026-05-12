@@ -5,6 +5,8 @@ import type { ExtractedChartDataWithValidation } from "@/lib/types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const anthropicModel = "claude-sonnet-4-6";
+
 const letterSystemPrompt =
   "You are a prior authorization specialist with 15 years of experience winning approvals for orthopedic procedures. Using the structured patient data provided, write a compelling Letter of Medical Necessity. The letter must: (1) Open with patient demographics and the specific procedure requested with CPT code. (2) Establish the clinical presentation - chief complaint, duration, severity, and specific functional limitations using the patient's own documented measurements where available. (3) Document conservative care chronologically - every treatment tried, how long, and why it failed. Payers require proof that surgery is a last resort. (4) Reference imaging findings using precise medical language that directly supports the surgical indication. (5) State the specific procedure with anatomical detail - laterality, approach, implants if applicable. (6) Close with a statement of medical necessity referencing the patient's inability to maintain activities of daily living. End with a signature block containing the requesting provider name, MD, and the practice name from the request details. Write in formal clinical language. Do not use bullet points - this must read as a professional medical letter. If source data is insufficient, state that physician review is required without using square brackets.";
 
@@ -43,7 +45,8 @@ Request details:
 CPT code: ${body.requestDetails.cptCode}
 Insurance payer: ${body.requestDetails.payerName}
 Requesting provider: ${body.requestDetails.providerName}
-Practice name: ${body.requestDetails.practiceName}`
+Practice name: ${body.requestDetails.practiceName}`,
+      maxTokens: 1500
     });
 
     const sanitized = sanitizeLetterPlaceholders(letter, {
@@ -64,11 +67,26 @@ Practice name: ${body.requestDetails.practiceName}`
 
 async function callAnthropic({
   system,
-  prompt
+  prompt,
+  maxTokens = 1500
 }: {
   system: string;
   prompt: string;
+  maxTokens?: number;
 }) {
+  const requestBody = {
+    model: anthropicModel,
+    max_tokens: maxTokens,
+    effort: "low",
+    system: system,
+    messages: [
+      {
+        role: "user",
+        content: prompt
+      }
+    ]
+  };
+
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -76,17 +94,7 @@ async function callAnthropic({
       "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
       "anthropic-version": "2023-06-01"
     },
-    body: JSON.stringify({
-      model: process.env.ANTHROPIC_MODEL ?? "claude-3-5-sonnet-20241022",
-      max_tokens: 2000,
-      system,
-      messages: [
-        {
-          role: "user",
-          content: prompt
-        }
-      ]
-    })
+    body: JSON.stringify(requestBody)
   });
 
   if (!response.ok) {
@@ -106,4 +114,40 @@ async function callAnthropic({
   }
 
   return text;
+    // Only allow valid Anthropic parameters
+    const requestBody = {
+      model: "claude-sonnet-4-20250514",
+      max_tokens: maxTokens,
+      system: system,
+      messages: [
+        {
+          role: "user",
+          content: prompt
+        }
+      ]
+    };
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Anthropic API request failed. ${text}`);
+    }
+
+    const data = await response.json();
+    const text = data.content?.[0]?.text?.trim();
+
+    if (!text) {
+      throw new Error("Anthropic did not return a usable response.");
+    }
+
+    return text;
 }

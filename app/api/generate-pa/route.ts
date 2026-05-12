@@ -8,6 +8,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const maxUploadSizeBytes = 10 * 1024 * 1024;
+const anthropicModel = "claude-sonnet-4-6";
 
 type RequestDetails = {
   cptCode: string;
@@ -31,29 +32,11 @@ Return a minimum of 1 treatment object. If no treatments are found at all, retur
 
 For denial_risk_flags, provide SPECIFIC, ACTIONABLE flags based on actual gaps in the documentation. Examples of GOOD flags: "Only 4 weeks of PT documented before requesting surgery - payers typically require 6-12 weeks", "No imaging provided to confirm diagnosis despite reported pain", "Conservative care dates incomplete - unclear if treatments were concurrent or sequential", "Single corticosteroid injection on [date] with no documented follow-up imaging or repeat treatment". Examples of BAD flags (too generic, avoid): "insufficient documentation of medical necessity", "missing pre-operative medical evaluation", "inadequate conservative care". Focus on: specific treatment durations, missing imaging modalities, unclear timelines, single attempts at treatment with no follow-up, gaps between dates that suggest inadequate trial periods.
 
-After extracting all fields, evaluate the chart against these 8 factors and return a score object called pa_strength with the following structure. For each factor, return a score of 0 or 1 (0 = missing or insufficient, 1 = present and adequate), and a one-sentence plain English note explaining the score:
-json{
-  "pa_strength": {
-    "diagnosis_codes": { "score": 0, "note": "..." },
-    "conservative_treatments_named": { "score": 0, "note": "..." },
-    "conservative_treatment_duration": { "score": 0, "note": "..." },
-    "imaging_findings": { "score": 0, "note": "..." },
-    "functional_limitations": { "score": 0, "note": "..." },
-    "surgical_approach": { "score": 0, "note": "..." },
-    "cpt_code_valid": { "score": 0, "note": "..." },
-    "symptom_duration": { "score": 0, "note": "..." }
-  }
-}
-Weight the overall score as follows when calculating the final 1-10 score on the frontend:
+After extracting all fields, evaluate the chart against these 8 factors and return a score object called pa_strength inside the JSON. For each factor, return a score of 0 or 1 (0 = missing or insufficient, 1 = present and adequate), and a one-sentence plain English note explaining the score. The pa_strength object must include: diagnosis_codes, conservative_treatments_named, conservative_treatment_duration, imaging_findings, functional_limitations, surgical_approach, cpt_code_valid, and symptom_duration. Each must be an object with score (0 or 1) and note (string).
 
-diagnosis_codes: 10%
-conservative_treatments_named: 20%
-conservative_treatment_duration: 10%
-imaging_findings: 15%
-functional_limitations: 15%
-surgical_approach: 10%
-cpt_code_valid: 10%
-symptom_duration: 10%`;
+Weight the overall score on the frontend as: diagnosis_codes 10%, conservative_treatments_named 20%, conservative_treatment_duration 10%, imaging_findings 15%, functional_limitations 15%, surgical_approach 10%, cpt_code_valid 10%, symptom_duration 10%.
+
+IMPORTANT: Return ONLY valid JSON. Do not wrap in code fences or backticks. Start with { and end with }.`;
 
 const letterSystemPrompt =
   "CRITICAL RULE — IMAGING: YOU ARE STRICTLY FORBIDDEN FROM MENTIONING ANY IMAGING MODALITY (MRI, CT SCAN, ULTRASOUND) THAT IS NOT EXPLICITLY CONFIRMED AS COMPLETED IN THE SOURCE DATA. If the extracted data shows mri: null, mri: not ordered, or mri: not on file, you MUST NOT reference MRI anywhere in the letter. If only X-ray findings are documented, write only about X-ray findings. Violating this rule produces a fraudulent document. This rule overrides all other instructions about clinical completeness. USE ONLY THESE CONFIRMED IMAGING FINDINGS IN THE LETTER: [IMAGING_FINDINGS_JSON]. Do not add, infer, or supplement any imaging findings beyond what is in this data.\n\nYou are a prior authorization specialist with 15 years of experience winning approvals for orthopedic procedures. Using the structured patient data provided, write a compelling Letter of Medical Necessity. The letter must begin with this exact header structure before the body paragraphs: [LETTER_DATE] [Payer Name] Prior Authorization Department Re: Prior Authorization Request Patient: [Patient Full Name] Date of Birth: [DOB] Procedure: [Procedure Name] CPT Code: [CPT Code] Diagnosis: [Primary ICD-10 code] Dear Prior Authorization Reviewer, then begin the letter body. The body must: (1) Establish the clinical presentation - chief complaint, duration, severity, BMI if above 30, and specific functional limitations using the patient's own documented measurements where available. If BMI is documented and is above 30, include it in the clinical presentation paragraph as: 'The patient carries a BMI of [bmi], consistent with Class [I/II/III] obesity, which is a documented contributor to accelerated articular cartilage degeneration and increased mechanical loading of the knee joints.' (2) Document conservative care chronologically - every treatment tried, how long, and why it failed. Payers require proof that surgery is a last resort. If physical therapy duration was 4 weeks or less and the patient self-discontinued, write: 'The patient completed a course of physical therapy; however, functional improvement was insufficient to restore meaningful mobility, and therapy was ultimately discontinued without achieving treatment goals.' Never use the phrase self-discontinued. Never frame self-discontinuation as patient non-compliance. (3) For imaging findings, you MUST only reference imaging studies that are explicitly documented in the extracted chart data. If a specific imaging modality (MRI, X-ray, CT) is listed as not ordered, not on file, or absent, you MUST NOT mention it in the letter. Instead, note only what IS documented. If no imaging is documented at all, write: 'Advanced imaging has been recommended to further evaluate the extent of joint degeneration.' Never invent or assume imaging that is not confirmed in the source data. When writing the imaging paragraph, use the exact findings from the extracted imaging_findings field. If Kellgren-Lawrence grading is present, write: 'Weight-bearing radiographs of the bilateral knees demonstrate Kellgren-Lawrence Grade [X] changes bilaterally, with [specific findings from chart].' Use the verbatim clinical values — never generalize or substitute. Always use the actual grading values and findings from the chart. (4) State the specific procedure with anatomical detail - laterality, approach, implants if applicable. If asa_classification is present, include in the surgical plan paragraph: 'Pre-operative evaluation has classified this patient as ASA [X], confirming surgical candidacy.' (5) Close with a statement of medical necessity referencing the patient's inability to maintain activities of daily living. Never use the phrase 'not documented', 'not on file', 'not recorded', 'are not recorded', 'is not recorded', 'duration and outcome are not', or 'exact duration and follow-up are not' in the generated letter. If information is missing for a specific treatment or finding, either omit that detail entirely from the narrative or use clinical language such as 'clinical response was noted' or 'treatment was discontinued.' The letter must read as a polished clinical document, not a data extraction report. The letter must end with exactly one signature block using this format: Sincerely, [Requesting Provider Name], MD [Practice Name] [Payer Prior Authorization Department]. Never repeat the signature block. Write in formal clinical language. Do not use bullet points. If source data is insufficient, state that physician review is required without using square brackets.";
@@ -181,10 +164,12 @@ Requesting provider: ${requestDetails.providerName}
 Practice name: ${requestDetails.practiceName}
 
 Patient chart text:
-${chartText}`
+${chartText}`,
+    maxTokens: 1500,
+    useStructuredOutput: true
   });
 
-  const parsed = parseJsonObject(content);
+  const parsed = await parseJsonObject(content);
   return normalizeChartData(parsed, requestDetails, chartText);
 }
 
@@ -226,8 +211,9 @@ Requesting provider: ${requestDetails.providerName}
 Practice name: ${requestDetails.practiceName}
 
 Letter date: ${today}
-${bmi ? `Patient BMI: ${bmi}` : ""}
-${asaClassification ? `ASA Classification: ${asaClassification}` : ""}`
+${bmi ? "Patient BMI: " + bmi : ""}
+${asaClassification ? "ASA Classification: " + asaClassification : ""}`,
+    maxTokens: 1500
   });
 
   // Fix 4: Remove duplicate signature blocks
@@ -289,13 +275,144 @@ function removeNotDocumentedLanguage(letter: string) {
   return letter;
 }
 
+const chartExtractionSchema = {
+  type: "object",
+  properties: {
+    patient_name: { type: ["string", "null"] },
+    date_of_birth: { type: ["string", "null"] },
+    diagnosis_codes: { type: "array", items: { type: "string" } },
+    primary_complaint: { type: ["string", "null"] },
+    symptom_duration: { type: ["string", "null"] },
+    functional_limitations: { type: "array", items: { type: "string" } },
+    conservative_treatments_attempted: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          treatment: { type: ["string", "null"] },
+          duration: { type: ["string", "null"] },
+          outcome: { type: ["string", "null"] },
+          dates: { type: ["string", "null"] }
+        },
+        required: ["treatment", "duration", "outcome", "dates"]
+      }
+    },
+    imaging_findings: {
+      type: ["object", "null"],
+      properties: {
+        modality: { type: ["string", "null"] },
+        key_findings: { type: ["string", "null"] }
+      }
+    },
+    requested_procedure: { type: ["string", "null"] },
+    surgical_approach_if_mentioned: { type: ["string", "null"] },
+    denial_risk_flags: { type: "array", items: { type: "string" } },
+    pa_strength: {
+      type: "object",
+      properties: {
+        diagnosis_codes: {
+          type: "object",
+          properties: { score: { enum: [0, 1] }, note: { type: "string" } },
+          required: ["score", "note"]
+        },
+        conservative_treatments_named: {
+          type: "object",
+          properties: { score: { enum: [0, 1] }, note: { type: "string" } },
+          required: ["score", "note"]
+        },
+        conservative_treatment_duration: {
+          type: "object",
+          properties: { score: { enum: [0, 1] }, note: { type: "string" } },
+          required: ["score", "note"]
+        },
+        imaging_findings: {
+          type: "object",
+          properties: { score: { enum: [0, 1] }, note: { type: "string" } },
+          required: ["score", "note"]
+        },
+        functional_limitations: {
+          type: "object",
+          properties: { score: { enum: [0, 1] }, note: { type: "string" } },
+          required: ["score", "note"]
+        },
+        surgical_approach: {
+          type: "object",
+          properties: { score: { enum: [0, 1] }, note: { type: "string" } },
+          required: ["score", "note"]
+        },
+        cpt_code_valid: {
+          type: "object",
+          properties: { score: { enum: [0, 1] }, note: { type: "string" } },
+          required: ["score", "note"]
+        },
+        symptom_duration: {
+          type: "object",
+          properties: { score: { enum: [0, 1] }, note: { type: "string" } },
+          required: ["score", "note"]
+        }
+      },
+      required: ["diagnosis_codes", "conservative_treatments_named", "conservative_treatment_duration", "imaging_findings", "functional_limitations", "surgical_approach", "cpt_code_valid", "symptom_duration"]
+    },
+    validation: {
+      type: "object",
+      properties: {
+        hard_blocks: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              field: { type: "string" },
+              label: { type: "string" },
+              message: { type: "string" }
+            },
+            required: ["field", "label", "message"]
+          }
+        },
+        soft_warnings: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              field: { type: "string" },
+              label: { type: "string" },
+              message: { type: "string" }
+            },
+            required: ["field", "label", "message"]
+          }
+        }
+      },
+      required: ["hard_blocks", "soft_warnings"]
+    }
+  },
+  required: ["patient_name", "date_of_birth", "diagnosis_codes", "primary_complaint", "symptom_duration", "functional_limitations", "conservative_treatments_attempted", "imaging_findings", "requested_procedure", "surgical_approach_if_mentioned", "denial_risk_flags", "pa_strength", "validation"]
+};
+
 async function callAnthropic({
   system,
-  prompt
+  prompt,
+  maxTokens = 1500,
+  useStructuredOutput = false
 }: {
   system: string;
   prompt: string;
+  maxTokens?: number;
+  useStructuredOutput?: boolean;
 }) {
+  // Only allow valid Anthropic parameters
+  const requestBody: Record<string, unknown> = {
+    model: "claude-sonnet-4-20250514",
+    max_tokens: maxTokens,
+    system: system,
+    messages: [
+      {
+        role: "user",
+        content: prompt
+      }
+    ]
+  };
+
+  // No extra parameters allowed
+
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -303,17 +420,7 @@ async function callAnthropic({
       "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
       "anthropic-version": "2023-06-01"
     },
-    body: JSON.stringify({
-      model: process.env.ANTHROPIC_MODEL ?? "claude-3-5-sonnet-20241022",
-      max_tokens: 2000,
-      system,
-      messages: [
-        {
-          role: "user",
-          content: prompt
-        }
-      ]
-    })
+    body: JSON.stringify(requestBody)
   });
 
   if (!response.ok) {
@@ -321,11 +428,7 @@ async function callAnthropic({
     throw new Error(`Anthropic API request failed. ${text}`);
   }
 
-  const data = (await response.json()) as {
-    content?: Array<{
-      text?: string;
-    }>;
-  };
+  const data = await response.json();
   const text = data.content?.[0]?.text?.trim();
 
   if (!text) {
@@ -335,18 +438,24 @@ async function callAnthropic({
   return text;
 }
 
-function parseJsonObject(content: string) {
+async function parseJsonObject(content: string) {
+  // Sanitize and parse JSON as required by Anthropic extraction
   try {
-    return JSON.parse(content) as Record<string, unknown>;
-  } catch {
-    const match = content.match(/\{[\s\S]*\}/);
-
-    if (!match) {
-      throw new Error("Anthropic did not return valid chart extraction JSON.");
-    }
-
-    return JSON.parse(match[0]) as Record<string, unknown>;
+    const clean = content.replace(/```json|```/g, '').trim();
+    return JSON.parse(clean) as Record<string, unknown>;
+  } catch (err) {
+    console.error('JSON parse error:', err);
+    throw new Error('Failed to parse extraction response');
   }
+}
+
+function cleanJsonContent(content: string): string {
+  return content
+    .trim()
+    .replace(/^[\s`]*(?:json)?[\s`]*/, "")
+    .replace(/[\s`]*$/, "")
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, " ")
+    .trim();
 }
 
 function normalizeChartData(
