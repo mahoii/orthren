@@ -25,6 +25,16 @@ type Suggestions = Partial<Record<PaStrengthFactorKey, string>>;
 
 type SuggestionLoading = Partial<Record<PaStrengthFactorKey, boolean>>;
 
+type SidebarTab = "pa-score" | "chart-data" | "denial-risks";
+
+type SidebarTabButtonProps = {
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+  badge?: string;
+  dotColor?: string;
+};
+
 const paStrengthWeights: Record<PaStrengthFactorKey, number> = {
   diagnosis_codes: 10,
   conservative_treatments_named: 20,
@@ -95,6 +105,19 @@ export default function ReviewPage() {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [animatedScorePercent, setAnimatedScorePercent] = useState(0);
+  const [activeTab, setActiveTab] = useState<SidebarTab>("pa-score");
+  const [tabScrollPositions, setTabScrollPositions] = useState<Record<SidebarTab, number>>({
+    "pa-score": 0,
+    "chart-data": 0,
+    "denial-risks": 0
+  });
+  const [tabScrollMetrics, setTabScrollMetrics] = useState<Record<SidebarTab, { scrollTop: number; scrollHeight: number; clientHeight: number }>>({
+    "pa-score": { scrollTop: 0, scrollHeight: 0, clientHeight: 0 },
+    "chart-data": { scrollTop: 0, scrollHeight: 0, clientHeight: 0 },
+    "denial-risks": { scrollTop: 0, scrollHeight: 0, clientHeight: 0 }
+  });
+  const tabContentRef = useRef<HTMLDivElement | null>(null);
+  const [tabContentOpacity, setTabContentOpacity] = useState(1);
   const hasAnimatedScoreRef = useRef(false);
 
   useEffect(() => {
@@ -148,6 +171,22 @@ export default function ReviewPage() {
     return () => window.clearTimeout(timeout);
   }, [toast]);
 
+  useEffect(() => {
+    const tabContent = tabContentRef.current;
+    if (!tabContent) {
+      return;
+    }
+
+    tabContent.scrollTop = tabScrollPositions[activeTab] ?? 0;
+  }, [activeTab, tabScrollPositions]);
+
+  useEffect(() => {
+    setTabContentOpacity(0);
+    const frame = window.requestAnimationFrame(() => setTabContentOpacity(1));
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeTab]);
+
   function updateManualFix(key: PaStrengthFactorKey, value: string, source: ManualFix["source"] = "manual") {
     const trimmed = value.trim();
     setManualFixes((current) => ({
@@ -158,6 +197,19 @@ export default function ReviewPage() {
         source
       }
     }));
+  }
+
+  function handleTabChange(nextTab: SidebarTab) {
+    const tabContent = tabContentRef.current;
+
+    if (tabContent) {
+      setTabScrollPositions((current) => ({
+        ...current,
+        [activeTab]: tabContent.scrollTop
+      }));
+    }
+
+    setActiveTab(nextTab);
   }
 
   async function handleSuggestFix(key: PaStrengthFactorKey, label: string) {
@@ -322,8 +374,13 @@ export default function ReviewPage() {
   return (
     <main className="min-h-[calc(100vh-3.5rem)] bg-[#F8F9FB]">
       {toast ? (
-        <div className="fixed right-6 top-6 z-50 rounded-md border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-lg">
-          {toast}
+        <div className="fixed right-6 top-6 z-50 flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-lg">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-100 text-green-700" aria-hidden="true">
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none">
+              <path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </span>
+          <span>{toast}</span>
         </div>
       ) : null}
       <header className="border-b border-clinical-line bg-white">
@@ -351,8 +408,54 @@ export default function ReviewPage() {
       </header>
 
       <div className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[360px_1fr]">
-        <aside className="space-y-6 rounded-lg border border-[#E2E8F0] bg-white p-5">
-          <section className="rounded-lg border border-slate-200 bg-slate-50/80 p-4">
+        <aside className="order-2 min-w-0 space-y-4 rounded-lg border border-[#E2E8F0] bg-white p-4 lg:order-1 lg:space-y-6 lg:p-5">
+          <div className="rounded-2xl bg-[#F1F5F9] p-1 shadow-inner lg:rounded-full">
+            <div className="grid gap-1 md:grid-cols-3">
+              <SidebarTabButton
+                label="PA Score"
+                isActive={activeTab === "pa-score"}
+                onClick={() => handleTabChange("pa-score")}
+                badge={scoreLabel.split("/")[0].trim()}
+              />
+              <SidebarTabButton
+                label="Chart Data"
+                isActive={activeTab === "chart-data"}
+                onClick={() => handleTabChange("chart-data")}
+              />
+              <SidebarTabButton
+                label="Denial Risks"
+                isActive={activeTab === "denial-risks"}
+                onClick={() => handleTabChange("denial-risks")}
+                dotColor={data.extracted.denial_risk_flags.length ? "#DC2626" : "#16A34A"}
+              />
+            </div>
+          </div>
+
+          <div
+            ref={tabContentRef}
+            onScroll={(event) => {
+              const target = event.currentTarget;
+              setTabScrollPositions((current) => ({ ...current, [activeTab]: target.scrollTop }));
+                setTabScrollMetrics((current) => ({
+                  ...current,
+                  [activeTab]: {
+                    scrollTop: target.scrollTop,
+                    scrollHeight: target.scrollHeight,
+                    clientHeight: target.clientHeight
+                  }
+                }));
+            }}
+            className="relative min-h-[420px] max-h-[calc(100vh-14rem)] overflow-y-auto pr-1"
+          >
+            <div
+              className={`pointer-events-none sticky top-0 z-10 h-8 bg-gradient-to-b from-white via-white/85 to-transparent transition-opacity duration-150 ${
+                tabScrollMetrics[activeTab].scrollTop > 0 ? "opacity-100" : "opacity-0"
+              }`}
+              aria-hidden="true"
+            />
+            <div className="transition-opacity duration-150 ease-out" style={{ opacity: tabContentOpacity }}>
+              {activeTab === "pa-score" ? (
+                <section className="rounded-lg border border-slate-200 bg-slate-50/80 p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">PA Strength Score</p>
@@ -479,70 +582,84 @@ export default function ReviewPage() {
                   );
                 })}
               </div>
-              <button
-                type="button"
-                onClick={handleRegenerateLetter}
-                disabled={isRegenerating}
-                className="mt-4 w-full rounded-md bg-clinical-navy px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-clinical-blue disabled:bg-slate-300"
-              >
-                {isRegenerating ? "Regenerating..." : "Regenerate letter with fixes"}
-              </button>
             </div>
+            <button
+              type="button"
+              onClick={handleRegenerateLetter}
+              disabled={isRegenerating}
+              className="mt-4 w-full rounded-md bg-clinical-navy px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-clinical-blue disabled:bg-slate-300"
+            >
+              {isRegenerating ? "Regenerating..." : "Regenerate letter with fixes"}
+            </button>
           </section>
-          <section>
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-base font-semibold text-clinical-navy">Chart data we found</h2>
-              {missingFields.length ? <WarningBadge>{missingFields.length} missing</WarningBadge> : null}
+              ) : null}
+              {activeTab === "chart-data" ? (
+                <section>
+                  <div className="flex items-start justify-between gap-3">
+                    <h2 className="text-base font-semibold text-clinical-navy">Chart data we found</h2>
+                    {missingFields.length ? <WarningBadge>{missingFields.length} missing</WarningBadge> : null}
+                  </div>
+                  <div className="mt-5 space-y-4">
+                    <DataRow label="Patient name" value={data.extracted.patient_name} />
+                    <DataRow label="Date of birth" value={data.extracted.date_of_birth} />
+                    <DataRow label="Diagnosis codes" value={data.extracted.diagnosis_codes} />
+                    <DataRow label="Primary complaint" value={data.extracted.primary_complaint} />
+                    <DataRow label="Symptom duration" value={data.extracted.symptom_duration} />
+                    <DataRow label="Requested procedure" value={data.extracted.requested_procedure} />
+                    <DataRow label="Surgical approach" value={data.extracted.surgical_approach_if_mentioned} />
+                    <DataRow
+                      label="Imaging findings"
+                      value={
+                        data.extracted.imaging_findings
+                          ? `${data.extracted.imaging_findings.modality ?? "Unknown modality"}: ${
+                              data.extracted.imaging_findings.key_findings ?? "Missing findings"
+                            }`
+                          : null
+                      }
+                    />
+                    <DataRow label="Functional limitations" value={data.extracted.functional_limitations} />
+                    <Treatments treatments={data.extracted.conservative_treatments_attempted} />
+                  </div>
+                </section>
+              ) : null}
+              {activeTab === "denial-risks" ? (
+                <section className="rounded-lg border border-red-200 border-l-4 border-l-[#EF4444] bg-[#FEF2F2] p-5">
+                  <h2 className="text-base font-semibold text-red-900">Denial Risk</h2>
+                  {data.extracted.denial_risk_flags.length ? (
+                    <ul className="mt-4 space-y-3">
+                      {data.extracted.denial_risk_flags.map((flag) => (
+                        <li
+                          key={flag}
+                          className="flex gap-3 rounded-md border border-red-100 bg-white px-3 py-3 text-sm leading-5 text-red-800 shadow-sm"
+                        >
+                          <span
+                            className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-100 text-xs font-bold text-[#EF4444]"
+                            aria-hidden="true"
+                          >
+                            !
+                          </span>
+                          <span>{flag}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-3 text-sm text-red-800">No denial risk flags were returned from extraction.</p>
+                  )}
+                </section>
+              ) : null}
             </div>
-            <div className="mt-5 space-y-4">
-              <DataRow label="Patient name" value={data.extracted.patient_name} />
-              <DataRow label="Date of birth" value={data.extracted.date_of_birth} />
-              <DataRow label="Diagnosis codes" value={data.extracted.diagnosis_codes} />
-              <DataRow label="Primary complaint" value={data.extracted.primary_complaint} />
-              <DataRow label="Symptom duration" value={data.extracted.symptom_duration} />
-              <DataRow label="Requested procedure" value={data.extracted.requested_procedure} />
-              <DataRow label="Surgical approach" value={data.extracted.surgical_approach_if_mentioned} />
-              <DataRow
-                label="Imaging findings"
-                value={
-                  data.extracted.imaging_findings
-                    ? `${data.extracted.imaging_findings.modality ?? "Unknown modality"}: ${
-                        data.extracted.imaging_findings.key_findings ?? "Missing findings"
-                      }`
-                    : null
-                }
-              />
-              <DataRow label="Functional limitations" value={data.extracted.functional_limitations} />
-              <Treatments treatments={data.extracted.conservative_treatments_attempted} />
-            </div>
-          </section>
-
-          <section className="rounded-lg border border-red-200 border-l-4 border-l-[#EF4444] bg-[#FEF2F2] p-5">
-            <h2 className="text-base font-semibold text-red-900">Denial Risk</h2>
-            {data.extracted.denial_risk_flags.length ? (
-              <ul className="mt-4 space-y-3">
-                {data.extracted.denial_risk_flags.map((flag) => (
-                  <li
-                    key={flag}
-                    className="flex gap-3 rounded-md border border-red-100 bg-white px-3 py-3 text-sm leading-5 text-red-800 shadow-sm"
-                  >
-                    <span
-                      className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-100 text-xs font-bold text-[#EF4444]"
-                      aria-hidden="true"
-                    >
-                      !
-                    </span>
-                    <span>{flag}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-3 text-sm text-red-800">No denial risk flags were returned from extraction.</p>
-            )}
-          </section>
+            <div
+              className={`pointer-events-none sticky bottom-0 z-10 h-10 bg-gradient-to-t from-white via-white/85 to-transparent transition-opacity duration-150 ${
+                tabScrollMetrics[activeTab].scrollHeight > tabScrollMetrics[activeTab].clientHeight + tabScrollMetrics[activeTab].scrollTop
+                  ? "opacity-100"
+                  : "opacity-0"
+              }`}
+              aria-hidden="true"
+            />
+          </div>
         </aside>
 
-        <section className="rounded-lg border border-clinical-line bg-white p-5 shadow-sm">
+        <section className="order-1 rounded-lg border border-clinical-line bg-white p-5 shadow-sm lg:order-2">
           <div className="flex flex-col gap-2 border-b border-clinical-line pb-4 md:flex-row md:items-end md:justify-between">
             <div>
               <h2 className="text-base font-semibold text-clinical-navy">Editable letter draft</h2>
@@ -649,6 +766,30 @@ function WarningBadge({ children }: { children: React.ReactNode }) {
   return <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-700">{children}</span>;
 }
 
+function SidebarTabButton({ label, isActive, onClick, badge, dotColor }: SidebarTabButtonProps) {
+  const badgeText = badge ?? null;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center justify-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition duration-150 ${
+        isActive
+          ? "border-white bg-white text-[#1E3A5F] shadow-[0_8px_20px_rgba(15,23,42,0.12)]"
+          : "border-transparent bg-transparent text-[#94A3B8] hover:bg-white/70 hover:text-slate-600"
+      }`}
+    >
+      <span>{label}</span>
+      {badgeText ? (
+        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${getScoreBadgeClass(Number(badgeText))}`}>
+          {badgeText}
+        </span>
+      ) : null}
+      {dotColor ? <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: dotColor }} aria-hidden="true" /> : null}
+    </button>
+  );
+}
+
 function findMissingFields(extracted: ExtractedChartData) {
   const missing: string[] = [];
   const fields: Array<[string, string | string[] | null]> = [
@@ -736,6 +877,17 @@ function getScoreBarClass(score: number) {
     return "bg-[#D97706]";
   }
   return "bg-[#DC2626]";
+}
+
+function getScoreBadgeClass(score: number) {
+  const color = getScoreColor(score);
+  if (color === "green") {
+    return "bg-green-50 text-[#16A34A]";
+  }
+  if (color === "amber") {
+    return "bg-amber-50 text-[#D97706]";
+  }
+  return "bg-red-50 text-[#DC2626]";
 }
 
 function getScoreDescriptor(score: number) {

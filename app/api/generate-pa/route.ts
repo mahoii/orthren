@@ -56,13 +56,13 @@ cpt_code_valid: 10%
 symptom_duration: 10%`;
 
 const letterSystemPrompt =
-  "You are a prior authorization specialist with 15 years of experience winning approvals for orthopedic procedures. Using the structured patient data provided, write a compelling Letter of Medical Necessity. The letter must: (1) Open with patient demographics and the specific procedure requested with CPT code. (2) Establish the clinical presentation - chief complaint, duration, severity, and specific functional limitations using the patient's own documented measurements where available. (3) Document conservative care chronologically - every treatment tried, how long, and why it failed. Payers require proof that surgery is a last resort. (4) Reference imaging findings using precise medical language that directly supports the surgical indication. (5) State the specific procedure with anatomical detail - laterality, approach, implants if applicable. (6) Close with a statement of medical necessity referencing the patient's inability to maintain activities of daily living. End with a signature block containing the requesting provider name, MD, and the practice name from the request details. Write in formal clinical language. Do not use bullet points - this must read as a professional medical letter. If source data is insufficient, state that physician review is required without using square brackets.";
+  "CRITICAL RULE — IMAGING: YOU ARE STRICTLY FORBIDDEN FROM MENTIONING ANY IMAGING MODALITY (MRI, CT SCAN, ULTRASOUND) THAT IS NOT EXPLICITLY CONFIRMED AS COMPLETED IN THE SOURCE DATA. If the extracted data shows mri: null, mri: not ordered, or mri: not on file, you MUST NOT reference MRI anywhere in the letter. If only X-ray findings are documented, write only about X-ray findings. Violating this rule produces a fraudulent document. This rule overrides all other instructions about clinical completeness. USE ONLY THESE CONFIRMED IMAGING FINDINGS IN THE LETTER: [IMAGING_FINDINGS_JSON]. Do not add, infer, or supplement any imaging findings beyond what is in this data.\n\nYou are a prior authorization specialist with 15 years of experience winning approvals for orthopedic procedures. Using the structured patient data provided, write a compelling Letter of Medical Necessity. The letter must begin with this exact header structure before the body paragraphs: [LETTER_DATE] [Payer Name] Prior Authorization Department Re: Prior Authorization Request Patient: [Patient Full Name] Date of Birth: [DOB] Procedure: [Procedure Name] CPT Code: [CPT Code] Diagnosis: [Primary ICD-10 code] Dear Prior Authorization Reviewer, then begin the letter body. The body must: (1) Establish the clinical presentation - chief complaint, duration, severity, BMI if above 30, and specific functional limitations using the patient's own documented measurements where available. If BMI is documented and is above 30, include it in the clinical presentation paragraph as: 'The patient carries a BMI of [bmi], consistent with Class [I/II/III] obesity, which is a documented contributor to accelerated articular cartilage degeneration and increased mechanical loading of the knee joints.' (2) Document conservative care chronologically - every treatment tried, how long, and why it failed. Payers require proof that surgery is a last resort. If physical therapy duration was 4 weeks or less and the patient self-discontinued, write: 'The patient completed a course of physical therapy; however, functional improvement was insufficient to restore meaningful mobility, and therapy was ultimately discontinued without achieving treatment goals.' Never use the phrase self-discontinued. Never frame self-discontinuation as patient non-compliance. (3) For imaging findings, you MUST only reference imaging studies that are explicitly documented in the extracted chart data. If a specific imaging modality (MRI, X-ray, CT) is listed as not ordered, not on file, or absent, you MUST NOT mention it in the letter. Instead, note only what IS documented. If no imaging is documented at all, write: 'Advanced imaging has been recommended to further evaluate the extent of joint degeneration.' Never invent or assume imaging that is not confirmed in the source data. When writing the imaging paragraph, use the exact findings from the extracted imaging_findings field. If Kellgren-Lawrence grading is present, write: 'Weight-bearing radiographs of the bilateral knees demonstrate Kellgren-Lawrence Grade [X] changes bilaterally, with [specific findings from chart].' Use the verbatim clinical values — never generalize or substitute. Always use the actual grading values and findings from the chart. (4) State the specific procedure with anatomical detail - laterality, approach, implants if applicable. If asa_classification is present, include in the surgical plan paragraph: 'Pre-operative evaluation has classified this patient as ASA [X], confirming surgical candidacy.' (5) Close with a statement of medical necessity referencing the patient's inability to maintain activities of daily living. Never use the phrase 'not documented', 'not on file', 'not recorded', 'are not recorded', 'is not recorded', 'duration and outcome are not', or 'exact duration and follow-up are not' in the generated letter. If information is missing for a specific treatment or finding, either omit that detail entirely from the narrative or use clinical language such as 'clinical response was noted' or 'treatment was discontinued.' The letter must read as a polished clinical document, not a data extraction report. The letter must end with exactly one signature block using this format: Sincerely, [Requesting Provider Name], MD [Practice Name] [Payer Prior Authorization Department]. Never repeat the signature block. Write in formal clinical language. Do not use bullet points. If source data is insufficient, state that physician review is required without using square brackets.";
 
 export async function POST(request: Request) {
   try {
-    if (!process.env.GROQ_API_KEY) {
+    if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
-        { error: "GROQ_API_KEY is not configured. Add it before generating a packet." },
+        { error: "ANTHROPIC_API_KEY is not configured. Add it before generating a packet." },
         { status: 500 }
       );
     }
@@ -172,7 +172,7 @@ async function extractChartData(
   chartText: string,
   requestDetails: RequestDetails
 ) {
-  const content = await callGroq({
+  const content = await callAnthropic({
     system: extractionSystemPrompt,
     prompt: `Request details:
 CPT code: ${requestDetails.cptCode}
@@ -185,7 +185,7 @@ ${chartText}`
   });
 
   const parsed = parseJsonObject(content);
-  return normalizeChartData(parsed, requestDetails);
+  return normalizeChartData(parsed, requestDetails, chartText);
 }
 
 async function generateLetter(
@@ -193,8 +193,29 @@ async function generateLetter(
   requestDetails: RequestDetails
 ) {
   const { validation, pa_strength, ...chartDataOnly } = extracted as any;
-  const letter = await callGroq({
-    system: letterSystemPrompt,
+
+  // Fix 3: Generate today's date programmatically
+  const today = new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric"
+  });
+
+  // Fix 7: Extract BMI and ASA from extracted data for injection
+  const bmi = (chartDataOnly as any).bmi || null;
+  const asaClassification = (chartDataOnly as any).asa_classification || null;
+
+  // Build imaging findings JSON string for injection
+  const imagingFindingsJson = JSON.stringify(extracted.imaging_findings || null);
+
+  // Build the system prompt with injected values
+  const systemPromptWithContext = letterSystemPrompt
+    .replace("[LETTER_DATE]", today)
+    .replace("[IMAGING_FINDINGS_JSON]", imagingFindingsJson);
+
+  // Fix 3: Pass letter_date to prompt context
+  let letter = await callAnthropic({
+    system: systemPromptWithContext,
     prompt: `Structured patient data:
 ${JSON.stringify(chartDataOnly, null, 2)}
 
@@ -202,8 +223,18 @@ Request details:
 CPT code: ${requestDetails.cptCode}
 Insurance payer: ${requestDetails.payerName}
 Requesting provider: ${requestDetails.providerName}
-Practice name: ${requestDetails.practiceName}`
+Practice name: ${requestDetails.practiceName}
+
+Letter date: ${today}
+${bmi ? `Patient BMI: ${bmi}` : ""}
+${asaClassification ? `ASA Classification: ${asaClassification}` : ""}`
   });
+
+  // Fix 4: Remove duplicate signature blocks
+  letter = removeDuplicateSignatureBlocks(letter);
+
+  // Fix 5: Remove "not documented" language and sentences containing it
+  letter = removeNotDocumentedLanguage(letter);
 
   return sanitizeLetterPlaceholders(letter, {
     patientName: extracted.patient_name,
@@ -215,27 +246,68 @@ Practice name: ${requestDetails.practiceName}`
   });
 }
 
-async function callGroq({
+// Fix 4: Remove duplicate signature blocks
+function removeDuplicateSignatureBlocks(letter: string) {
+  const signaturePattern = /Sincerely,[\s\S]*?MD[\s\S]*?(?=Sincerely,|$)/gi;
+  const matches = letter.match(signaturePattern);
+
+  if (matches && matches.length > 1) {
+    // Remove all signature blocks first
+    letter = letter.replace(signaturePattern, "");
+    // Add back only the last one
+    letter = letter + "\n" + matches[matches.length - 1];
+  }
+
+  return letter;
+}
+
+// Fix 5: Remove "not documented" language and sentences containing it
+function removeNotDocumentedLanguage(letter: string) {
+  const phrases = [
+    "not documented",
+    "not well-documented",
+    "not recorded",
+    "not on file",
+    "are not recorded",
+    "is not recorded",
+    "duration and outcome are not",
+    "exact duration and follow-up are not"
+  ];
+
+  // First pass: replace phrases with placeholder
+  phrases.forEach((phrase) => {
+    letter = letter.replace(new RegExp(phrase, "gi"), "was not available for review");
+  });
+
+  // Second pass: remove entire sentences containing "was not available for review"
+  // Match sentences that start with capital letter and end with period
+  letter = letter.replace(/[^.!?]*was not available for review[^.!?]*[.!?]/gi, "");
+
+  // Clean up any resulting double spaces or weird punctuation
+  letter = letter.replace(/\s+/g, " ").replace(/\s+([.!?,])/g, "$1");
+
+  return letter;
+}
+
+async function callAnthropic({
   system,
   prompt
 }: {
   system: string;
   prompt: string;
 }) {
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${process.env.GROQ_API_KEY}`
+      "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
+      "anthropic-version": "2023-06-01"
     },
     body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
+      model: "claude-sonnet-4-20250514",
       max_tokens: 2000,
+      system,
       messages: [
-        {
-          role: "system",
-          content: system
-        },
         {
           role: "user",
           content: prompt
@@ -246,20 +318,18 @@ async function callGroq({
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Groq API request failed. ${text}`);
+    throw new Error(`Anthropic API request failed. ${text}`);
   }
 
   const data = (await response.json()) as {
-    choices?: Array<{
-      message?: {
-        content?: string;
-      };
+    content?: Array<{
+      text?: string;
     }>;
   };
-  const text = data.choices?.[0]?.message?.content?.trim();
+  const text = data.content?.[0]?.text?.trim();
 
   if (!text) {
-    throw new Error("Groq did not return a usable response.");
+    throw new Error("Anthropic did not return a usable response.");
   }
 
   return text;
@@ -272,7 +342,7 @@ function parseJsonObject(content: string) {
     const match = content.match(/\{[\s\S]*\}/);
 
     if (!match) {
-      throw new Error("Groq did not return valid chart extraction JSON.");
+      throw new Error("Anthropic did not return valid chart extraction JSON.");
     }
 
     return JSON.parse(match[0]) as Record<string, unknown>;
@@ -281,7 +351,8 @@ function parseJsonObject(content: string) {
 
 function normalizeChartData(
   data: Record<string, unknown>,
-  requestDetails: RequestDetails
+  requestDetails: RequestDetails,
+  chartText: string
 ): ExtractedChartData & { validation: any } {
   const imaging = isObject(data.imaging_findings) ? data.imaging_findings : null;
   const patientName = nullableString(data.patient_name);
@@ -304,6 +375,8 @@ function normalizeChartData(
 
   const hard_blocks: any[] = [];
   const soft_warnings: any[] = [];
+  const chartPayer = findChartPayer(chartText);
+  const chartSurgeon = findChartSurgeon(chartText);
 
   // Hard blocks
   if (!patientName) {
@@ -363,6 +436,25 @@ function normalizeChartData(
     });
   }
 
+  // Fix 8: Payer mismatch detection - check if first word of payer name is in chart text
+  const formPayer = requestDetails.payerName?.toLowerCase().trim();
+  const chartTextLower = chartText?.toLowerCase();
+  if (formPayer && chartTextLower && !chartTextLower.includes(formPayer.split(" ")[0])) {
+    soft_warnings.push({
+      field: "payer_mismatch",
+      label: "Payer Name Mismatch",
+      message: `Payer entered (${requestDetails.payerName}) was not found in the chart. Verify this matches the patient's actual insurance before submitting.`
+    });
+  }
+
+  if (chartSurgeon && !partialNameMatch(requestDetails.providerName, chartSurgeon)) {
+    soft_warnings.push({
+      field: "provider_mismatch",
+      label: "Provider Name Mismatch",
+      message: `The provider entered (${requestDetails.providerName}) differs from the surgeon documented in the chart (${chartSurgeon}). Please verify.`
+    });
+  }
+
   const normalized = {
     patient_name: patientName,
     date_of_birth: nullableString(data.date_of_birth),
@@ -419,4 +511,46 @@ function arrayOfObjects(value: unknown) {
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function findChartPayer(chartText: string) {
+  const payerPatterns = [
+    /(?:payer|insurance|insurer|coverage)(?:\s*(?:name|plan|carrier))?\s*[:\-]?\s*([A-Z][A-Za-z0-9&.,'\- ]{2,})/i,
+    /(?:with|through|under)\s+([A-Z][A-Za-z0-9&.,'\- ]{2,})\s+(?:insurance|coverage|plan)/i
+  ];
+
+  for (const pattern of payerPatterns) {
+    const match = chartText.match(pattern);
+    if (match?.[1]) {
+      return cleanChartMatch(match[1]);
+    }
+  }
+
+  return null;
+}
+
+function findChartSurgeon(chartText: string) {
+  const surgeonPatterns = [
+    /(?:attending surgeon|surgeon|orthopedic surgeon|performed by|scheduled with|requesting surgeon)\s*[:\-]?\s*([A-Z][A-Za-z.'\-]+(?:\s+[A-Z][A-Za-z.'\-]+){1,3})/i,
+    /(?:Dr\.?\s+)?([A-Z][A-Za-z.'\-]+(?:\s+[A-Z][A-Za-z.'\-]+){1,3})\s*,?\s*(?:MD|DO)\b/i
+  ];
+
+  for (const pattern of surgeonPatterns) {
+    const match = chartText.match(pattern);
+    if (match?.[1]) {
+      return cleanChartMatch(match[1]);
+    }
+  }
+
+  return null;
+}
+
+function cleanChartMatch(value: string) {
+  return value.replace(/\s+/g, " ").replace(/[;,.]+$/, "").trim();
+}
+
+function partialNameMatch(first: string, second: string) {
+  const normalizedFirst = first.toLowerCase();
+  const normalizedSecond = second.toLowerCase();
+  return normalizedFirst.includes(normalizedSecond) || normalizedSecond.includes(normalizedFirst);
 }
