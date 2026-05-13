@@ -116,7 +116,7 @@ export default function UploadPage() {
 
     const progressTimer = window.setInterval(() => {
       setActiveStep((current) => Math.min(current + 1, progressSteps.length - 1));
-    }, 1800);
+    }, 7000);
 
     try {
       const formData = new FormData();
@@ -259,16 +259,38 @@ export default function UploadPage() {
 
             {isLoading ? (
               <div className="mt-6 rounded-md border border-clinical-line bg-slate-50 p-4">
-                <p className="text-sm font-semibold text-clinical-navy">Generating packet</p>
-                <div className="mt-4 space-y-3">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex gap-1">
+                    <span className="h-2 w-2 rounded-full bg-clinical-navy animate-bounce [animation-delay:0ms]" />
+                    <span className="h-2 w-2 rounded-full bg-clinical-navy animate-bounce [animation-delay:150ms]" />
+                    <span className="h-2 w-2 rounded-full bg-clinical-navy animate-bounce [animation-delay:300ms]" />
+                  </div>
+                  <p className="text-sm font-semibold text-clinical-navy">Generating packet</p>
+                </div>
+                <p className="text-xs text-slate-500 mb-4">
+                  AI analysis takes 20–40 seconds. Your packet is being built.
+                </p>
+                <div className="space-y-3">
                   {progressSteps.map((step, index) => (
                     <div key={step} className="flex items-center gap-3 text-sm">
                       <span
-                        className={`h-2.5 w-2.5 rounded-full ${
-                          index <= activeStep ? "bg-clinical-blue" : "bg-slate-300"
+                        className={`h-2.5 w-2.5 rounded-full transition-colors duration-500 ${
+                          index < activeStep
+                            ? "bg-green-500"
+                            : index === activeStep
+                            ? "bg-clinical-blue animate-pulse"
+                            : "bg-slate-300"
                         }`}
                       />
-                      <span className={index <= activeStep ? "text-slate-800" : "text-slate-400"}>{step}</span>
+                      <span className={`${
+                        index < activeStep
+                          ? "text-slate-400 line-through"
+                          : index === activeStep
+                          ? "text-slate-800 font-medium"
+                          : "text-slate-400"
+                      }`}>
+                        {step}
+                      </span>
                     </div>
                   ))}
                 </div>
