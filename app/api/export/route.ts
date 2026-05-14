@@ -48,6 +48,7 @@ export async function POST(request: Request) {
       cptCode: body.cptCode,
       requestedProcedure: body.extracted.requested_procedure
     });
+    const letterBody = stripLetterHeading(sanitizedLetter);
 
     const document = new Document({
       sections: [
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
               payerName
             }),
             new Paragraph({ children: [new PageBreak()] }),
-            ...letterParagraphs(sanitizedLetter),
+            ...letterParagraphs(letterBody),
             new Paragraph({ children: [new PageBreak()] }),
             ...checklistPage()
           ]
@@ -114,6 +115,19 @@ function coverPage(details: {
     labeledLine("Requesting Provider", details.providerName),
     labeledLine("Insurance Payer", details.payerName)
   ];
+}
+
+function stripLetterHeading(letter: string): string {
+  const lines = letter.split(/\n+/);
+  const firstMeaningfulIndex = lines.findIndex((line) => line.trim().length > 0);
+  if (firstMeaningfulIndex === -1) {
+    return letter;
+  }
+  const firstLine = lines[firstMeaningfulIndex].replace(/[#*]/g, "").trim().toLowerCase();
+  if (firstLine === "letter of medical necessity") {
+    lines.splice(firstMeaningfulIndex, 1);
+  }
+  return lines.join("\n");
 }
 
 function letterParagraphs(letter: string) {
