@@ -455,7 +455,7 @@ export default function ReviewPage() {
             />
             <div className="transition-opacity duration-150 ease-out" style={{ opacity: tabContentOpacity }}>
               {activeTab === "pa-score" ? (
-                <section className="rounded-lg border border-slate-200 bg-slate-50/80 p-4">
+                <section className="rounded-lg border border-slate-200 bg-slate-50/80 p-4 pb-6">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">PA Strength Score</p>
@@ -583,14 +583,6 @@ export default function ReviewPage() {
                 })}
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleRegenerateLetter}
-              disabled={isRegenerating}
-              className="mt-4 w-full rounded-md bg-clinical-navy px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-clinical-blue disabled:bg-slate-300"
-            >
-              {isRegenerating ? "Regenerating..." : "Regenerate letter with fixes"}
-            </button>
           </section>
               ) : null}
               {activeTab === "chart-data" ? (
@@ -657,6 +649,16 @@ export default function ReviewPage() {
               aria-hidden="true"
             />
           </div>
+          {activeTab === "pa-score" ? (
+            <button
+              type="button"
+              onClick={handleRegenerateLetter}
+              disabled={isRegenerating}
+              className="mt-4 w-full rounded-md bg-clinical-navy px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-clinical-blue disabled:bg-slate-300"
+            >
+              {isRegenerating ? "Regenerating..." : "Regenerate letter with fixes"}
+            </button>
+          ) : null}
         </aside>
 
         <section className="order-1 rounded-lg border border-clinical-line bg-white p-5 shadow-sm lg:order-2">
