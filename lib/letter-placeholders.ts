@@ -17,7 +17,7 @@ export function sanitizeLetterPlaceholders(letter: string, context: LetterPlaceh
   const cptCode = cleanValue(context.cptCode);
   const requestedProcedure = cleanValue(context.requestedProcedure);
   const payerAddressBlock = [payerName, "Prior Authorization Department"].filter(Boolean).join("\n");
-  const letterhead = [providerName, practiceName ?? "Orthopedic Practice"].filter(Boolean).join("\n");
+  const letterhead = [providerName, practiceName].filter(Boolean).join("\n");
 
   let sanitized = letter;
 
@@ -45,7 +45,7 @@ export function sanitizeLetterPlaceholders(letter: string, context: LetterPlaceh
     return value ?? match;
   });
 
-  return ensureSignatureBlock(removeRemainingBracketLines(sanitized), providerName, practiceName ?? "Orthopedic Practice");
+  return ensureSignatureBlock(removeRemainingBracketLines(sanitized), providerName, practiceName);
 }
 
 export function formatLetterDate(date: Date) {
@@ -155,20 +155,22 @@ function removeRemainingBracketLines(text: string) {
     .trim();
 }
 
-function ensureSignatureBlock(text: string, providerName: string | null, practiceName: string) {
+function ensureSignatureBlock(text: string, providerName: string | null, practiceName: string | null) {
   if (!providerName) {
     return text;
   }
 
   const closingLines = text.split(/\r?\n/).slice(-12).join("\n").toLowerCase();
   const hasProvider = closingLines.includes(providerName.toLowerCase());
-  const hasPractice = closingLines.includes(practiceName.toLowerCase());
+  const hasPractice = practiceName ? closingLines.includes(practiceName.toLowerCase()) : true;
 
   if (hasProvider && hasPractice) {
     return text;
   }
 
-  return `${text}\n\nSincerely,\n${formatProviderSignatureName(providerName)}\n${practiceName}`;
+  const signatureLines = [`Sincerely,`, `${formatProviderSignatureName(providerName)}`];
+  if (practiceName) signatureLines.push(practiceName);
+  return `${text}\n\n${signatureLines.join("\n")}`;
 }
 
 function formatProviderSignatureName(providerName: string) {

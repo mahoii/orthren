@@ -18,7 +18,9 @@ type RequestDetails = {
 };
 
 const extractionSystemPrompt =
-  `You are a medical records analyst specializing in orthopedic prior authorization. Extract the following from the provided patient chart text and return ONLY valid JSON. Include these chart data keys: patient_name, date_of_birth, diagnosis_codes (array), primary_complaint, symptom_duration, functional_limitations (array of specific limitations mentioned), conservative_treatments_attempted (array), imaging_findings (object with modality and key findings), requested_procedure, surgical_approach_if_mentioned, denial_risk_flags (array of strings describing specific, actionable missing or weak elements that could cause denial). If information is not found, use null for strings and empty arrays for arrays, except conservative_treatments_attempted must follow the instruction below. After extracting all fields, also return a 'validation' object with hard_blocks and soft_warnings arrays. For hard_blocks, include any of these fields that are missing or null: patient_name, diagnosis_codes (if empty), requested_procedure. For soft_warnings, include any of these fields that are missing or null: surgical_approach_if_mentioned, imaging_findings, conservative_treatments_attempted (if empty), functional_limitations (if empty). Each block/warning object must have: {field, label, message}. Return the complete JSON including chart data and validation object.
+  `You are a medical records analyst specializing in orthopedic prior authorization. Extract the following from the provided patient chart text and return ONLY valid JSON. Include these chart data keys: patient_name, date_of_birth, diagnosis_codes (array), primary_complaint, symptom_duration, functional_limitations (array of specific limitations mentioned), objective_measurements (array), conservative_treatments_attempted (array), imaging_findings (object with modality and key findings), requested_procedure, surgical_approach_if_mentioned, denial_risk_flags (array of strings describing specific, actionable missing or weak elements that could cause denial). If information is not found, use null for strings and empty arrays for arrays, except conservative_treatments_attempted must follow the instruction below. After extracting all fields, also return a 'validation' object with hard_blocks and soft_warnings arrays. For hard_blocks, include any of these fields that are missing or null: patient_name, diagnosis_codes (if empty), requested_procedure. For soft_warnings, include any of these fields that are missing or null: surgical_approach_if_mentioned, imaging_findings, conservative_treatments_attempted (if empty), functional_limitations (if empty). Each block/warning object must have: {field, label, message}. Return the complete JSON including chart data and validation object.
+
+For objective_measurements, extract ALL quantified clinical measurements documented in the chart. This includes: range of motion values (e.g. "Knee flexion limited to 85 degrees"), pain scale scores (e.g. "Pain rated 8/10 at rest"), functional outcome scores (e.g. "KOOS score 32/100", "Oxford Knee Score 18/48", "VAS 7.5"), strength measurements, walking distance or tolerance, and any other numeric clinical findings. Return each as a plain English string (e.g. "ROM: knee flexion 85°, extension deficit 10°"). Return an empty array if no quantified measurements are documented.
 
 Extract ALL conservative treatments attempted by the patient before surgery. For each treatment found, you MUST provide the treatment_name — never return null or unknown for this field. Search the chart for any mention of: physical therapy (PT), occupational therapy (OT), NSAIDs (ibuprofen, naproxen, celecoxib, meloxicam), corticosteroid injections (cortisone, kenalog, depomedrol), hyaluronic acid injections (synvisc, hyalgan, euflexxa), bracing or orthotics, activity modification, weight loss programs, chiropractic care, acupuncture, topical medications, opioid or non-opioid analgesics, or any other conservative intervention mentioned.
 For each treatment found return an object with exactly these fields:
@@ -30,7 +32,7 @@ dates: any specific dates mentioned for this treatment. Return null if not found
 
 Return a minimum of 1 treatment object. If no treatments are found at all, return a single object with treatment_name: Conservative treatment history not documented, duration: null, outcome: null, dates: null.
 
-For denial_risk_flags, provide SPECIFIC, ACTIONABLE flags based on actual gaps in the documentation. Examples of GOOD flags: "Only 4 weeks of PT documented before requesting surgery - payers typically require 6-12 weeks", "No imaging provided to confirm diagnosis despite reported pain", "Conservative care dates incomplete - unclear if treatments were concurrent or sequential", "Single corticosteroid injection on [date] with no documented follow-up imaging or repeat treatment". Examples of BAD flags (too generic, avoid): "insufficient documentation of medical necessity", "missing pre-operative medical evaluation", "inadequate conservative care". Focus on: specific treatment durations, missing imaging modalities, unclear timelines, single attempts at treatment with no follow-up, gaps between dates that suggest inadequate trial periods.
+For denial_risk_flags, provide SPECIFIC, ACTIONABLE flags based on actual gaps in the documentation. Examples of GOOD flags: "Only 4 weeks of PT documented before requesting surgery - payers typically require 6-12 weeks", "No imaging provided to confirm diagnosis despite reported pain", "Conservative care dates incomplete - unclear if treatments were concurrent or sequential", "Single corticosteroid injection on [date] with no documented follow-up imaging or repeat treatment". Examples of BAD flags (too generic, avoid): "insufficient documentation of medical necessity", "missing pre-operative medical evaluation", "inadequate conservative care". Focus on: specific treatment durations, missing imaging modalities, unclear timelines, single attempts at treatment with no follow-up, gaps between dates that suggest inadequate trial periods. MANDATORY FLAG: If fewer than 3 distinct conservative treatments are documented in the chart, you MUST include a denial risk flag stating: "Only [N] conservative treatment(s) documented — most payers require evidence of at least 3 distinct conservative modalities before approving surgical intervention."
 
 After extracting all fields, evaluate the chart against these 8 factors and return a score object called pa_strength inside the JSON. For each factor, return a score of 0 or 1 (0 = missing or insufficient, 1 = present and adequate), and a one-sentence plain English note explaining the score. The pa_strength object must include: diagnosis_codes, conservative_treatments_named, conservative_treatment_duration, imaging_findings, functional_limitations, surgical_approach, cpt_code_valid, and symptom_duration. Each must be an object with score (0 or 1) and note (string).
 
@@ -46,11 +48,29 @@ RULE 3 — ABSOLUTE: The letter date is provided to you in the prompt as 'Letter
 
 RULE 4: Complete every sentence and every paragraph. If you are running long, shorten earlier sections rather than truncating mid-sentence. The letter must end with a complete signature block.
 
+RULE 5 — DATE PRECISION: Use only specific, confirmed dates from the chart when referencing clinical events. Never use vague temporal references such as 'around Thanksgiving', 'last fall', 'recently', or 'several months ago'. If a specific date is not documented for an event, state the duration (e.g. '6 months of conservative care') without fabricating a time anchor.
+
+RULE 6 — CLINICAL LANGUAGE: Use definitive, evidence-based language throughout. Never use hedging phrases that undermine medical necessity such as 'exhausted to the extent tolerated', 'as much as possible', 'attempted when feasible', or similar qualifiers. State that conservative treatments have failed and surgery is medically indicated.
+
 CRITICAL RULE — IMAGING: YOU ARE STRICTLY FORBIDDEN FROM MENTIONING ANY IMAGING MODALITY (MRI, CT SCAN, ULTRASOUND) THAT IS NOT EXPLICITLY CONFIRMED AS COMPLETED IN THE SOURCE DATA. If the extracted data shows mri: null, mri: not ordered, or mri: not on file, you MUST NOT reference MRI anywhere in the letter. If only X-ray findings are documented, write only about X-ray findings. Violating this rule produces a fraudulent document. This rule overrides all other instructions about clinical completeness. USE ONLY THESE CONFIRMED IMAGING FINDINGS IN THE LETTER: [IMAGING_FINDINGS_JSON]. Do not add, infer, or supplement any imaging findings beyond what is in this data.
 
-You are a prior authorization specialist with 15 years of experience winning approvals for orthopedic procedures. Using the structured patient data provided, write a compelling Letter of Medical Necessity. The letter must begin with this exact header structure before the body paragraphs: [LETTER_DATE] [Payer Name] Prior Authorization Department Re: Prior Authorization Request Patient: [Patient Full Name] Date of Birth: [DOB] Procedure: [Procedure Name] CPT Code: [CPT Code] Diagnosis: [Primary ICD-10 code] Dear Prior Authorization Reviewer, then begin the letter body. The body must: (1) Establish the clinical presentation - chief complaint, duration, severity, BMI if above 30, and specific functional limitations using the patient's own documented measurements where available. If BMI is documented and is above 30, include it in the clinical presentation paragraph as: 'The patient carries a BMI of [bmi], consistent with Class [I/II/III] obesity, which is a documented contributor to accelerated articular cartilage degeneration and increased mechanical loading of the knee joints.' (2) Document conservative care chronologically - every treatment tried, how long, and why it failed. Payers require proof that surgery is a last resort. If physical therapy duration was 4 weeks or less and the patient self-discontinued, write: 'The patient completed a course of physical therapy; however, functional improvement was insufficient to restore meaningful mobility, and therapy was ultimately discontinued without achieving treatment goals.' Never use the phrase self-discontinued. Never frame self-discontinuation as patient non-compliance. (3) For imaging findings, you MUST only reference imaging studies that are explicitly documented in the extracted chart data. If a specific imaging modality (MRI, X-ray, CT) is listed as not ordered, not on file, or absent, you MUST NOT mention it in the letter. Instead, note only what IS documented. If no imaging is documented at all, write: 'Advanced imaging has been recommended to further evaluate the extent of joint degeneration.' Never invent or assume imaging that is not confirmed in the source data. When writing the imaging paragraph, use the exact findings from the extracted imaging_findings field. If Kellgren-Lawrence grading is present, write: 'Weight-bearing radiographs of the bilateral knees demonstrate Kellgren-Lawrence Grade [X] changes bilaterally, with [specific findings from chart].' Use the verbatim clinical values — never generalize or substitute. Always use the actual grading values and findings from the chart. (4) State the specific procedure with anatomical detail - laterality, approach, implants if applicable. If asa_classification is present, include in the surgical plan paragraph: 'Pre-operative evaluation has classified this patient as ASA [X], confirming surgical candidacy.' (5) Close with a statement of medical necessity referencing the patient's inability to maintain activities of daily living. 
+You are a prior authorization specialist with 15 years of experience winning approvals for orthopedic procedures. Using the structured patient data provided, write a compelling Letter of Medical Necessity. The letter must begin with this exact header structure before the body paragraphs:
 
-Never include Member ID, Claim Number, Reference Number, or any field that is not present in the source data. If a field does not exist in the extracted chart data, omit it entirely from the header block. Do not use placeholder text like 'Physician review required' for missing administrative fields.
+[LETTER_DATE]
+[Payer Name]
+Prior Authorization Department
+Re: Prior Authorization Request — ICD-10: [Primary ICD-10 code]
+Member ID: See attached insurance card
+Patient: [Patient Full Name]
+Date of Birth: [DOB]
+Procedure: [Procedure Name]
+CPT Code: [CPT Code]
+
+Dear Prior Authorization Reviewer,
+
+Then begin the letter body. The body must: (1) Establish the clinical presentation - chief complaint, duration, severity, BMI if above 30, and specific functional limitations using the patient's own documented measurements where available. If objective_measurements are provided in the prompt, integrate them into the clinical presentation paragraph using precise clinical language (e.g. 'Range of motion assessment demonstrates knee flexion limited to 85 degrees with a 10-degree extension deficit.'). If BMI is documented and is above 30, include it as: 'The patient carries a BMI of [bmi], consistent with Class [I/II/III] obesity, which is a documented contributor to accelerated articular cartilage degeneration and increased mechanical loading of the knee joints.' (2) Document conservative care chronologically - every treatment tried, how long, and why it failed. Payers require proof that surgery is a last resort. If physical therapy duration was 4 weeks or less and the patient self-discontinued, write: 'The patient completed a course of physical therapy; however, functional improvement was insufficient to restore meaningful mobility, and therapy was ultimately discontinued without achieving treatment goals.' Never use the phrase self-discontinued. Never frame self-discontinuation as patient non-compliance. (3) For imaging findings, you MUST only reference imaging studies that are explicitly documented in the extracted chart data. If a specific imaging modality (MRI, X-ray, CT) is listed as not ordered, not on file, or absent, you MUST NOT mention it in the letter. Instead, note only what IS documented. If no imaging is documented at all, write: 'Advanced imaging has been recommended to further evaluate the extent of joint degeneration.' Never invent or assume imaging that is not confirmed in the source data. When writing the imaging paragraph, use the exact findings from the extracted imaging_findings field. If Kellgren-Lawrence grading is present, write: 'Weight-bearing radiographs of the bilateral knees demonstrate Kellgren-Lawrence Grade [X] changes bilaterally, with [specific findings from chart].' Use the verbatim clinical values — never generalize or substitute. Always use the actual grading values and findings from the chart. (4) State the specific procedure with anatomical detail - laterality, approach, implants if applicable. If asa_classification is present, include in the surgical plan paragraph: 'Pre-operative evaluation has classified this patient as ASA [X], confirming surgical candidacy.' (5) Close with a statement of medical necessity referencing the patient's inability to maintain activities of daily living.
+
+Never include Member ID number, Claim Number, Reference Number, or any field that is not present in the source data (the 'Member ID: See attached insurance card' line in the header is always included as written). If a field does not exist in the extracted chart data, omit it entirely from the header block. Do not use placeholder text like 'Physician review required' for missing administrative fields.
 
 CRITICAL RULE — MISSING INFORMATION: If source data is insufficient for a specific field, either omit that detail entirely from the narrative or note it once at the end of the relevant paragraph using this exact phrase: "Chart review is recommended to confirm this detail prior to submission." Never use this phrase more than once per letter. Never use square brackets.
 
@@ -213,6 +233,10 @@ async function generateLetter(
     .replace("[LETTER_DATE]", today)
     .replace("[IMAGING_FINDINGS_JSON]", imagingFindingsJson);
 
+  const objectiveMeasurementsStr = extracted.objective_measurements?.length
+    ? `\nObjective measurements: ${extracted.objective_measurements.join("; ")}`
+    : "";
+
   // Fix 3: Pass letter_date to prompt context
   let letter = await callAnthropicWithRetry({
     system: systemPromptWithContext,
@@ -227,7 +251,7 @@ Practice name: ${requestDetails.practiceName}
 
 Letter date: ${today}
 ${bmi ? "Patient BMI: " + bmi : ""}
-${asaClassification ? "ASA Classification: " + asaClassification : ""}`,
+${asaClassification ? "ASA Classification: " + asaClassification : ""}${objectiveMeasurementsStr}`,
     maxTokens: 8000
   });
 
@@ -299,6 +323,7 @@ const chartExtractionSchema = {
     primary_complaint: { type: ["string", "null"] },
     symptom_duration: { type: ["string", "null"] },
     functional_limitations: { type: "array", items: { type: "string" } },
+    objective_measurements: { type: "array", items: { type: "string" } },
     conservative_treatments_attempted: {
       type: "array",
       items: {
@@ -399,7 +424,7 @@ const chartExtractionSchema = {
       required: ["hard_blocks", "soft_warnings"]
     }
   },
-  required: ["patient_name", "date_of_birth", "diagnosis_codes", "primary_complaint", "symptom_duration", "functional_limitations", "conservative_treatments_attempted", "imaging_findings", "requested_procedure", "surgical_approach_if_mentioned", "denial_risk_flags", "pa_strength", "validation"]
+  required: ["patient_name", "date_of_birth", "diagnosis_codes", "primary_complaint", "symptom_duration", "functional_limitations", "objective_measurements", "conservative_treatments_attempted", "imaging_findings", "requested_procedure", "surgical_approach_if_mentioned", "denial_risk_flags", "pa_strength", "validation"]
 };
 
 async function callAnthropic({
@@ -497,6 +522,7 @@ function normalizeChartData(
     dates: nullableString(item.dates)
   }));
   const functionalLimitations = stringArray(data.functional_limitations);
+  const objectiveMeasurements = stringArray(data.objective_measurements);
 
   const hard_blocks: any[] = [];
   const soft_warnings: any[] = [];
@@ -587,6 +613,7 @@ function normalizeChartData(
     primary_complaint: nullableString(data.primary_complaint),
     symptom_duration: nullableString(data.symptom_duration),
     functional_limitations: functionalLimitations,
+    objective_measurements: objectiveMeasurements,
     conservative_treatments_attempted: conservativeTreatments,
     imaging_findings: imagingFindings,
     requested_procedure: requestedProcedure,

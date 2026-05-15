@@ -118,16 +118,15 @@ function coverPage(details: {
 }
 
 function stripLetterHeading(letter: string): string {
-  const lines = letter.split(/\n+/);
-  const firstMeaningfulIndex = lines.findIndex((line) => line.trim().length > 0);
-  if (firstMeaningfulIndex === -1) {
-    return letter;
-  }
-  const firstLine = lines[firstMeaningfulIndex].replace(/[#*]/g, "").trim().toLowerCase();
-  if (firstLine === "letter of medical necessity") {
-    lines.splice(firstMeaningfulIndex, 1);
-  }
-  return lines.join("\n");
+  // Remove "Letter of Medical Necessity" heading wherever it appears in the text,
+  // not just the first line. The docx packer adds its own HEADING_1, so any
+  // occurrence in the raw letter text would create a duplicate heading.
+  return letter
+    .split(/\r?\n/)
+    .filter((line) => !/^[#*\s]*letter of medical necessity[#*\s]*$/i.test(line.trim()))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function letterParagraphs(letter: string) {

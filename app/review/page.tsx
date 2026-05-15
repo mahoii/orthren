@@ -615,8 +615,7 @@ export default function ReviewPage() {
                     <DataRow label="Symptom duration" value={data.extracted.symptom_duration} />
                     <DataRow label="Requested procedure" value={data.extracted.requested_procedure} />
                     <DataRow label="Surgical approach" value={data.extracted.surgical_approach_if_mentioned} />
-                    <DataRow
-                      label="Imaging findings"
+                    <DataRow label="Imaging findings"
                       value={
                         data.extracted.imaging_findings
                           ? `${data.extracted.imaging_findings.modality ?? "Unknown modality"}: ${
@@ -625,6 +624,7 @@ export default function ReviewPage() {
                           : null
                       }
                     />
+                    <DataRow label="Objective measurements" value={data.extracted.objective_measurements?.length ? data.extracted.objective_measurements : null} />
                     <DataRow label="Functional limitations" value={data.extracted.functional_limitations} />
                     <Treatments treatments={data.extracted.conservative_treatments_attempted} />
                   </div>
@@ -657,7 +657,7 @@ export default function ReviewPage() {
               ) : null}
             </div>
             <div
-              className={`pointer-events-none sticky bottom-0 z-10 h-6 bg-gradient-to-t from-white/60 via-white/85 to-transparent transition-opacity duration-150 ${
+              className={`pointer-events-none sticky bottom-0 z-10 h-4 bg-gradient-to-t from-white/40 via-white/85 to-transparent transition-opacity duration-150 ${
                 tabScrollMetrics[activeTab].scrollHeight > tabScrollMetrics[activeTab].clientHeight + tabScrollMetrics[activeTab].scrollTop
                   ? "opacity-100"
                   : "opacity-0"

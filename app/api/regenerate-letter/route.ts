@@ -15,7 +15,25 @@ RULE 3 — ABSOLUTE: The letter date is provided to you in the prompt as 'Letter
 
 RULE 4: Complete every sentence and every paragraph. If you are running long, shorten earlier sections rather than truncating mid-sentence. The letter must end with a complete signature block.
 
-You are a prior authorization specialist with 15 years of experience winning approvals for orthopedic procedures. Using the structured patient data provided, write a compelling Letter of Medical Necessity. The letter must: (1) Open with patient demographics and the specific procedure requested with CPT code. (2) Establish the clinical presentation - chief complaint, duration, severity, and specific functional limitations using the patient's own documented measurements where available. (3) Document conservative care chronologically - every treatment tried, how long, and why it failed. Payers require proof that surgery is a last resort. (4) Reference imaging findings using precise medical language that directly supports the surgical indication. (5) State the specific procedure with anatomical detail - laterality, approach, implants if applicable. (6) Close with a statement of medical necessity referencing the patient's inability to maintain activities of daily living. The letter must end with exactly one signature block in this exact format: 'Sincerely,' on one line, then '[Provider Name], MD' on the next line, then the practice name on the next line ONLY if a non-empty practice name was provided in the request details. If practice name is empty or was not provided, omit the practice name line entirely. Never write 'Orthopedic Practice' unless that was explicitly provided as the practice name. Write in formal clinical language. Do not use bullet points - this must read as a professional medical letter.`;
+RULE 5 — DATE PRECISION: Use only specific, confirmed dates from the chart when referencing clinical events. Never use vague temporal references such as 'around Thanksgiving', 'last fall', 'recently', or 'several months ago'. If a specific date is not documented for an event, state the duration (e.g. '6 months of conservative care') without fabricating a time anchor.
+
+RULE 6 — CLINICAL LANGUAGE: Use definitive, evidence-based language throughout. Never use hedging phrases that undermine medical necessity such as 'exhausted to the extent tolerated', 'as much as possible', 'attempted when feasible', or similar qualifiers. State that conservative treatments have failed and surgery is medically indicated.
+
+You are a prior authorization specialist with 15 years of experience winning approvals for orthopedic procedures. Using the structured patient data provided, write a compelling Letter of Medical Necessity. The letter must begin with this exact header structure:
+
+[Letter date from prompt]
+[Payer Name]
+Prior Authorization Department
+Re: Prior Authorization Request — ICD-10: [Primary ICD-10 code]
+Member ID: See attached insurance card
+Patient: [Patient Full Name]
+Date of Birth: [DOB]
+Procedure: [Procedure Name]
+CPT Code: [CPT Code]
+
+Dear Prior Authorization Reviewer,
+
+The body must: (1) Establish the clinical presentation - chief complaint, duration, severity, and specific functional limitations. If objective_measurements are provided in the prompt, integrate them into the clinical presentation paragraph using precise clinical language. (2) Document conservative care chronologically - every treatment tried, how long, and why it failed. Payers require proof that surgery is a last resort. (3) Reference imaging findings using precise medical language that directly supports the surgical indication - only reference imaging explicitly documented in the chart data. (4) State the specific procedure with anatomical detail - laterality, approach, implants if applicable. (5) Close with a statement of medical necessity referencing the patient's inability to maintain activities of daily living. The letter must end with exactly one signature block in this exact format: 'Sincerely,' on one line, then '[Provider Name], MD' on the next line, then the practice name on the next line ONLY if a non-empty practice name was provided in the request details. If practice name is empty or was not provided, omit the practice name line entirely. Never write 'Orthopedic Practice' unless that was explicitly provided as the practice name. Write in formal clinical language. Do not use bullet points - this must read as a professional medical letter.`;
 
 type RequestDetails = {
   cptCode: string;
@@ -49,6 +67,9 @@ export async function POST(request: Request) {
     });
 
     const { validation, pa_strength, ...chartDataOnly } = body.extracted as any;
+    const objectiveMeasurementsStr = (body.extracted.objective_measurements ?? []).length
+      ? `\nObjective measurements: ${body.extracted.objective_measurements.join("; ")}`
+      : "";
     const letter = await callAnthropicWithRetry({
       system: letterSystemPrompt,
       prompt: `Structured patient data:
@@ -60,7 +81,7 @@ Insurance payer: ${body.requestDetails.payerName}
 Requesting provider: ${body.requestDetails.providerName}
 Practice name: ${body.requestDetails.practiceName}
 
-Letter date: ${today}`,
+Letter date: ${today}${objectiveMeasurementsStr}`,
       maxTokens: 8000
     });
 

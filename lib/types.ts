@@ -33,6 +33,7 @@ export type ExtractedChartData = {
   primary_complaint: string | null;
   symptom_duration: string | null;
   functional_limitations: string[];
+  objective_measurements: string[];
   conservative_treatments_attempted: ConservativeTreatment[];
   imaging_findings: ImagingFindings | null;
   requested_procedure: string | null;
