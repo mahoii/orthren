@@ -38,9 +38,13 @@ Weight the overall score on the frontend as: diagnosis_codes 10%, conservative_t
 
 Return ONLY valid JSON. Do not wrap in code fences or backticks. Start with { and end with }.`;
 
-const letterSystemPrompt = `ABSOLUTE RULE: Never include any disclaimer, warning block, denial risk notice, or advisory section inside the letter body. The letter must contain ONLY the formal Letter of Medical Necessity — date, header, salutation, clinical narrative, and signature block. All denial risks, documentation gaps, and flags belong exclusively in the denial_risk_flags array returned during extraction. Violating this rule produces an unusable clinical document.
+const letterSystemPrompt = `RULE 1 — ABSOLUTE: You are writing ONLY the letter body. All error detection, denial risk flagging, and documentation gap analysis has already been completed by a separate system upstream. You have NO responsibility to flag errors, warn the provider, or note deficiencies anywhere in this letter. Do not open with warnings. Do not embed advisory blocks. Do not add inline notes. Do not use phrases like 'Note to provider', 'Physician review required', 'Physician attestation required', 'CRITICAL', or any variant. If you include any advisory content anywhere in the letter, the output is invalid.
 
-CRITICAL RULE — NO OPENING DISCLAIMER: Never begin the letter with a disclaimer, warning, preamble, or meta-commentary about documentation gaps. Never write opening paragraphs telling the provider not to submit the letter. Begin the letter directly with the date and header block. If documentation is incomplete, note gaps inline using clinical language or omit the detail — never open with a disclaimer paragraph.
+RULE 2 — ABSOLUTE: Write the letter using only what is confirmed in the source data. For any missing field, either omit it entirely or write around it using confirmed information. Never insert placeholder text, bracketed instructions, or editorial commentary.
+
+RULE 3 — ABSOLUTE: The letter date is provided to you in the prompt as 'Letter date: [date]'. Use this exact date string in the letter header. Do not substitute 'Physician to insert date' or any placeholder.
+
+RULE 4: Complete every sentence and every paragraph. If you are running long, shorten earlier sections rather than truncating mid-sentence. The letter must end with a complete signature block.
 
 CRITICAL RULE — IMAGING: YOU ARE STRICTLY FORBIDDEN FROM MENTIONING ANY IMAGING MODALITY (MRI, CT SCAN, ULTRASOUND) THAT IS NOT EXPLICITLY CONFIRMED AS COMPLETED IN THE SOURCE DATA. If the extracted data shows mri: null, mri: not ordered, or mri: not on file, you MUST NOT reference MRI anywhere in the letter. If only X-ray findings are documented, write only about X-ray findings. Violating this rule produces a fraudulent document. This rule overrides all other instructions about clinical completeness. USE ONLY THESE CONFIRMED IMAGING FINDINGS IN THE LETTER: [IMAGING_FINDINGS_JSON]. Do not add, infer, or supplement any imaging findings beyond what is in this data.
 
@@ -50,9 +54,7 @@ Never include Member ID, Claim Number, Reference Number, or any field that is no
 
 CRITICAL RULE — MISSING INFORMATION: If source data is insufficient for a specific field, either omit that detail entirely from the narrative or note it once at the end of the relevant paragraph using this exact phrase: "Chart review is recommended to confirm this detail prior to submission." Never use this phrase more than once per letter. Never use square brackets.
 
-If you are approaching the end of your response and have not yet completed the letter, prioritize completing the clinical narrative and signature block over adding additional detail. Never cut a sentence mid-word or mid-thought.
-
-Never use the phrase 'not documented', 'not on file', 'not recorded', 'are not recorded', 'is not recorded', 'duration and outcome are not', or 'exact duration and follow-up are not' in the generated letter. If information is missing for a specific treatment or finding, either omit that detail entirely from the narrative or use clinical language such as 'clinical response was noted' or 'treatment was discontinued.' The letter must read as a polished clinical document, not a data extraction report. The letter must end with exactly one signature block using this format: Sincerely, [Requesting Provider Name], MD [Practice Name] [Payer Prior Authorization Department]. Never repeat the signature block. Write in formal clinical language. Do not use bullet points. CRITICAL: Never invent, assume, or fabricate a practice name, clinic name, or institution name. If practice name is not provided in the request details, use only the provider name and omit the institution line entirely from the letterhead.`;
+Never use the phrase 'not documented', 'not on file', 'not recorded', 'are not recorded', 'is not recorded', 'duration and outcome are not', or 'exact duration and follow-up are not' in the generated letter. If information is missing for a specific treatment or finding, either omit that detail entirely from the narrative or use clinical language such as 'clinical response was noted' or 'treatment was discontinued.' The letter must read as a polished clinical document, not a data extraction report. The letter must end with exactly one signature block in this exact format: 'Sincerely,' on one line, then '[Provider Name], MD' on the next line, then the practice name on the next line ONLY if a non-empty practice name was provided in the request details. If practice name is empty or was not provided, omit the practice name line entirely. Never write 'Orthopedic Practice' unless that was explicitly provided as the practice name. Never repeat the signature block. Write in formal clinical language. Do not use bullet points. CRITICAL: Never invent, assume, or fabricate a practice name, clinic name, or institution name.`;
 
 export async function POST(request: Request) {
   try {
@@ -226,7 +228,7 @@ Practice name: ${requestDetails.practiceName}
 Letter date: ${today}
 ${bmi ? "Patient BMI: " + bmi : ""}
 ${asaClassification ? "ASA Classification: " + asaClassification : ""}`,
-    maxTokens: 6000
+    maxTokens: 8000
   });
 
   // Fix 4: Remove duplicate signature blocks

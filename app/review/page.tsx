@@ -246,6 +246,12 @@ export default function ReviewPage() {
       }
 
       setSuggestions((current) => ({ ...current, [key]: payload.suggestion ?? "" }));
+      setTimeout(() => {
+        const tabContent = tabContentRef.current;
+        if (tabContent) {
+          tabContent.scrollTop = tabContent.scrollHeight;
+        }
+      }, 50);
     } catch (error) {
       setSuggestions((current) => ({ ...current, [key]: "" }));
       setToast(error instanceof Error ? error.message : "Unable to generate a suggestion.");
@@ -452,7 +458,7 @@ export default function ReviewPage() {
                   }
                 }));
             }}
-            className="relative min-h-[420px] max-h-[calc(100vh-14rem)] overflow-y-auto pr-1"
+            className="relative min-h-[420px] max-h-[calc(100vh-20rem)] overflow-y-auto pr-1"
           >
             <div
               className={`pointer-events-none sticky top-0 z-10 h-8 bg-gradient-to-b from-white via-white/85 to-transparent transition-opacity duration-150 ${
@@ -651,7 +657,7 @@ export default function ReviewPage() {
               ) : null}
             </div>
             <div
-              className={`pointer-events-none sticky bottom-0 z-10 h-10 bg-gradient-to-t from-white via-white/85 to-transparent transition-opacity duration-150 ${
+              className={`pointer-events-none sticky bottom-0 z-10 h-6 bg-gradient-to-t from-white/60 via-white/85 to-transparent transition-opacity duration-150 ${
                 tabScrollMetrics[activeTab].scrollHeight > tabScrollMetrics[activeTab].clientHeight + tabScrollMetrics[activeTab].scrollTop
                   ? "opacity-100"
                   : "opacity-0"

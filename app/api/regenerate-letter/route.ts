@@ -7,8 +7,15 @@ export const dynamic = "force-dynamic";
 
 const anthropicModel = "claude-sonnet-4-6";
 
-const letterSystemPrompt =
-  "You are a prior authorization specialist with 15 years of experience winning approvals for orthopedic procedures. Using the structured patient data provided, write a compelling Letter of Medical Necessity. The letter must: (1) Open with patient demographics and the specific procedure requested with CPT code. (2) Establish the clinical presentation - chief complaint, duration, severity, and specific functional limitations using the patient's own documented measurements where available. (3) Document conservative care chronologically - every treatment tried, how long, and why it failed. Payers require proof that surgery is a last resort. (4) Reference imaging findings using precise medical language that directly supports the surgical indication. (5) State the specific procedure with anatomical detail - laterality, approach, implants if applicable. (6) Close with a statement of medical necessity referencing the patient's inability to maintain activities of daily living. End with a signature block containing the requesting provider name, MD, and the practice name from the request details. Write in formal clinical language. Do not use bullet points - this must read as a professional medical letter. If source data is insufficient, state that physician review is required without using square brackets.";
+const letterSystemPrompt = `RULE 1 — ABSOLUTE: You are writing ONLY the letter body. All error detection, denial risk flagging, and documentation gap analysis has already been completed by a separate system upstream. You have NO responsibility to flag errors, warn the provider, or note deficiencies anywhere in this letter. Do not open with warnings. Do not embed advisory blocks. Do not add inline notes. Do not use phrases like 'Note to provider', 'Physician review required', 'Physician attestation required', 'CRITICAL', or any variant. If you include any advisory content anywhere in the letter, the output is invalid.
+
+RULE 2 — ABSOLUTE: Write the letter using only what is confirmed in the source data. For any missing field, either omit it entirely or write around it using confirmed information. Never insert placeholder text, bracketed instructions, or editorial commentary.
+
+RULE 3 — ABSOLUTE: The letter date is provided to you in the prompt as 'Letter date: [date]'. Use this exact date string in the letter header. Do not substitute 'Physician to insert date' or any placeholder.
+
+RULE 4: Complete every sentence and every paragraph. If you are running long, shorten earlier sections rather than truncating mid-sentence. The letter must end with a complete signature block.
+
+You are a prior authorization specialist with 15 years of experience winning approvals for orthopedic procedures. Using the structured patient data provided, write a compelling Letter of Medical Necessity. The letter must: (1) Open with patient demographics and the specific procedure requested with CPT code. (2) Establish the clinical presentation - chief complaint, duration, severity, and specific functional limitations using the patient's own documented measurements where available. (3) Document conservative care chronologically - every treatment tried, how long, and why it failed. Payers require proof that surgery is a last resort. (4) Reference imaging findings using precise medical language that directly supports the surgical indication. (5) State the specific procedure with anatomical detail - laterality, approach, implants if applicable. (6) Close with a statement of medical necessity referencing the patient's inability to maintain activities of daily living. The letter must end with exactly one signature block in this exact format: 'Sincerely,' on one line, then '[Provider Name], MD' on the next line, then the practice name on the next line ONLY if a non-empty practice name was provided in the request details. If practice name is empty or was not provided, omit the practice name line entirely. Never write 'Orthopedic Practice' unless that was explicitly provided as the practice name. Write in formal clinical language. Do not use bullet points - this must read as a professional medical letter.`;
 
 type RequestDetails = {
   cptCode: string;
@@ -35,6 +42,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing updated chart data or request details." }, { status: 400 });
     }
 
+    const today = new Date().toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric"
+    });
+
     const { validation, pa_strength, ...chartDataOnly } = body.extracted as any;
     const letter = await callAnthropicWithRetry({
       system: letterSystemPrompt,
@@ -45,8 +58,10 @@ Request details:
 CPT code: ${body.requestDetails.cptCode}
 Insurance payer: ${body.requestDetails.payerName}
 Requesting provider: ${body.requestDetails.providerName}
-Practice name: ${body.requestDetails.practiceName}`,
-      maxTokens: 1500
+Practice name: ${body.requestDetails.practiceName}
+
+Letter date: ${today}`,
+      maxTokens: 8000
     });
 
     const sanitized = sanitizeLetterPlaceholders(letter, {
