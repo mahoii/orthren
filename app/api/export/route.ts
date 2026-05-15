@@ -68,7 +68,7 @@ export async function POST(request: Request) {
             new Paragraph({ children: [new PageBreak()] }),
             ...letterParagraphs(letterBody),
             new Paragraph({ children: [new PageBreak()] }),
-            ...checklistPage()
+            ...checklistPage(body.extracted)
           ]
         }
       ]
@@ -152,12 +152,18 @@ function letterParagraphs(letter: string) {
   ];
 }
 
-function checklistPage() {
-  const items = [
-    "Authorization form attached",
-    "Imaging reports attached",
-    "PT/conservative care notes attached",
-    "Operative report attached (if applicable)"
+function checklistPage(extracted: ExtractedChartData) {
+  const items: { label: string; missing: boolean }[] = [
+    { label: "Authorization form attached", missing: false },
+    {
+      label: "Imaging reports attached",
+      missing: !extracted.imaging_findings?.key_findings
+    },
+    {
+      label: "PT/conservative care notes attached",
+      missing: extracted.conservative_treatments_attempted.length === 0
+    },
+    { label: "Operative report attached (if applicable)", missing: false }
   ];
 
   return [
@@ -170,7 +176,14 @@ function checklistPage() {
       (item) =>
         new Paragraph({
           spacing: { after: 240 },
-          children: [new TextRun({ text: `Pending: ${item}`, size: 24 })]
+          children: [
+            new TextRun({
+              text: `${item.missing ? "⚠ ACTION REQUIRED" : "Pending"}: ${item.label}`,
+              size: 24,
+              bold: item.missing,
+              color: item.missing ? "CC0000" : "000000"
+            })
+          ]
         })
     )
   ];

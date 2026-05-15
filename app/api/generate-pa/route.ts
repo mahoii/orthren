@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     const cptCode = stringField(formData.get("cptCode"));
     const payerName = stringField(formData.get("payerName"));
     const providerName = stringField(formData.get("providerName"));
-    const practiceName = stringField(formData.get("practiceName")) || "Orthopedic Practice";
+    const practiceName = stringField(formData.get("practiceName"));
 
     if (!(chart instanceof File)) {
       return NextResponse.json({ error: "Upload a chart file before generating the packet." }, { status: 400 });

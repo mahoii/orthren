@@ -187,6 +187,13 @@ export default function ReviewPage() {
     return () => window.cancelAnimationFrame(frame);
   }, [activeTab]);
 
+  useEffect(() => {
+    document.title = "Review PA Packet — Greenlit MD";
+    return () => {
+      document.title = "Greenlit MD";
+    };
+  }, []);
+
   function updateManualFix(key: PaStrengthFactorKey, value: string, source: ManualFix["source"] = "manual") {
     const trimmed = value.trim();
     setManualFixes((current) => ({
@@ -549,7 +556,10 @@ export default function ReviewPage() {
                                   {isSuggesting[factor.key] ? "Suggesting..." : "Suggest fix"}
                                 </button>
                                 {isManualResolved ? (
-                                  <span className="text-xs font-semibold text-blue-600">Marked resolved</span>
+                                  <div className="flex flex-col gap-0.5">
+                                    <span className="text-xs font-semibold text-blue-600">Marked resolved</span>
+                                    <span className="text-xs text-slate-500">Hit &quot;Regenerate letter&quot; below to apply this fix.</span>
+                                  </div>
                                 ) : null}
                               </div>
                               {hasSuggestion ? (

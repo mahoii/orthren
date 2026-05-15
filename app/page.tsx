@@ -162,7 +162,7 @@ export default function UploadPage() {
         <div className="mb-8">
           <p className="text-sm font-semibold uppercase tracking-wide text-clinical-blue">Orthopedic PA Builder</p>
           <h1 className="mt-3 text-3xl font-semibold text-clinical-navy md:text-4xl">
-            Generate a payer-ready prior authorization packet.
+            The average orthopedic PA denial costs your practice $15,000–$50,000 in delayed revenue. Greenlit MD generates a payer-ready packet in 60 seconds.
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
             Upload the chart, enter the request details, and review the AI-assisted draft before exporting the final packet.
