@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAllSignups } from "@/lib/supabase/server";
-import { sendUpdateEmail } from "@/lib/resend";
+import { createResendClient, sendUpdateEmail } from "@/lib/resend";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,6 +35,7 @@ export async function POST(request: Request) {
     const signups = await getAllSignups();
     const emails = signups.map((s) => s.email);
 
+    const resend = createResendClient();
     let sent = 0;
     let failed = 0;
 
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
             headline: body.headline!,
             bullets: body.bullets!,
             screenshot_url: body.screenshot_url
-          }).then(() => {
+          }, resend).then(() => {
             sent += 1;
           }).catch(() => {
             failed += 1;

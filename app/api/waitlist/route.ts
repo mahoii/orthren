@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { insertSignup, getSignupPosition } from "@/lib/supabase/server";
-import { sendConfirmationEmail } from "@/lib/resend";
+import { createResendClient, sendConfirmationEmail } from "@/lib/resend";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -76,9 +76,10 @@ export async function POST(request: Request) {
     }
 
     const position = await getSignupPosition(email);
+    const resend = createResendClient();
 
     // Fire confirmation email (non-blocking — don't fail the request if email fails)
-    sendConfirmationEmail(email, position).catch((err) =>
+    sendConfirmationEmail(email, position, resend).catch((err) =>
       console.error("Resend confirmation email failed:", err)
     );
 

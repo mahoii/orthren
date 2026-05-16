@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSignupEmailsByStage, updateEmailStageForEmails } from "@/lib/supabase/server";
-import { sendLaunchEmail } from "@/lib/resend";
+import { createResendClient, sendLaunchEmail } from "@/lib/resend";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,6 +26,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, sent: 0, message: "All subscribers already notified." });
     }
 
+    const resend = createResendClient();
     let sent = 0;
     let failed = 0;
     const sentEmails: string[] = [];
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
       const batch = emails.slice(i, i + BATCH_SIZE);
       await Promise.allSettled(
         batch.map((email) =>
-          sendLaunchEmail(email, LAUNCH_URL).then(() => {
+          sendLaunchEmail(email, LAUNCH_URL, resend).then(() => {
             sent += 1;
             sentEmails.push(email);
           }).catch(() => {

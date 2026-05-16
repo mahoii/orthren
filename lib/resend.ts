@@ -1,7 +1,9 @@
 import { Resend } from "resend";
 import crypto from "crypto";
 
-export const resend = new Resend(process.env.RESEND_API_KEY!);
+export function createResendClient() {
+  return new Resend(process.env.RESEND_API_KEY);
+}
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://greenlitmd.app";
 const secret = process.env.UNSUBSCRIBE_SECRET ?? "fallback-secret";
@@ -60,7 +62,7 @@ const baseHtml = (body: string, email: string) => `<!DOCTYPE html>
 </div>
 </body></html>`;
 
-export async function sendConfirmationEmail(email: string, position: number) {
+export async function sendConfirmationEmail(email: string, position: number, resend = createResendClient()) {
   const html = baseHtml(`
     <h1>You're on the Greenlit MD waitlist.</h1>
     <p>Thanks for signing up. You're <strong>#${position}</strong> on the list.</p>
@@ -79,7 +81,8 @@ export async function sendConfirmationEmail(email: string, position: number) {
 
 export async function sendUpdateEmail(
   email: string,
-  opts: { subject: string; headline: string; bullets: string[]; screenshot_url?: string }
+  opts: { subject: string; headline: string; bullets: string[]; screenshot_url?: string },
+  resend = createResendClient()
 ) {
   const bulletItems = opts.bullets.map((b) => `<li>${b}</li>`).join("");
   const screenshotBlock = opts.screenshot_url
@@ -101,7 +104,7 @@ export async function sendUpdateEmail(
   });
 }
 
-export async function sendLaunchEmail(email: string, launchUrl: string) {
+export async function sendLaunchEmail(email: string, launchUrl: string, resend = createResendClient()) {
   const html = baseHtml(`
     <h1>Greenlit MD is live.</h1>
     <p>Your early access is ready. Click below to get started — no setup required.</p>
