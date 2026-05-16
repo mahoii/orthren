@@ -2,6 +2,7 @@
 
 import { ChangeEvent, DragEvent, FormEvent, ReactNode, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { GeneratePaResponse } from "@/lib/types";
 
 const progressSteps = [
@@ -167,6 +168,14 @@ export default function UploadPage() {
           <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
             Upload the chart, enter the request details, and review the AI-assisted draft before exporting the final packet.
           </p>
+          <div className="mt-8 flex items-center gap-4">
+            <Link
+              href="/waitlist"
+              className="inline-flex items-center justify-center rounded-md border border-[#CBD5E1] bg-white px-5 py-2.5 text-sm font-semibold text-clinical-navy shadow-sm transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-clinical-blue focus:ring-offset-2"
+            >
+              Join the waitlist &rarr;
+            </Link>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="grid gap-7 lg:grid-cols-[1.1fr_0.9fr]">

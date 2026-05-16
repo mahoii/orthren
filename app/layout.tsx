@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -25,11 +26,19 @@ export default function RootLayout({
       <body>
         <header className="border-b border-[#E2E8F0] bg-white/90 backdrop-blur">
           <nav className="mx-auto flex h-14 max-w-7xl items-center px-6" aria-label="Primary">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-1 items-center gap-2">
               <span className="text-base font-bold text-clinical-navy">Greenlit MD</span>
               <span className="rounded-full border border-[#CBD5E1] bg-[#F8F9FB] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
                 Beta
               </span>
+            </div>
+            <div className="flex items-center">
+              <Link
+                href="/waitlist"
+                className="text-sm font-semibold text-clinical-blue hover:text-clinical-navy transition-colors"
+              >
+                Join Waitlist
+              </Link>
             </div>
           </nav>
         </header>
