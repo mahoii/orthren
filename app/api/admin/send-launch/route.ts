@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabase, getAllSignups } from "@/lib/supabase";
+import { getSignupEmailsByStage, updateEmailStageForEmails } from "@/lib/supabase/server";
 import { sendLaunchEmail } from "@/lib/resend";
 
 export const runtime = "nodejs";
@@ -20,12 +20,7 @@ export async function POST(request: Request) {
 
   try {
     // Only send to those not yet notified
-    const { data: signups } = await supabase
-      .from("waitlist_signups")
-      .select("email")
-      .eq("email_stage", 1);
-
-    const emails = (signups ?? []).map((s: { email: string }) => s.email);
+    const emails = await getSignupEmailsByStage(1);
 
     if (emails.length === 0) {
       return NextResponse.json({ success: true, sent: 0, message: "All subscribers already notified." });
@@ -52,10 +47,7 @@ export async function POST(request: Request) {
 
     // Mark successfully emailed subscribers as stage 3
     if (sentEmails.length > 0) {
-      await supabase
-        .from("waitlist_signups")
-        .update({ email_stage: 3 })
-        .in("email", sentEmails);
+      await updateEmailStageForEmails(sentEmails, 3);
     }
 
     return NextResponse.json({ success: true, sent, failed, total: emails.length });

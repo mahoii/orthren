@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { verifyUnsubscribeToken, createUnsubscribeToken } from "@/lib/resend";
-import { deleteSignupByEmail } from "@/lib/supabase";
+import { verifyUnsubscribeToken } from "@/lib/resend";
+import { deleteSignupByEmail } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

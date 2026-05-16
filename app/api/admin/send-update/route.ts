@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAllSignups } from "@/lib/supabase";
+import { getAllSignups } from "@/lib/supabase/server";
 import { sendUpdateEmail } from "@/lib/resend";
 
 export const runtime = "nodejs";

@@ -49,7 +49,7 @@ export default function AdminPage() {
     e.preventDefault();
     if (isLoading) return;
     if (!confirm("Are you sure you want to send the launch email to all unnotified subscribers?")) return;
-    
+
     setIsLoading(true);
     setMessage("Sending launch email...");
 
@@ -146,7 +146,7 @@ export default function AdminPage() {
           <section className="bg-white p-6 rounded-xl shadow-sm border border-[#E2E8F0]">
             <h2 className="text-xl font-bold text-clinical-navy mb-4">Send Launch Email</h2>
             <p className="text-sm text-slate-600 mb-6">
-              This will send the final "We are live" email to all waitlist subscribers who have an email_stage of 1. Their stage will be updated to 3 after sending.
+              This will send the final &quot;We are live&quot; email to all waitlist subscribers who have an email_stage of 1. Their stage will be updated to 3 after sending.
             </p>
             <button
               onClick={handleSendLaunch}

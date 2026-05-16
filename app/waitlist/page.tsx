@@ -49,9 +49,9 @@ export default function WaitlistPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-clinical-navy mb-3">You're on the list</h1>
+          <h1 className="text-2xl font-bold text-clinical-navy mb-3">You&apos;re on the list</h1>
           <p className="text-slate-600 mb-8 leading-relaxed">
-            We've sent a quick confirmation to your email. We'll reach out personally when early access opens.
+            We&apos;ve sent a quick confirmation to your email. We&apos;ll reach out personally when early access opens.
           </p>
           <Link
             href="/"

@@ -1,9 +1,18 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 export default function UnsubscribePage() {
+  return (
+    <Suspense>
+      <UnsubscribeContent />
+    </Suspense>
+  );
+}
+
+function UnsubscribeContent() {
   const searchParams = useSearchParams();
   const success = searchParams.get("success");
 
@@ -19,7 +28,7 @@ export default function UnsubscribePage() {
             </div>
             <h1 className="text-2xl font-bold text-clinical-navy mb-3">Unsubscribed</h1>
             <p className="text-slate-600 mb-8 leading-relaxed">
-              You have been successfully removed from the Greenlit MD waitlist. You won't receive any more emails from us.
+              You have been successfully removed from the Greenlit MD waitlist. You won&apos;t receive any more emails from us.
             </p>
           </>
         ) : (
