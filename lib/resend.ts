@@ -116,6 +116,3 @@ export async function sendLaunchEmail(email: string, launchUrl: string) {
     html
   });
 }
-    html
-  });
-}
