@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     const { email } = await request.json();
 
     if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
-      return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid email address.' }, { status: 400 });
     }
 
     // 1. Insert into Supabase [cite: 155]
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     if (dbError) {
       // Handle the specific Postgres unique constraint violation [cite: 164]
       if (dbError.code === '23505') {
-        return NextResponse.json({ error: 'already_registered' }, { status: 409 });
+        return NextResponse.json({ error: 'You are already registered.' }, { status: 409 });
       }
       throw dbError;
     }
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error("Waitlist API Error:", error);
     return NextResponse.json(
-      { error: 'failed_to_process' }, 
+      { error: 'Failed to process. Please try again later.' }, 
       { status: 500 }
     );
   }
