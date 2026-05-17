@@ -23,13 +23,13 @@ export function createSupabaseServerClient() {
 
 export async function insertSignup(
   email: string,
-  phone: string | null,
+  name: string | null,
   practice_name: string | null
 ): Promise<{ data: WaitlistSignup | null; error: { code?: string; message: string } | null }> {
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from("waitlist_signups")
-    .insert({ email, phone: phone || null, practice_name: practice_name || null, email_stage: 1 })
+    .insert({ email, name: name || null, practice_name: practice_name || null, email_stage: 1 })
     .select()
     .single();
 

@@ -6,7 +6,6 @@ import Link from "next/link";
 export default function WaitlistPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [practiceName, setPracticeName] = useState("");
   const [honey, setHoney] = useState(""); // Honeypot
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +22,7 @@ export default function WaitlistPage() {
       const res = await fetch("/api/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, phone, practice_name: practiceName, _honey: honey }),
+        body: JSON.stringify({ email, phone, _honey: honey }),
       });
 
       const data = await res.json();
@@ -104,40 +103,6 @@ export default function WaitlistPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@practice.com"
-                disabled={isLoading}
-                className="w-full rounded-md border border-clinical-line px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-clinical-blue focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
-              />
-            </label>
-
-            <label className="block">
-              <span className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-2">
-                Practice Name
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
-                  Optional
-                </span>
-              </span>
-              <input
-                type="text"
-                value={practiceName}
-                onChange={(e) => setPracticeName(e.target.value)}
-                placeholder="e.g. Langone Orthopedics"
-                disabled={isLoading}
-                className="w-full rounded-md border border-clinical-line px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-clinical-blue focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
-              />
-            </label>
-
-            <label className="block">
-              <span className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-2">
-                Phone Number
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
-                  Optional
-                </span>
-              </span>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="(555) 123-4567"
                 disabled={isLoading}
                 className="w-full rounded-md border border-clinical-line px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-clinical-blue focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
               />

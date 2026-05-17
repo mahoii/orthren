@@ -8,6 +8,7 @@ export type Database = {
           id: string;
           email: string;
           phone: string | null;
+          name: string | null;
           practice_name: string | null;
           email_stage: number;
           created_at: string;
@@ -16,6 +17,7 @@ export type Database = {
           id?: string;
           email: string;
           phone?: string | null;
+          name?: string | null;
           practice_name?: string | null;
           email_stage?: number;
           created_at?: string;
@@ -24,6 +26,7 @@ export type Database = {
           id?: string;
           email?: string;
           phone?: string | null;
+          name?: string | null;
           practice_name?: string | null;
           email_stage?: number;
           created_at?: string;
