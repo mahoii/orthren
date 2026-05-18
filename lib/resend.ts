@@ -70,7 +70,7 @@ export async function sendConfirmationEmail(email: string, position: number) {
   `, email);
 
   return resend.emails.send({
-    from: "Greenlit MD <hello@greenlitmd.app>",
+    from: "Greenlit MD <hello@contact.greenlitmd.app>",
     to: email,
     subject: "You're on the Greenlit MD waitlist",
     html
@@ -94,7 +94,7 @@ export async function sendUpdateEmail(
   `, email);
 
   return resend.emails.send({
-    from: "Greenlit MD <hello@greenlitmd.app>",
+    from: "Greenlit MD <hello@contact.greenlitmd.app>",
     to: email,
     subject: opts.subject,
     html
@@ -110,7 +110,7 @@ export async function sendLaunchEmail(email: string, launchUrl: string) {
   `, email);
 
   return resend.emails.send({
-    from: "Greenlit MD <hello@greenlitmd.app>",
+    from: "Greenlit MD <hello@contact.greenlitmd.app>",
     to: email,
     subject: "Your early access to Greenlit MD is ready",
     html
