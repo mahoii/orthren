@@ -27,7 +27,11 @@ export async function POST(request: Request) {
     const position = await getSignupPosition(email);
 
     // Trigger Resend Confirmation
-    await sendConfirmationEmail(email, position > 0 ? position : 1);
+    const { error: resendError } = await sendConfirmationEmail(email, position > 0 ? position : 1);
+    
+    if (resendError) {
+      console.error("Resend Error (Confirmation Email):", resendError);
+    }
 
     return NextResponse.json({ success: true });
 

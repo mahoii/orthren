@@ -47,9 +47,15 @@ export async function POST(request: Request) {
             headline: body.headline!,
             bullets: body.bullets!,
             screenshot_url: body.screenshot_url
-          }).then(() => {
-            sent += 1;
-          }).catch(() => {
+          }).then((res) => {
+            if (res.error) {
+              console.error(`Resend failed for ${email}:`, res.error);
+              failed += 1;
+            } else {
+              sent += 1;
+            }
+          }).catch((err) => {
+            console.error(`Unexpected error sending to ${email}:`, err);
             failed += 1;
           })
         )

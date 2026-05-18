@@ -34,10 +34,16 @@ export async function POST(request: Request) {
       const batch = emails.slice(i, i + BATCH_SIZE);
       await Promise.allSettled(
         batch.map((email) =>
-          sendLaunchEmail(email, LAUNCH_URL).then(() => {
-            sent += 1;
-            sentEmails.push(email);
-          }).catch(() => {
+          sendLaunchEmail(email, LAUNCH_URL).then((res) => {
+            if (res.error) {
+              console.error(`Resend failed for ${email}:`, res.error);
+              failed += 1;
+            } else {
+              sent += 1;
+              sentEmails.push(email);
+            }
+          }).catch((err) => {
+            console.error(`Unexpected error sending to ${email}:`, err);
             failed += 1;
           })
         )
