@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyUnsubscribeToken } from "@/lib/resend";
-import { deleteSignupByEmail } from "@/lib/supabase/server";
+import { unsubscribeEmail } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,18 +9,19 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const token = searchParams.get("token");
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://greenlitmd.app";
+
   if (!token) {
-    return NextResponse.json({ error: "Missing token." }, { status: 400 });
+    return NextResponse.redirect(`${appUrl}/unsubscribed`);
   }
 
   const email = verifyUnsubscribeToken(token);
 
   if (!email) {
-    return NextResponse.json({ error: "Invalid or expired unsubscribe link." }, { status: 400 });
+    return NextResponse.redirect(`${appUrl}/unsubscribed`);
   }
 
-  await deleteSignupByEmail(email);
+  await unsubscribeEmail(email);
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://greenlitmd.app";
-  return NextResponse.redirect(`${appUrl}/unsubscribe?success=1`);
+  return NextResponse.redirect(`${appUrl}/unsubscribed`);
 }

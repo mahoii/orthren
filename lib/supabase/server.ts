@@ -68,6 +68,7 @@ export async function getAllSignups(): Promise<WaitlistSignup[]> {
   const { data } = await supabase
     .from("waitlist_signups")
     .select("*")
+    .neq("unsubscribed", true)
     .order("created_at", { ascending: true });
 
   return data ?? [];
@@ -78,14 +79,15 @@ export async function getSignupEmailsByStage(stage: number): Promise<string[]> {
   const { data } = await supabase
     .from("waitlist_signups")
     .select("email")
-    .eq("email_stage", stage);
+    .eq("email_stage", stage)
+    .neq("unsubscribed", true);
 
   return (data ?? []).map((signup) => signup.email);
 }
 
-export async function deleteSignupByEmail(email: string): Promise<void> {
+export async function unsubscribeEmail(email: string): Promise<void> {
   const supabase = createSupabaseServerClient();
-  await supabase.from("waitlist_signups").delete().eq("email", email);
+  await supabase.from("waitlist_signups").update({ unsubscribed: true }).eq("email", email);
 }
 
 export async function updateEmailStage(email: string, stage: number): Promise<void> {

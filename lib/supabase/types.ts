@@ -10,6 +10,7 @@ export type Database = {
           phone: string | null;
           name: string | null;
           practice_name: string | null;
+          unsubscribed: boolean | null;
           email_stage: number;
           created_at: string;
         };
@@ -19,6 +20,7 @@ export type Database = {
           phone?: string | null;
           name?: string | null;
           practice_name?: string | null;
+          unsubscribed?: boolean | null;
           email_stage?: number;
           created_at?: string;
         };
@@ -28,6 +30,7 @@ export type Database = {
           phone?: string | null;
           name?: string | null;
           practice_name?: string | null;
+          unsubscribed?: boolean | null;
           email_stage?: number;
           created_at?: string;
         };

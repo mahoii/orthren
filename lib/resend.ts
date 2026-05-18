@@ -30,7 +30,7 @@ export function verifyUnsubscribeToken(token: string): string | null {
 }
 
 function unsubscribeUrl(email: string): string {
-  return `${appUrl}/unsubscribe?token=${createUnsubscribeToken(email)}`;
+  return `${appUrl}/api/unsubscribe?token=${createUnsubscribeToken(email)}`;
 }
 
 const baseHtml = (body: string, email: string) => `<!DOCTYPE html>
@@ -65,14 +65,14 @@ export async function sendConfirmationEmail(email: string, position: number) {
     <h1>You're on the Greenlit MD waitlist.</h1>
     <p>Thanks for signing up. You're <strong>#${position}</strong> on the list.</p>
     <p>Greenlit MD reads a patient chart and generates a complete prior authorization packet — letter of medical necessity, PA score, and submission checklist — in under 60 seconds. No templates. No copy-paste.</p>
-    <p>We'll reach out personally when your spot opens. In the meantime, feel free to reply to this email with questions.</p>
+    <p>We'll let you know the moment we launch. In the meantime, <a href="https://greenlitmd.app">see how it works →</a></p>
     <p style="color:#94a3b8;font-size:13px">— The Greenlit MD Team</p>
   `, email);
 
   return resend.emails.send({
-    from: "Greenlit MD <hello@contact.greenlitmd.app>",
+    from: "Kamari at Greenlit MD <hello@contact.greenlitmd.app>",
     to: email,
-    subject: "You're on the Greenlit MD waitlist",
+    subject: `You're #${position} on the Greenlit MD waitlist`,
     html
   });
 }
@@ -94,7 +94,7 @@ export async function sendUpdateEmail(
   `, email);
 
   return resend.emails.send({
-    from: "Greenlit MD <hello@contact.greenlitmd.app>",
+    from: "Kamari at Greenlit MD <hello@contact.greenlitmd.app>",
     to: email,
     subject: opts.subject,
     html
@@ -110,7 +110,7 @@ export async function sendLaunchEmail(email: string, launchUrl: string) {
   `, email);
 
   return resend.emails.send({
-    from: "Greenlit MD <hello@contact.greenlitmd.app>",
+    from: "Kamari at Greenlit MD <hello@contact.greenlitmd.app>",
     to: email,
     subject: "Your early access to Greenlit MD is ready",
     html
