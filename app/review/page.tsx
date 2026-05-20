@@ -421,7 +421,7 @@ export default function ReviewPage() {
       </header>
 
       <div className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[360px_1fr]">
-        <aside className="order-2 min-w-0 space-y-4 rounded-lg border border-[#E2E8F0] bg-white p-4 lg:order-1 lg:space-y-6 lg:p-5">
+        <aside className="order-2 min-w-0 flex flex-col space-y-4 rounded-lg border border-[#E2E8F0] bg-white p-4 lg:order-1 lg:space-y-6 lg:p-5">
           <div className="rounded-2xl bg-[#F1F5F9] p-1 shadow-inner lg:rounded-full">
             <div className="grid gap-1 md:grid-cols-3">
               <SidebarTabButton
@@ -458,7 +458,7 @@ export default function ReviewPage() {
                 }
               }));
             }}
-            className="relative min-h-[420px] max-h-[calc(100vh-20rem)] overflow-y-auto pr-1 pb-24"
+            className="relative min-h-[420px] max-h-[calc(100vh-10rem)] overflow-y-auto pr-1 pb-32"
           >
             <div
               className={`pointer-events-none sticky top-0 z-10 h-8 bg-gradient-to-b from-white via-white/85 to-transparent transition-opacity duration-150 ${tabScrollMetrics[activeTab].scrollTop > 0 ? "opacity-100" : "opacity-0"
@@ -653,7 +653,7 @@ export default function ReviewPage() {
               ) : null}
             </div>
             <div
-              className={`pointer-events-none sticky bottom-0 z-10 h-4 bg-gradient-to-t from-white/40 via-white/85 to-transparent transition-opacity duration-150 ${tabScrollMetrics[activeTab].scrollHeight > tabScrollMetrics[activeTab].clientHeight + tabScrollMetrics[activeTab].scrollTop
+              className={`pointer-events-none sticky bottom-0 z-10 h-6 bg-gradient-to-t from-white/40 via-white/85 to-transparent transition-opacity duration-150 ${tabScrollMetrics[activeTab].scrollHeight > tabScrollMetrics[activeTab].clientHeight + tabScrollMetrics[activeTab].scrollTop
                   ? "opacity-100"
                   : "opacity-0"
                 }`}
