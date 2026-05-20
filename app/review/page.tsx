@@ -51,47 +51,47 @@ const paStrengthFactors: Array<{
   label: string;
   placeholder: string;
 }> = [
-  {
-    key: "diagnosis_codes",
-    label: "Diagnosis Codes",
-    placeholder: "e.g. M17.11, M16.12"
-  },
-  {
-    key: "conservative_treatments_named",
-    label: "Conservative Treatments Named",
-    placeholder: "e.g. Physical therapy, NSAIDs"
-  },
-  {
-    key: "conservative_treatment_duration",
-    label: "Conservative Treatment Duration",
-    placeholder: "e.g. 8 weeks of PT"
-  },
-  {
-    key: "imaging_findings",
-    label: "Imaging Findings",
-    placeholder: "e.g. MRI: full thickness tear"
-  },
-  {
-    key: "functional_limitations",
-    label: "Functional Limitations",
-    placeholder: "e.g. cannot climb stairs"
-  },
-  {
-    key: "surgical_approach",
-    label: "Surgical Approach",
-    placeholder: "e.g. arthroscopic"
-  },
-  {
-    key: "cpt_code_valid",
-    label: "CPT Code Valid",
-    placeholder: "e.g. 29827"
-  },
-  {
-    key: "symptom_duration",
-    label: "Symptom Duration",
-    placeholder: "e.g. 6 months"
-  }
-];
+    {
+      key: "diagnosis_codes",
+      label: "Diagnosis Codes",
+      placeholder: "e.g. M17.11, M16.12"
+    },
+    {
+      key: "conservative_treatments_named",
+      label: "Conservative Treatments Named",
+      placeholder: "e.g. Physical therapy, NSAIDs"
+    },
+    {
+      key: "conservative_treatment_duration",
+      label: "Conservative Treatment Duration",
+      placeholder: "e.g. 8 weeks of PT"
+    },
+    {
+      key: "imaging_findings",
+      label: "Imaging Findings",
+      placeholder: "e.g. MRI: full thickness tear"
+    },
+    {
+      key: "functional_limitations",
+      label: "Functional Limitations",
+      placeholder: "e.g. cannot climb stairs"
+    },
+    {
+      key: "surgical_approach",
+      label: "Surgical Approach",
+      placeholder: "e.g. arthroscopic"
+    },
+    {
+      key: "cpt_code_valid",
+      label: "CPT Code Valid",
+      placeholder: "e.g. 29827"
+    },
+    {
+      key: "symptom_duration",
+      label: "Symptom Duration",
+      placeholder: "e.g. 6 months"
+    }
+  ];
 
 export default function ReviewPage() {
   const [data, setData] = useState<ReviewData | null>(null);
@@ -306,10 +306,10 @@ export default function ReviewPage() {
       setData((current) =>
         current
           ? {
-              ...current,
-              extracted: updatedExtracted,
-              cptCode: updatedRequestDetails.cptCode
-            }
+            ...current,
+            extracted: updatedExtracted,
+            cptCode: updatedRequestDetails.cptCode
+          }
           : current
       );
       setToast("Letter regenerated with your updates");
@@ -449,157 +449,154 @@ export default function ReviewPage() {
             onScroll={(event) => {
               const target = event.currentTarget;
               setTabScrollPositions((current) => ({ ...current, [activeTab]: target.scrollTop }));
-                setTabScrollMetrics((current) => ({
-                  ...current,
-                  [activeTab]: {
-                    scrollTop: target.scrollTop,
-                    scrollHeight: target.scrollHeight,
-                    clientHeight: target.clientHeight
-                  }
-                }));
+              setTabScrollMetrics((current) => ({
+                ...current,
+                [activeTab]: {
+                  scrollTop: target.scrollTop,
+                  scrollHeight: target.scrollHeight,
+                  clientHeight: target.clientHeight
+                }
+              }));
             }}
-            className="relative min-h-[420px] max-h-[calc(100vh-20rem)] overflow-y-auto pr-1"
+            className="relative min-h-[420px] max-h-[calc(100vh-20rem)] overflow-y-auto pr-1 pb-24"
           >
             <div
-              className={`pointer-events-none sticky top-0 z-10 h-8 bg-gradient-to-b from-white via-white/85 to-transparent transition-opacity duration-150 ${
-                tabScrollMetrics[activeTab].scrollTop > 0 ? "opacity-100" : "opacity-0"
-              }`}
+              className={`pointer-events-none sticky top-0 z-10 h-8 bg-gradient-to-b from-white via-white/85 to-transparent transition-opacity duration-150 ${tabScrollMetrics[activeTab].scrollTop > 0 ? "opacity-100" : "opacity-0"
+                }`}
               aria-hidden="true"
             />
             <div className="transition-opacity duration-150 ease-out" style={{ opacity: tabContentOpacity }}>
               {activeTab === "pa-score" ? (
                 <section className="rounded-lg border border-slate-200 bg-slate-50/80 p-4 pb-6">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">PA Strength Score</p>
-                <p className={`mt-2 text-3xl font-semibold ${getScoreTextClass(paScore)}`}>{scoreLabel}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsScoreExpanded((current) => !current)}
-                className="mt-1 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-slate-300"
-                aria-expanded={isScoreExpanded}
-                aria-label="Toggle PA strength breakdown"
-              >
-                <svg
-                  className={`h-4 w-4 transition-transform duration-200 ${isScoreExpanded ? "rotate-180" : "rotate-0"}`}
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  aria-hidden="true"
-                >
-                  <path d="M5 8l5 5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
-              </button>
-            </div>
-            <div className="mt-4">
-              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                <div
-                  className={`h-full rounded-full transition-[width] duration-[800ms] ${getScoreBarClass(paScore)}`}
-                  style={{ width: `${animatedScorePercent}%` }}
-                />
-              </div>
-              <p className="mt-2 text-sm font-medium text-slate-600">{paScoreDescriptor}</p>
-            </div>
-            <div
-              className={`mt-4 overflow-hidden transition-all duration-200 ease-in-out ${
-                isScoreExpanded ? "max-h-[1400px] opacity-100" : "max-h-0 opacity-0"
-              }`}
-            >
-              <div className="space-y-3 pt-2">
-                {paStrengthFactors.map((factor) => {
-                  const baseScore = basePaStrength?.[factor.key]?.score ?? 0;
-                  const baseNote = basePaStrength?.[factor.key]?.note ?? "";
-                  const manualFix = manualFixes[factor.key];
-                  const isManualResolved = Boolean(manualFix?.resolved);
-                  const hasSuggestion = Boolean(suggestions[factor.key]);
-                  const displayNote = baseNote || "No note provided.";
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">PA Strength Score</p>
+                      <p className={`mt-2 text-3xl font-semibold ${getScoreTextClass(paScore)}`}>{scoreLabel}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsScoreExpanded((current) => !current)}
+                      className="mt-1 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-slate-300"
+                      aria-expanded={isScoreExpanded}
+                      aria-label="Toggle PA strength breakdown"
+                    >
+                      <svg
+                        className={`h-4 w-4 transition-transform duration-200 ${isScoreExpanded ? "rotate-180" : "rotate-0"}`}
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        aria-hidden="true"
+                      >
+                        <path d="M5 8l5 5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="mt-4">
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                      <div
+                        className={`h-full rounded-full transition-[width] duration-[800ms] ${getScoreBarClass(paScore)}`}
+                        style={{ width: `${animatedScorePercent}%` }}
+                      />
+                    </div>
+                    <p className="mt-2 text-sm font-medium text-slate-600">{paScoreDescriptor}</p>
+                  </div>
+                  <div
+                    className={`mt-4 overflow-hidden transition-all duration-200 ease-in-out ${isScoreExpanded ? "max-h-[1400px] opacity-100" : "max-h-0 opacity-0"
+                      }`}
+                  >
+                    <div className="space-y-3 pt-2">
+                      {paStrengthFactors.map((factor) => {
+                        const baseScore = basePaStrength?.[factor.key]?.score ?? 0;
+                        const baseNote = basePaStrength?.[factor.key]?.note ?? "";
+                        const manualFix = manualFixes[factor.key];
+                        const isManualResolved = Boolean(manualFix?.resolved);
+                        const hasSuggestion = Boolean(suggestions[factor.key]);
+                        const displayNote = baseNote || "No note provided.";
 
-                  return (
-                    <div key={factor.key} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-                      <div className="flex gap-3">
-                        <span
-                          className={`mt-0.5 flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold ${
-                            isManualResolved
-                              ? "border-blue-200 bg-blue-50 text-blue-600"
-                              : baseScore === 1
-                                ? "border-green-200 bg-green-50 text-green-600"
-                                : "border-red-200 bg-red-50 text-red-600"
-                          }`}
-                        >
-                          {isManualResolved ? (
-                            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
-                              <path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                            </svg>
-                          ) : baseScore === 1 ? (
-                            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
-                              <path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                            </svg>
-                          ) : (
-                            <span aria-hidden="true">!</span>
-                          )}
-                        </span>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between gap-3">
-                            <p className="text-sm font-semibold text-slate-800">{factor.label}</p>
-                            <span className="text-xs font-semibold text-slate-500">{isManualResolved ? "Resolved" : baseScore === 1 ? "OK" : "Missing"}</span>
-                          </div>
-                          <p className="mt-1 text-sm text-slate-600">{displayNote}</p>
-                          {baseScore === 0 ? (
-                            <div className="mt-3 space-y-2">
-                              <input
-                                value={manualFix?.value ?? ""}
-                                onChange={(event) => updateManualFix(factor.key, event.target.value)}
-                                placeholder={factor.placeholder}
-                                className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-clinical-blue focus:ring-2 focus:ring-blue-100"
-                              />
-                              <div className="flex flex-wrap items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleSuggestFix(factor.key, factor.label)}
-                                  disabled={Boolean(isSuggesting[factor.key])}
-                                  className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-800 disabled:cursor-not-allowed disabled:text-slate-400"
-                                >
-                                  {isSuggesting[factor.key] ? "Suggesting..." : "Suggest fix"}
-                                </button>
+                        return (
+                          <div key={factor.key} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                            <div className="flex gap-3">
+                              <span
+                                className={`mt-0.5 flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold ${isManualResolved
+                                    ? "border-blue-200 bg-blue-50 text-blue-600"
+                                    : baseScore === 1
+                                      ? "border-green-200 bg-green-50 text-green-600"
+                                      : "border-red-200 bg-red-50 text-red-600"
+                                  }`}
+                              >
                                 {isManualResolved ? (
-                                  <div className="flex flex-col gap-0.5">
-                                    <span className="text-xs font-semibold text-blue-600">Marked resolved</span>
-                                    <span className="text-xs text-slate-500">Hit &quot;Regenerate letter&quot; below to apply this fix.</span>
+                                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
+                                    <path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                  </svg>
+                                ) : baseScore === 1 ? (
+                                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
+                                    <path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                  </svg>
+                                ) : (
+                                  <span aria-hidden="true">!</span>
+                                )}
+                              </span>
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between gap-3">
+                                  <p className="text-sm font-semibold text-slate-800">{factor.label}</p>
+                                  <span className="text-xs font-semibold text-slate-500">{isManualResolved ? "Resolved" : baseScore === 1 ? "OK" : "Missing"}</span>
+                                </div>
+                                <p className="mt-1 text-sm text-slate-600">{displayNote}</p>
+                                {baseScore === 0 ? (
+                                  <div className="mt-3 space-y-2">
+                                    <input
+                                      value={manualFix?.value ?? ""}
+                                      onChange={(event) => updateManualFix(factor.key, event.target.value)}
+                                      placeholder={factor.placeholder}
+                                      className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-clinical-blue focus:ring-2 focus:ring-blue-100"
+                                    />
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSuggestFix(factor.key, factor.label)}
+                                        disabled={Boolean(isSuggesting[factor.key])}
+                                        className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-800 disabled:cursor-not-allowed disabled:text-slate-400"
+                                      >
+                                        {isSuggesting[factor.key] ? "Suggesting..." : "Suggest fix"}
+                                      </button>
+                                      {isManualResolved ? (
+                                        <div className="flex flex-col gap-0.5">
+                                          <span className="text-xs font-semibold text-blue-600">Marked resolved</span>
+                                          <span className="text-xs text-slate-500">Hit &quot;Regenerate letter&quot; below to apply this fix.</span>
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                    {hasSuggestion ? (
+                                      <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                                        <p className="font-medium">Suggestion</p>
+                                        <p className="mt-1">{suggestions[factor.key]}</p>
+                                        <div className="mt-2 flex gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleApplySuggestion(factor.key)}
+                                            className="rounded-md bg-clinical-navy px-3 py-1 text-xs font-semibold text-white hover:bg-clinical-blue"
+                                          >
+                                            Apply
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDismissSuggestion(factor.key)}
+                                            className="rounded-md border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300"
+                                          >
+                                            Dismiss
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ) : null}
                                   </div>
                                 ) : null}
                               </div>
-                              {hasSuggestion ? (
-                                <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
-                                  <p className="font-medium">Suggestion</p>
-                                  <p className="mt-1">{suggestions[factor.key]}</p>
-                                  <div className="mt-2 flex gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleApplySuggestion(factor.key)}
-                                      className="rounded-md bg-clinical-navy px-3 py-1 text-xs font-semibold text-white hover:bg-clinical-blue"
-                                    >
-                                      Apply
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDismissSuggestion(factor.key)}
-                                      className="rounded-md border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300"
-                                    >
-                                      Dismiss
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : null}
                             </div>
-                          ) : null}
-                        </div>
-                      </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          </section>
+                  </div>
+                </section>
               ) : null}
               {activeTab === "chart-data" ? (
                 <section>
@@ -618,9 +615,8 @@ export default function ReviewPage() {
                     <DataRow label="Imaging findings"
                       value={
                         data.extracted.imaging_findings
-                          ? `${data.extracted.imaging_findings.modality ?? "Unknown modality"}: ${
-                              data.extracted.imaging_findings.key_findings ?? "Missing findings"
-                            }`
+                          ? `${data.extracted.imaging_findings.modality ?? "Unknown modality"}: ${data.extracted.imaging_findings.key_findings ?? "Missing findings"
+                          }`
                           : null
                       }
                     />
@@ -657,23 +653,24 @@ export default function ReviewPage() {
               ) : null}
             </div>
             <div
-              className={`pointer-events-none sticky bottom-0 z-10 h-4 bg-gradient-to-t from-white/40 via-white/85 to-transparent transition-opacity duration-150 ${
-                tabScrollMetrics[activeTab].scrollHeight > tabScrollMetrics[activeTab].clientHeight + tabScrollMetrics[activeTab].scrollTop
+              className={`pointer-events-none sticky bottom-0 z-10 h-4 bg-gradient-to-t from-white/40 via-white/85 to-transparent transition-opacity duration-150 ${tabScrollMetrics[activeTab].scrollHeight > tabScrollMetrics[activeTab].clientHeight + tabScrollMetrics[activeTab].scrollTop
                   ? "opacity-100"
                   : "opacity-0"
-              }`}
+                }`}
               aria-hidden="true"
             />
           </div>
           {activeTab === "pa-score" ? (
-            <button
-              type="button"
-              onClick={handleRegenerateLetter}
-              disabled={isRegenerating}
-              className="mt-4 w-full rounded-md bg-clinical-navy px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-clinical-blue disabled:bg-slate-300"
-            >
-              {isRegenerating ? "Regenerating..." : "Regenerate letter with fixes"}
-            </button>
+            <div className="pt-3 border-t border-slate-200 bg-white">
+              <button
+                type="button"
+                onClick={handleRegenerateLetter}
+                disabled={isRegenerating}
+                className="mt-4 w-full rounded-md bg-clinical-navy px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-clinical-blue disabled:bg-slate-300"
+              >
+                {isRegenerating ? "Regenerating..." : "Regenerate letter with fixes"}
+              </button>
+            </div>
           ) : null}
         </aside>
 
@@ -791,11 +788,10 @@ function SidebarTabButton({ label, isActive, onClick, badge, dotColor }: Sidebar
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center justify-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition duration-150 ${
-        isActive
+      className={`flex items-center justify-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition duration-150 ${isActive
           ? "border-white bg-white text-[#1E3A5F] shadow-[0_8px_20px_rgba(15,23,42,0.12)]"
           : "border-transparent bg-transparent text-[#94A3B8] hover:bg-white/70 hover:text-slate-600"
-      }`}
+        }`}
     >
       <span>{label}</span>
       {badgeText ? (
