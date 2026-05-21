@@ -25,16 +25,6 @@ type Suggestions = Partial<Record<PaStrengthFactorKey, string>>;
 
 type SuggestionLoading = Partial<Record<PaStrengthFactorKey, boolean>>;
 
-type SidebarTab = "pa-score" | "chart-data" | "denial-risks";
-
-type SidebarTabButtonProps = {
-  label: string;
-  isActive: boolean;
-  onClick: () => void;
-  badge?: string;
-  dotColor?: string;
-};
-
 const paStrengthWeights: Record<PaStrengthFactorKey, number> = {
   diagnosis_codes: 10,
   conservative_treatments_named: 20,
@@ -103,21 +93,9 @@ export default function ReviewPage() {
   const [suggestions, setSuggestions] = useState<Suggestions>({});
   const [isSuggesting, setIsSuggesting] = useState<SuggestionLoading>({});
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [remediationFactor, setRemediationFactor] = useState<PaStrengthFactorKey | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [animatedScorePercent, setAnimatedScorePercent] = useState(0);
-  const [activeTab, setActiveTab] = useState<SidebarTab>("pa-score");
-  const [tabScrollPositions, setTabScrollPositions] = useState<Record<SidebarTab, number>>({
-    "pa-score": 0,
-    "chart-data": 0,
-    "denial-risks": 0
-  });
-  const [tabScrollMetrics, setTabScrollMetrics] = useState<Record<SidebarTab, { scrollTop: number; scrollHeight: number; clientHeight: number }>>({
-    "pa-score": { scrollTop: 0, scrollHeight: 0, clientHeight: 0 },
-    "chart-data": { scrollTop: 0, scrollHeight: 0, clientHeight: 0 },
-    "denial-risks": { scrollTop: 0, scrollHeight: 0, clientHeight: 0 }
-  });
-  const tabContentRef = useRef<HTMLDivElement | null>(null);
-  const [tabContentOpacity, setTabContentOpacity] = useState(1);
   const hasAnimatedScoreRef = useRef(false);
 
   useEffect(() => {
@@ -139,8 +117,11 @@ export default function ReviewPage() {
   const missingFields = useMemo(() => (data ? findMissingFields(data.extracted) : []), [data]);
   const basePaStrength = data?.extracted.pa_strength;
   const paScore = useMemo(() => computePaStrengthScore(basePaStrength, manualFixes), [basePaStrength, manualFixes]);
+  const hasAppliedFixes = useMemo(
+    () => Object.values(manualFixes).some((fix) => fix?.resolved),
+    [manualFixes]
+  );
   const paScorePercent = Math.min(100, Math.max(0, (paScore / 10) * 100));
-  const paScoreColor = getScoreColor(paScore);
   const paScoreDescriptor = getScoreDescriptor(paScore);
   const scoreLabel = `${paScore.toFixed(1)} / 10`;
 
@@ -172,22 +153,6 @@ export default function ReviewPage() {
   }, [toast]);
 
   useEffect(() => {
-    const tabContent = tabContentRef.current;
-    if (!tabContent) {
-      return;
-    }
-
-    tabContent.scrollTop = tabScrollPositions[activeTab] ?? 0;
-  }, [activeTab, tabScrollPositions]);
-
-  useEffect(() => {
-    setTabContentOpacity(0);
-    const frame = window.requestAnimationFrame(() => setTabContentOpacity(1));
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [activeTab]);
-
-  useEffect(() => {
     document.title = "Review PA Packet — Greenlit MD";
     return () => {
       document.title = "Greenlit MD";
@@ -204,19 +169,6 @@ export default function ReviewPage() {
         source
       }
     }));
-  }
-
-  function handleTabChange(nextTab: SidebarTab) {
-    const tabContent = tabContentRef.current;
-
-    if (tabContent) {
-      setTabScrollPositions((current) => ({
-        ...current,
-        [activeTab]: tabContent.scrollTop
-      }));
-    }
-
-    setActiveTab(nextTab);
   }
 
   async function handleSuggestFix(key: PaStrengthFactorKey, label: string) {
@@ -246,12 +198,6 @@ export default function ReviewPage() {
       }
 
       setSuggestions((current) => ({ ...current, [key]: payload.suggestion ?? "" }));
-      setTimeout(() => {
-        const tabContent = tabContentRef.current;
-        if (tabContent) {
-          tabContent.scrollTop = tabContent.scrollHeight;
-        }
-      }, 50);
     } catch (error) {
       setSuggestions((current) => ({ ...current, [key]: "" }));
       setToast(error instanceof Error ? error.message : "Unable to generate a suggestion.");
@@ -410,6 +356,13 @@ export default function ReviewPage() {
               New upload
             </Link>
             <button
+              onClick={handleRegenerateLetter}
+              disabled={isRegenerating || !hasAppliedFixes}
+              className="rounded-md border border-clinical-line px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 transition"
+            >
+              {isRegenerating ? "Regenerating..." : "Regenerate letter"}
+            </button>
+            <button
               onClick={handleDownload}
               disabled={isDownloading}
               className="rounded-md bg-clinical-navy px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-clinical-blue disabled:bg-slate-300"
@@ -421,52 +374,11 @@ export default function ReviewPage() {
       </header>
 
       <div className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[360px_1fr]">
-        <aside className="order-2 min-w-0 flex flex-col space-y-4 rounded-lg border border-[#E2E8F0] bg-white p-4 lg:order-1 lg:space-y-6 lg:p-5">
-          <div className="rounded-2xl bg-[#F1F5F9] p-1 shadow-inner lg:rounded-full">
-            <div className="grid gap-1 md:grid-cols-3">
-              <SidebarTabButton
-                label="PA Score"
-                isActive={activeTab === "pa-score"}
-                onClick={() => handleTabChange("pa-score")}
-                badge={scoreLabel.split("/")[0].trim()}
-              />
-              <SidebarTabButton
-                label="Chart Data"
-                isActive={activeTab === "chart-data"}
-                onClick={() => handleTabChange("chart-data")}
-              />
-              <SidebarTabButton
-                label="Denial Risks"
-                isActive={activeTab === "denial-risks"}
-                onClick={() => handleTabChange("denial-risks")}
-                dotColor={data.extracted.denial_risk_flags.length ? "#DC2626" : "#16A34A"}
-              />
-            </div>
-          </div>
+        <aside className="order-2 lg:order-1 flex flex-col h-[calc(100vh-3.5rem)] sticky top-14 min-w-0 rounded-lg border border-[#E2E8F0] bg-white p-4 lg:p-5">
 
-          <div
-            ref={tabContentRef}
-            onScroll={(event) => {
-              const target = event.currentTarget;
-              setTabScrollPositions((current) => ({ ...current, [activeTab]: target.scrollTop }));
-              setTabScrollMetrics((current) => ({
-                ...current,
-                [activeTab]: {
-                  scrollTop: target.scrollTop,
-                  scrollHeight: target.scrollHeight,
-                  clientHeight: target.clientHeight
-                }
-              }));
-            }}
-            className="relative min-h-[420px] max-h-[calc(100vh-10rem)] overflow-y-auto pr-1 pb-32"
-          >
-            <div
-              className={`pointer-events-none sticky top-0 z-10 h-8 bg-gradient-to-b from-white via-white/85 to-transparent transition-opacity duration-150 ${tabScrollMetrics[activeTab].scrollTop > 0 ? "opacity-100" : "opacity-0"
-                }`}
-              aria-hidden="true"
-            />
-            <div className="transition-opacity duration-150 ease-out" style={{ opacity: tabContentOpacity }}>
-              {activeTab === "pa-score" ? (
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1 pb-8">
+            <section>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-3">PA Strength Score</p>
                 <section className="rounded-lg border border-slate-200 bg-slate-50/80 p-4 pb-6">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -509,7 +421,6 @@ export default function ReviewPage() {
                         const baseNote = basePaStrength?.[factor.key]?.note ?? "";
                         const manualFix = manualFixes[factor.key];
                         const isManualResolved = Boolean(manualFix?.resolved);
-                        const hasSuggestion = Boolean(suggestions[factor.key]);
                         const displayNote = baseNote || "No note provided.";
 
                         return (
@@ -541,53 +452,14 @@ export default function ReviewPage() {
                                   <span className="text-xs font-semibold text-slate-500">{isManualResolved ? "Resolved" : baseScore === 1 ? "OK" : "Missing"}</span>
                                 </div>
                                 <p className="mt-1 text-sm text-slate-600">{displayNote}</p>
-                                {baseScore === 0 ? (
-                                  <div className="mt-3 space-y-2">
-                                    <input
-                                      value={manualFix?.value ?? ""}
-                                      onChange={(event) => updateManualFix(factor.key, event.target.value)}
-                                      placeholder={factor.placeholder}
-                                      className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-clinical-blue focus:ring-2 focus:ring-blue-100"
-                                    />
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleSuggestFix(factor.key, factor.label)}
-                                        disabled={Boolean(isSuggesting[factor.key])}
-                                        className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-800 disabled:cursor-not-allowed disabled:text-slate-400"
-                                      >
-                                        {isSuggesting[factor.key] ? "Suggesting..." : "Suggest fix"}
-                                      </button>
-                                      {isManualResolved ? (
-                                        <div className="flex flex-col gap-0.5">
-                                          <span className="text-xs font-semibold text-blue-600">Marked resolved</span>
-                                          <span className="text-xs text-slate-500">Hit &quot;Regenerate letter&quot; below to apply this fix.</span>
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                    {hasSuggestion ? (
-                                      <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
-                                        <p className="font-medium">Suggestion</p>
-                                        <p className="mt-1">{suggestions[factor.key]}</p>
-                                        <div className="mt-2 flex gap-2">
-                                          <button
-                                            type="button"
-                                            onClick={() => handleApplySuggestion(factor.key)}
-                                            className="rounded-md bg-clinical-navy px-3 py-1 text-xs font-semibold text-white hover:bg-clinical-blue"
-                                          >
-                                            Apply
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleDismissSuggestion(factor.key)}
-                                            className="rounded-md border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300"
-                                          >
-                                            Dismiss
-                                          </button>
-                                        </div>
-                                      </div>
-                                    ) : null}
-                                  </div>
+                                {baseScore === 0 && !isManualResolved ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setRemediationFactor(factor.key)}
+                                    className="mt-2 inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-clinical-navy hover:text-clinical-navy transition"
+                                  >
+                                    Fix this →
+                                  </button>
                                 ) : null}
                               </div>
                             </div>
@@ -597,9 +469,10 @@ export default function ReviewPage() {
                     </div>
                   </div>
                 </section>
-              ) : null}
-              {activeTab === "chart-data" ? (
-                <section>
+            </section>
+            <div className="my-5 border-t border-slate-100" />
+            <section>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-3">Chart Data</p>
                   <div className="flex items-start justify-between gap-3">
                     <h2 className="text-base font-semibold text-clinical-navy">Chart data we found</h2>
                     {missingFields.length ? <WarningBadge>{missingFields.length} missing</WarningBadge> : null}
@@ -625,8 +498,9 @@ export default function ReviewPage() {
                     <Treatments treatments={data.extracted.conservative_treatments_attempted} />
                   </div>
                 </section>
-              ) : null}
-              {activeTab === "denial-risks" ? (
+            <div className="my-5 border-t border-slate-100" />
+            <section>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-3">Denial Risks</p>
                 <section className="rounded-lg border border-red-200 border-l-4 border-l-[#EF4444] bg-[#FEF2F2] p-5">
                   <h2 className="text-base font-semibold text-red-900">Denial Risk</h2>
                   {data.extracted.denial_risk_flags.length ? (
@@ -650,52 +524,149 @@ export default function ReviewPage() {
                     <p className="mt-3 text-sm text-red-800">No denial risk flags were returned from extraction.</p>
                   )}
                 </section>
-              ) : null}
-            </div>
-            <div
-              className={`pointer-events-none sticky bottom-0 z-10 h-6 bg-gradient-to-t from-white/40 via-white/85 to-transparent transition-opacity duration-150 ${tabScrollMetrics[activeTab].scrollHeight > tabScrollMetrics[activeTab].clientHeight + tabScrollMetrics[activeTab].scrollTop
-                  ? "opacity-100"
-                  : "opacity-0"
-                }`}
-              aria-hidden="true"
-            />
+            </section>
           </div>
-          {activeTab === "pa-score" ? (
-            <div className="pt-3 border-t border-slate-200 bg-white">
-              <button
-                type="button"
-                onClick={handleRegenerateLetter}
-                disabled={isRegenerating}
-                className="mt-4 w-full rounded-md bg-clinical-navy px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-clinical-blue disabled:bg-slate-300"
-              >
-                {isRegenerating ? "Regenerating..." : "Regenerate letter with fixes"}
-              </button>
-            </div>
-          ) : null}
         </aside>
 
-        <section className="order-1 rounded-lg border border-clinical-line bg-white p-5 shadow-sm lg:order-2">
-          <div className="flex flex-col gap-2 border-b border-clinical-line pb-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-clinical-navy">Editable letter draft</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Review and revise before downloading. The exported document includes the required AI-assisted disclaimer.
+        {remediationFactor ? (
+          <section className="order-1 lg:order-2 rounded-lg border border-clinical-line bg-white shadow-sm flex flex-col h-[calc(100vh-3.5rem)] fixed inset-0 z-50 lg:static lg:z-auto lg:sticky lg:top-14">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-clinical-line shrink-0">
+              <button
+                onClick={() => setRemediationFactor(null)}
+                className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-800 transition"
+              >
+                <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none">
+                  <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+                Back to letter
+              </button>
+              <span className="text-slate-300">|</span>
+              <p className="text-sm font-semibold text-clinical-navy">
+                {paStrengthFactors.find((factor) => factor.key === remediationFactor)?.label}
               </p>
             </div>
-            <p className="text-sm font-medium text-slate-500">CPT {data.cptCode}</p>
-          </div>
-          {downloadError ? (
-            <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {downloadError}
+
+            <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-1">Issue</p>
+                <p className="text-sm text-slate-700 leading-6">
+                  {basePaStrength?.[remediationFactor]?.note}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wide text-slate-400">Your fix</label>
+                <textarea
+                  value={manualFixes[remediationFactor]?.value ?? ""}
+                  onChange={(event) => updateManualFix(remediationFactor, event.target.value)}
+                  placeholder={paStrengthFactors.find((factor) => factor.key === remediationFactor)?.placeholder}
+                  rows={3}
+                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none resize-none focus:border-clinical-blue focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  handleSuggestFix(
+                    remediationFactor,
+                    paStrengthFactors.find((factor) => factor.key === remediationFactor)?.label ?? ""
+                  )
+                }
+                disabled={Boolean(isSuggesting[remediationFactor])}
+                className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:border-slate-300 hover:text-slate-800 disabled:cursor-not-allowed disabled:text-slate-400 transition"
+              >
+                {isSuggesting[remediationFactor] ? "Suggesting..." : "✦ Suggest fix"}
+              </button>
+
+              {suggestions[remediationFactor] ? (
+                <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 space-y-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-blue-400">Suggestion</p>
+                  <p className="text-sm text-blue-800 leading-6">
+                    {suggestions[remediationFactor]}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleApplySuggestion(remediationFactor)}
+                      className="rounded-md bg-clinical-navy px-3 py-1.5 text-xs font-semibold text-white hover:bg-clinical-blue"
+                    >
+                      Apply
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDismissSuggestion(remediationFactor)}
+                      className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-slate-300"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {manualFixes[remediationFactor]?.resolved ? (
+                <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2">
+                  <span className="h-4 w-4 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-xs">✓</span>
+                  <p className="text-xs font-semibold text-green-700">
+                    Fix applied — regenerate the letter to update
+                  </p>
+                </div>
+              ) : null}
             </div>
-          ) : null}
-          <textarea
-            value={letter}
-            onChange={(event) => setLetter(event.target.value)}
-            className="mt-5 min-h-[680px] w-full resize-y rounded-md border border-clinical-line bg-white p-4 text-base leading-7 text-slate-900 outline-none focus:border-clinical-blue focus:ring-2 focus:ring-blue-100"
-            style={{ fontFamily: "Georgia, serif" }}
-          />
-        </section>
+
+            <div className="shrink-0 border-t border-slate-100 px-5 py-3 flex items-center justify-between">
+              <button
+                onClick={() => {
+                  const keys = paStrengthFactors.map((factor) => factor.key);
+                  const idx = keys.indexOf(remediationFactor);
+                  if (idx > 0) setRemediationFactor(keys[idx - 1]);
+                }}
+                className="text-xs font-semibold text-slate-400 hover:text-slate-700 transition"
+              >
+                ← Previous
+              </button>
+              <p className="text-xs text-slate-400">
+                {paStrengthFactors.findIndex((factor) => factor.key === remediationFactor) + 1}
+                {" / "}{paStrengthFactors.length}
+              </p>
+              <button
+                onClick={() => {
+                  const keys = paStrengthFactors.map((factor) => factor.key);
+                  const idx = keys.indexOf(remediationFactor);
+                  if (idx < keys.length - 1) setRemediationFactor(keys[idx + 1]);
+                }}
+                className="text-xs font-semibold text-slate-400 hover:text-slate-700 transition"
+              >
+                Next →
+              </button>
+            </div>
+          </section>
+        ) : (
+          <section className="order-1 lg:order-2 rounded-lg border border-clinical-line bg-white shadow-sm">
+            <div className="p-5">
+              <div className="flex flex-col gap-2 border-b border-clinical-line pb-4 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <h2 className="text-base font-semibold text-clinical-navy">Editable letter draft</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Review and revise before downloading. The exported document includes the required AI-assisted disclaimer.
+                  </p>
+                </div>
+                <p className="text-sm font-medium text-slate-500">CPT {data.cptCode}</p>
+              </div>
+              {downloadError ? (
+                <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {downloadError}
+                </div>
+              ) : null}
+              <textarea
+                value={letter}
+                onChange={(event) => setLetter(event.target.value)}
+                className="mt-5 min-h-[680px] w-full resize-y rounded-md border border-clinical-line bg-white p-4 text-base leading-7 text-slate-900 outline-none focus:border-clinical-blue focus:ring-2 focus:ring-blue-100"
+                style={{ fontFamily: "Georgia, serif" }}
+              />
+            </div>
+          </section>
+        )}
       </div>
     </main>
   );
@@ -779,29 +750,6 @@ function getOutcomeBadgeClass(outcome: string | null) {
 
 function WarningBadge({ children }: { children: React.ReactNode }) {
   return <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-700">{children}</span>;
-}
-
-function SidebarTabButton({ label, isActive, onClick, badge, dotColor }: SidebarTabButtonProps) {
-  const badgeText = badge ?? null;
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex items-center justify-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition duration-150 ${isActive
-          ? "border-white bg-white text-[#1E3A5F] shadow-[0_8px_20px_rgba(15,23,42,0.12)]"
-          : "border-transparent bg-transparent text-[#94A3B8] hover:bg-white/70 hover:text-slate-600"
-        }`}
-    >
-      <span>{label}</span>
-      {badgeText ? (
-        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${getScoreBadgeClass(Number(badgeText))}`}>
-          {badgeText}
-        </span>
-      ) : null}
-      {dotColor ? <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: dotColor }} aria-hidden="true" /> : null}
-    </button>
-  );
 }
 
 function findMissingFields(extracted: ExtractedChartData) {
@@ -891,17 +839,6 @@ function getScoreBarClass(score: number) {
     return "bg-[#D97706]";
   }
   return "bg-[#DC2626]";
-}
-
-function getScoreBadgeClass(score: number) {
-  const color = getScoreColor(score);
-  if (color === "green") {
-    return "bg-green-50 text-[#16A34A]";
-  }
-  if (color === "amber") {
-    return "bg-amber-50 text-[#D97706]";
-  }
-  return "bg-red-50 text-[#DC2626]";
 }
 
 function getScoreDescriptor(score: number) {
