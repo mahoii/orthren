@@ -204,10 +204,12 @@ async function extractChartText(chart: File) {
 async function extractChartData(
   chartText: string,
   requestDetails: RequestDetails
-) {
-  const content = await callAnthropicWithRetry({
-    system: extractionSystemPrompt,
-    prompt: `Request details:
+): Promise<ExtractedChartData & { validation: any }> {
+  // ── Section C: Catastrophic try/catch wraps the entire parsing phase ──────
+  try {
+    const content = await callAnthropicWithRetry({
+      system: extractionSystemPrompt,
+      prompt: `Request details:
 CPT code: ${requestDetails.cptCode}
 Insurance payer: ${requestDetails.payerName}
 Requesting provider: ${requestDetails.providerName}
@@ -215,12 +217,17 @@ Practice name: ${requestDetails.practiceName}
 
 Patient chart text:
 ${chartText}`,
-    maxTokens: 3000,
-    useStructuredOutput: true
-  });
+      maxTokens: 3000,
+      useStructuredOutput: true
+    });
 
-  const parsed = await parseJsonObject(content);
-  return normalizeChartData(parsed, requestDetails, chartText);
+    const parsed = await parseJsonObject(content);
+    return normalizeChartData(parsed, requestDetails, chartText);
+  } catch (err) {
+    // ── Section C: Catastrophic fallback — never crash the server ─────────
+    console.error("[generate-pa] Catastrophic parse failure — returning safe fallback object:", err);
+    return buildCatastrophicFallback(requestDetails);
+  }
 }
 
 async function generateLetter(
@@ -494,14 +501,32 @@ async function callAnthropic({
   return text;
 }
 
-async function parseJsonObject(content: string) {
+// ── Section A: Defensive regex boundary parser ────────────────────────────
+async function parseJsonObject(content: string): Promise<Record<string, unknown>> {
+  // Step 1: Strip code-fence wrappers the LLM sometimes emits
+  let extractionText = content
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/, "")
+    .trim();
+
+  // Step 2: Use regex to find the outermost JSON object boundaries
+  const jsonMatch = extractionText.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    extractionText = jsonMatch[0];
+  } else {
+    // Fallback: trim and try the raw text as-is
+    extractionText = extractionText.trim();
+  }
+
+  // Step 3: Remove illegal control characters that break JSON.parse
+  extractionText = extractionText.replace(/[\u0000-\u001F\u007F-\u009F]/g, " ");
+
   try {
-    const clean = content.replace(/```json|```/g, '').trim();
-    return JSON.parse(clean) as Record<string, unknown>;
+    return JSON.parse(extractionText) as Record<string, unknown>;
   } catch (err) {
-    console.error('JSON parse error. Raw content received:');
-    console.error(content?.substring(0, 500));
-    throw new Error('Failed to parse extraction response');
+    console.error("[generate-pa] JSON parse error. Raw content (first 600 chars):");
+    console.error(content?.substring(0, 600));
+    throw new Error("Failed to parse extraction response: " + (err instanceof Error ? err.message : String(err)));
   }
 }
 
@@ -514,31 +539,40 @@ function cleanJsonContent(content: string): string {
     .trim();
 }
 
+// ── Section B: Strict structural normalization layer ─────────────────────
 function normalizeChartData(
   data: Record<string, unknown>,
   requestDetails: RequestDetails,
   chartText: string
 ): ExtractedChartData & { validation: any } {
-  const imaging = isObject(data.imaging_findings) ? data.imaging_findings : null;
+
+  // ── B1: Critical string fields — default to "Not Documented" when falsy ──
   const patientName = nullableString(data.patient_name);
-  const diagnosisCodes = stringArray(data.diagnosis_codes);
+  const primaryComplaint = nullableString(data.primary_complaint);
+  const symptomDuration = nullableString(data.symptom_duration);
   const requestedProcedure = nullableString(data.requested_procedure);
   const surgicalApproach = nullableString(data.surgical_approach_if_mentioned);
-  const imagingFindings = imaging
-    ? {
-      modality: nullableString(imaging.modality),
-      key_findings: nullableString(imaging.key_findings ?? imaging.findings)
-    }
-    : null;
-  const conservativeTreatments = arrayOfObjects(data.conservative_treatments_attempted).map((item) => ({
-    treatment: nullableString(item.treatment_name ?? item.treatment ?? item.name),
-    duration: nullableString(item.duration),
-    outcome: nullableString(item.outcome),
-    dates: nullableString(item.dates)
-  }));
+
+  // ── B2: Numerical fields ─────────────────────────────────────────────────
+  const bmi = safeNumeric(data.bmi);
+  const asa_classification = safeAsaClassification(data.asa_classification);
+
+  // ── B3: Flat arrays ──────────────────────────────────────────────────────
+  const diagnosisCodes = stringArray(data.diagnosis_codes);
   const functionalLimitations = stringArray(data.functional_limitations);
+  const denialRiskFlags = stringArray(data.denial_risk_flags);
   const objectiveMeasurements = stringArray(data.objective_measurements);
 
+  // ── B4: Conservative treatments — coerce strings and ensure key safety ───
+  const conservativeTreatments = normalizeConservativeTreatments(data.conservative_treatments_attempted);
+
+  // ── B5: Nested imaging findings object ───────────────────────────────────
+  const imagingFindings = normalizeImagingFindings(data.imaging_findings);
+
+  // ── B6: Validation object (hard_blocks, soft_warnings) ───────────────────
+  // We re-derive hard_blocks and soft_warnings from validated data rather than
+  // trusting what the LLM returned, so the PA Strength Meter always reflects
+  // the true state of normalized data.
   const hard_blocks: any[] = [];
   const soft_warnings: any[] = [];
   const chartPayer = findChartPayer(chartText);
@@ -602,7 +636,7 @@ function normalizeChartData(
     });
   }
 
-  // Fix 8: Payer mismatch detection - check if first word of payer name is in chart text
+  // Payer mismatch detection
   const formPayer = requestDetails.payerName?.toLowerCase().trim();
   const chartTextLower = chartText?.toLowerCase();
   if (formPayer && chartTextLower && !chartTextLower.includes(formPayer.split(" ")[0])) {
@@ -621,26 +655,103 @@ function normalizeChartData(
     });
   }
 
-  const normalized = {
+  return {
     patient_name: patientName,
     date_of_birth: nullableString(data.date_of_birth),
     diagnosis_codes: diagnosisCodes,
-    primary_complaint: nullableString(data.primary_complaint),
-    symptom_duration: nullableString(data.symptom_duration),
+    primary_complaint: primaryComplaint,
+    symptom_duration: symptomDuration,
     functional_limitations: functionalLimitations,
     objective_measurements: objectiveMeasurements,
     conservative_treatments_attempted: conservativeTreatments,
     imaging_findings: imagingFindings,
     requested_procedure: requestedProcedure,
     surgical_approach_if_mentioned: surgicalApproach,
-    denial_risk_flags: stringArray(data.denial_risk_flags),
+    denial_risk_flags: denialRiskFlags,
     pa_strength: normalizePaStrength(data.pa_strength),
+    // Expose bmi and asa_classification for letter generation (they pass through as any)
+    ...(bmi !== null ? { bmi } : {}),
+    ...(asa_classification !== null ? { asa_classification } : {}),
     validation: { hard_blocks, soft_warnings }
   };
-
-  return normalized;
 }
 
+// ── Section B4: Conservative treatment normalization ───────────────────────
+function normalizeConservativeTreatments(raw: unknown): Array<{
+  treatment: string | null;
+  duration: string | null;
+  outcome: string | null;
+  dates: string | null;
+}> {
+  if (!Array.isArray(raw)) return [];
+
+  return raw.map((item) => {
+    // If the element is a flat string, coerce it into a structured object
+    if (typeof item === "string" && item.trim()) {
+      return {
+        treatment: item.trim(),
+        duration: "Unknown",
+        outcome: "Failed",
+        dates: "Not documented"
+      };
+    }
+
+    // If the element is an object, ensure key safety with fallbacks
+    if (isObject(item)) {
+      const treatmentName = nullableString(
+        item.treatment_name ?? item.treatment ?? item.name
+      );
+      return {
+        treatment: treatmentName ?? "Unknown Treatment",
+        duration: nullableString(item.duration) ?? "Unknown",
+        outcome: nullableString(item.outcome) ?? "Failed",
+        dates: nullableString(item.dates) ?? "Not documented"
+      };
+    }
+
+    // Unrecognised element shape — return safe sentinel
+    return {
+      treatment: "Unknown Treatment",
+      duration: "Unknown",
+      outcome: "Failed",
+      dates: "Not documented"
+    };
+  });
+}
+
+// ── Section B5: Imaging findings normalization ────────────────────────────
+function normalizeImagingFindings(raw: unknown): { modality: string | null; key_findings: string | null } | null {
+  if (!isObject(raw)) return null;
+
+  const modality = nullableString(raw.modality);
+  const key_findings = nullableString(raw.key_findings ?? raw.findings);
+
+  // Return null when both keys are absent — preserves existing soft-warning logic
+  if (!modality && !key_findings) return null;
+
+  return { modality, key_findings };
+}
+
+// ── Section B2: Numerical helpers ────────────────────────────────────────
+function safeNumeric(value: unknown): number | null {
+  if (typeof value === "number" && !isNaN(value)) return value;
+  if (typeof value === "string") {
+    const match = value.match(/\d+(?:\.\d+)?/);
+    if (match) {
+      const n = Number(match[0]);
+      return isNaN(n) ? null : n;
+    }
+  }
+  return null;
+}
+
+function safeAsaClassification(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const s = String(value).trim();
+  return s || null;
+}
+
+// ── Section B6: PA Strength normalization ─────────────────────────────────
 function normalizePaStrength(value: unknown): PaStrength {
   const defaultFactor: PaStrengthFactor = { score: 0, note: "" };
   const source = isObject(value) ? value : {};
@@ -661,6 +772,66 @@ function normalizePaStrength(value: unknown): PaStrength {
     surgical_approach: readFactor("surgical_approach"),
     cpt_code_valid: readFactor("cpt_code_valid"),
     symptom_duration: readFactor("symptom_duration")
+  };
+}
+
+// ── Section C: Catastrophic fallback builder ──────────────────────────────
+function buildCatastrophicFallback(
+  requestDetails: RequestDetails
+): ExtractedChartData & { validation: any } {
+  const defaultFactor: PaStrengthFactor = { score: 0, note: "Data could not be extracted from the chart." };
+
+  return {
+    patient_name: null,
+    date_of_birth: null,
+    diagnosis_codes: [],
+    primary_complaint: null,
+    symptom_duration: null,
+    functional_limitations: [],
+    objective_measurements: [],
+    conservative_treatments_attempted: [],
+    imaging_findings: null,
+    requested_procedure: null,
+    surgical_approach_if_mentioned: null,
+    denial_risk_flags: [
+      "CATASTROPHIC PARSING ERROR: The AI clinical data extractor returned a malformed response that could not be parsed. All values have defaulted to empty. Please manually enter all patient information in the PA Score panel below to remediate this record before submitting."
+    ],
+    pa_strength: {
+      diagnosis_codes: defaultFactor,
+      conservative_treatments_named: defaultFactor,
+      conservative_treatment_duration: defaultFactor,
+      imaging_findings: defaultFactor,
+      functional_limitations: defaultFactor,
+      surgical_approach: defaultFactor,
+      cpt_code_valid: defaultFactor,
+      symptom_duration: defaultFactor
+    },
+    validation: {
+      hard_blocks: [
+        {
+          field: "patient_name",
+          label: "Patient Name",
+          message: "Patient identity is required for payer authorization and medical records verification."
+        },
+        {
+          field: "diagnosis_codes",
+          label: "Diagnosis Codes",
+          message: "At least one ICD diagnosis code is required to establish medical necessity."
+        },
+        {
+          field: "requested_procedure",
+          label: "Requested Procedure",
+          message: "The specific procedure being requested must be clearly documented for payer review."
+        }
+      ],
+      soft_warnings: [
+        {
+          field: "parse_failure",
+          label: "Extraction Failure",
+          message: `The chart extraction returned an unparseable response for CPT ${requestDetails.cptCode} / ${requestDetails.payerName}. Retry generation or manually enter all fields.`
+        }
+      ]
+    }
   };
 }
 

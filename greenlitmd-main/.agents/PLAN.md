@@ -1,99 +1,93 @@
-# PLAN.md - Greenlit MD Features Implementation
+# PLAN.md - Robust JSON Extraction, Parsing, and Normalization
 
-This plan outlines the design and step-by-step implementation for adding two new features to Greenlit MD: **Demo Mode / Sample Chart** and **Copy-to-Clipboard on Chart Data Tab**.
+This plan details the design and step-by-step implementation for making the JSON extraction, parsing, and normalization pipeline inside `app/api/generate-pa/route.ts` completely resilient against malformed LLM outputs, partial responses, or structurally incomplete JSON objects.
 
 ---
 
-## FEATURE 1: Demo Mode / Sample Chart
+## 1. Goal
+Ensure that no matter how malformed, truncated, or structurally incomplete the JSON returned by Anthropic Claude is, our Next.js backend cleanly parses, validates, and normalizes the data. This guarantees that the React review screen (`app/review/page.tsx`) never throws runtime errors (such as "Cannot read properties of undefined" or ".map is not a function") and displays fallback placeholder values gracefully.
 
-### Goal
-Add a "Try a sample chart" flow on the upload page (app/page.tsx) that lets users run a full demo without uploading a real file. The demo should use pre-loaded static data and simulate the generation flow.
+---
 
-### Proposed Implementation Details
+## 2. Proposed Implementation Details
 
-1. **Button Placement & Styling**:
-   - Add an `"or try a sample chart →"` button/link immediately below the drag-and-drop label on `app/page.tsx`.
-   - Style: Sleek slate link (`text-slate-500 hover:text-clinical-blue transition-colors text-sm font-medium mt-3 block text-center`).
-   
-2. **State & Pre-filling**:
-   - Introduce an `isDemoMode` boolean state (defaulting to `false`) in the `UploadPage` component.
-   - When clicked:
-     - Set `isDemoMode` to `true`.
-     - Clear any existing validation/upload errors.
-     - Pre-fill the state for input fields:
-       - CPT Code: `27447`
-       - Payer Name: `BlueCross BlueShield`
-       - Provider Name: `Dr. R. Chambers, MD`
-       - Practice Name: `Westbrook Orthopedic Surgery Center`
-   - Revert `isDemoMode` to `false` if the user manually uploads/drops a file or drags a file into the upload zone.
-   - In the dropzone UI, if `isDemoMode` is active and no real `file` is selected, display `"Maria_Delgado_Chart.pdf"` (or similar realistic filename) instead of the default drag/drop prompt.
+### A. Defensive Regex Boundary Parsing (`parseJsonObject`)
+1. Refactor the existing `parseJsonObject(content)` function or replace it with an optimized regex parser.
+2. Scan the input text (`content`) for JSON boundaries using `/\{[\s\S]*\}/`.
+3. If a match is found:
+   - Extract the matched string.
+   - Strip any accidental code-fence wrappers (like ````json` or ````) and trim whitespace.
+4. If no match is found:
+   - Cleanly fallback to the raw `content` trimmed of preambles/postambles.
+5. Clean out illegal control characters using a regex like `/[\u0000-\u001F\u007F-\u009F]/g` before executing `JSON.parse()`.
 
-3. **Form Submission Behavior**:
-   - Update `hasRequiredFields` so it resolves to `true` when either `file` is present OR `isDemoMode` is active (in addition to the required text inputs).
-   - In `handleSubmit`, if `isDemoMode` is active, skip the POST call to `/api/generate-pa`.
-   - To make the demo engaging and snappy while still showcasing the UI steps, use a **1000ms interval shortcut** (4000ms total duration) for the progress animation:
-     ```typescript
-     const intervalTime = isDemoMode ? 1000 : 7000;
+---
+
+### B. Strict Structural Normalization Layer (`normalizeChartData`)
+Modify `normalizeChartData(data, requestDetails, chartText)` to enforce guaranteed properties and types:
+
+1. **Critical String Fields**:
+   - `patient_name`, `primary_complaint`, `symptom_duration`, and `requested_procedure` must be strings. If missing, null, or falsy, they must default to `"Not Documented"`.
+
+2. **Numerical Fields**:
+   - `bmi`: Safely parse it. If it is a string containing numbers (e.g., `"BMI 28.5"`), extract the numeric portion using `/d+(?:.d+)?/` and cast it to a Number. Otherwise, default to `null`.
+   - `asa_classification`: Cast it safely to a string or `null` (e.g. `String(val).trim() || null`).
+
+3. **Flat Arrays**:
+   - Ensure `diagnosis_codes`, `functional_limitations`, and `denial_risk_flags` are strictly verified using `Array.isArray()`. Default to `[]` if missing, falsy, or of any other type.
+
+4. **Conservative Treatments (Crucial Array of Objects)**:
+   - Check if `conservative_treatments_attempted` is a valid array. If not, default to `[]`.
+   - Map each element to an object:
+     - If the element is a **flat string**, parse it into:
+       ```json
+       {
+         "treatment": "the string",
+         "treatment_name": "the string",
+         "duration": "Unknown",
+         "dates": "Not documented",
+         "outcome": "Failed"
+       }
+       ```
+     - If the element is an **object**, verify key safety and fallback as follows:
+       - `treatment_name` / `treatment`: fallback to `"Unknown Treatment"`.
+       - `duration`: fallback to `"Unknown"`.
+       - `dates`: fallback to `"Not documented"`.
+       - `outcome`: fallback to `"Failed"`.
+     - Assign both `treatment` and `treatment_name` on each returned item to satisfy both `types.ts` specifications and LLM key variations.
+
+5. **Nested Imaging Findings Object**:
+   - Ensure `imaging_findings` is always an object (never null or undefined).
+   - Feats keys: `modality` (string | null), `key_findings` (string | null), and `findings` (string | null).
+   - If missing or not an object, default to:
+     ```json
+     {
+       "modality": null,
+       "key_findings": null,
+       "findings": null
+     }
      ```
-   - After the steps complete, write `DEMO_PA_DATA` directly into `sessionStorage` under the key `"pa-review-data"`, injecting an extra `isDemo: true` flag.
-   - Call `router.push("/review")`.
 
-4. **Demo Data Storage**:
-   - Create a helper file `lib/demo-data.ts` to host the complete static `DEMO_PA_DATA` matching the `GeneratePaResponse` structure.
-   - The file will contain:
-     - A professionally structured, high-quality Letter of Medical Necessity for Maria Delgado / Dr. R. Chambers.
-     - Complete extracted metadata containing patient information, bilaterally matching osteoarthritis diagnostics, attempted treatments, imaging, functional limitations, and realistic risk scoring elements.
-
-5. **Review Page Integration**:
-   - Add `isDemo?: boolean` to the `ReviewData` type on `app/review/page.tsx`.
-   - Display a subtle `Demo — sample patient data` amber badge near the top header if `data.isDemo` is true.
-   - Disable the "Download PA Packet" button in demo mode and add a title-based hover tooltip: `"Download available with a real chart"`.
+6. **Nested Validation Object (Critical for PA Strength Meter)**:
+   - Ensure `validation` is present.
+   - Guarantee `validation.hard_blocks` and `validation.soft_warnings` are always arrays (default to `[]`).
+   - Parse each element inside these arrays cleanly to ensure they have `field`, `label`, and `message` properties.
+   - Force `validation.pa_strength` to be a valid number between `1` and `10`. If missing, falsy, or a string, default it safely to `1`.
 
 ---
 
-## FEATURE 2: Copy-to-Clipboard on Chart Data Tab
-
-### Goal
-Add a copy icon button to each data point in the Chart Data tab on the review page (`app/review/page.tsx`) so billing staff can copy individual values directly into payer portal fields.
-
-### Proposed Implementation Details
-
-1. **Modify `DataRow` Component**:
-   - Accept an optional `copyable?: boolean` prop on `DataRow`.
-   - Add a local `copied` state: `const [copied, setCopied] = useState(false);`
-   
-2. **Copy Action**:
-   - If clicked and `value` is non-null/non-empty, execute:
-     `navigator.clipboard.writeText(textToCopy)`
-   - If the value is an array (like `diagnosis_codes`), join elements with `", "` before writing to the clipboard. Keep the screen rendering as is (which uses `"; "` separation).
-
-3. **User Feedback (Copied Confirmation)**:
-   - When a copy succeeds, set `copied` to `true`.
-   - Revert to `false` after 1500ms using a standard `setTimeout`.
-   - If `copied` is true, render a green checkmark icon in place of the clipboard icon.
-
-4. **Styling & Alignment**:
-   - Render a small, unobtrusive clipboard icon (14x14px, `text-slate-400 hover:text-slate-700`).
-   - Position it on the far right of the header line of the `DataRow` (using flex spacing `justify-between`).
-
-5. **Copyable Fields**:
-   - Pass `copyable: true` to the following `DataRow` instances:
-     - Patient name
-     - Date of birth
-     - Diagnosis codes
-     - Primary complaint
-     - Symptom duration
-     - Requested procedure
-     - Functional limitations
-   - Leave `surgical_approach_if_mentioned` and `objective_measurements` as default (not copyable).
-   - Do not add copy buttons to imaging findings or treatments.
-
-6. **Value Validity Check**:
-   - Only render the copy button when the underlying value is present and non-empty. If the value is null/missing, only show the existing `"Missing"` warning badge without the copy button.
+### C. Catastrophic Try-Catch Fallback
+1. Wrap the entire parsing phase in `extractChartData` within a `try/catch` block.
+2. If `JSON.parse` or `normalizeChartData` throws a catastrophic exception (e.g. LLM outputs truncated/unparseable junk), catch it and populate a **perfect fallback JSON object**:
+   - Conforms fully to `ExtractedChartDataWithValidation` structure.
+   - `patient_name`, `primary_complaint`, `symptom_duration`, and `requested_procedure` set to `"Not Documented"`.
+   - `denial_risk_flags` contains: `["CATASTROPHIC PARSING ERROR: The AI clinical data extractor returned a malformed response that could not be parsed. All values have defaulted to 'Not Documented'. Please manually enter all patient information below to remediate this record."]`.
+   - `validation.hard_blocks` contains visual clinical warnings mapping the critical required fields (`patient_name`, `requested_procedure`, `diagnosis_codes`) so they are flagged as missing on the review screen.
+   - Do not crash the server; return the fallback object gracefully.
 
 ---
 
-## Constraints Verification
-- Absolutely no modifications will be made to API routes or the `GeneratePaResponse`/`ExtractedChartData` types.
-- No new external dependencies will be added.
-- All original styling, layout structure, and TS rules will be preserved.
+## 3. Integration Safeguard
+- Do NOT modify the file text extraction logic (using `pdf-parse` or `mammoth`).
+- Do NOT modify the primary system prompts or subsequent Claude calls generating the LOMN.
+- Maintain route imports and exports as they currently are.
