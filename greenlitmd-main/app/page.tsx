@@ -4,6 +4,7 @@ import { ChangeEvent, DragEvent, FormEvent, ReactNode, useMemo, useState } from 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { GeneratePaResponse } from "@/lib/types";
+import { DEMO_PA_DATA } from "@/lib/demo-data";
 
 const progressSteps = [
   "Extracting chart data...",
@@ -40,6 +41,7 @@ const commonOrthopedicCptCodes = [
 export default function UploadPage() {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState(false);
   const [cptCode, setCptCode] = useState("");
   const [payerName, setPayerName] = useState("");
   const [providerName, setProviderName] = useState("");
@@ -50,8 +52,8 @@ export default function UploadPage() {
   const [error, setError] = useState<string | null>(null);
 
   const hasRequiredFields = useMemo(
-    () => Boolean(file && cptCode.trim() && payerName.trim() && providerName.trim()),
-    [cptCode, file, payerName, providerName]
+    () => Boolean((file || isDemoMode) && cptCode.trim() && payerName.trim() && providerName.trim()),
+    [cptCode, file, isDemoMode, payerName, providerName]
   );
 
   const cptWarning = useMemo(() => getCptWarning(cptCode), [cptCode]);
@@ -81,7 +83,19 @@ export default function UploadPage() {
       return;
     }
 
+    // A real file upload cancels demo mode
+    setIsDemoMode(false);
     setFile(selectedFile);
+  }
+
+  function handleDemoClick() {
+    setError(null);
+    setFile(null);
+    setIsDemoMode(true);
+    setCptCode("27447");
+    setPayerName("BlueCross BlueShield");
+    setProviderName("Dr. R. Chambers, MD");
+    setPracticeName("Westbrook Orthopedic Surgery Center");
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -101,7 +115,7 @@ export default function UploadPage() {
       return;
     }
 
-    if (!file) {
+    if (!isDemoMode && !file) {
       setError("Upload a patient chart file before generating the packet.");
       return;
     }
@@ -115,13 +129,36 @@ export default function UploadPage() {
     setError(null);
     setActiveStep(0);
 
+    // Demo mode uses a 1000ms interval (4000ms total) for a snappy experience
+    const intervalTime = isDemoMode ? 1000 : 7000;
     const progressTimer = window.setInterval(() => {
       setActiveStep((current) => Math.min(current + 1, progressSteps.length - 1));
-    }, 7000);
+    }, intervalTime);
 
     try {
+      if (isDemoMode) {
+        // Wait for the full animation cycle to complete
+        await new Promise<void>((resolve) =>
+          window.setTimeout(resolve, intervalTime * progressSteps.length)
+        );
+
+        sessionStorage.setItem(
+          "pa-review-data",
+          JSON.stringify({
+            ...DEMO_PA_DATA,
+            cptCode: cptCode.trim(),
+            payerName: payerName.trim(),
+            providerName: providerName.trim(),
+            practiceName: practiceName.trim(),
+            isDemo: true
+          })
+        );
+        router.push("/review");
+        return;
+      }
+
       const formData = new FormData();
-      formData.append("chart", file);
+      formData.append("chart", file!);
       formData.append("cptCode", cptCode.trim());
       formData.append("payerName", payerName.trim());
       formData.append("providerName", providerName.trim());
@@ -179,6 +216,7 @@ export default function UploadPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="grid gap-7 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="flex flex-col gap-3">
           <label
             onDragOver={(event) => {
               event.preventDefault();
@@ -200,11 +238,34 @@ export default function UploadPage() {
               Chart upload
             </span>
             <span className="mt-5 text-xl font-semibold text-clinical-navy">
-              {file ? file.name : "Drag and drop the patient chart here"}
+              {file
+                ? file.name
+                : isDemoMode
+                ? "Maria_Delgado_Chart.pdf"
+                : "Drag and drop the patient chart here"}
             </span>
-            <span className="mt-3 text-sm text-slate-500">or click to browse - PDF or DOCX supported</span>
+            <span className="mt-3 text-sm text-slate-500">
+              {isDemoMode ? "Sample chart loaded — ready to generate" : "or click to browse - PDF or DOCX supported"}
+            </span>
             {file ? <span className="mt-4 text-sm text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</span> : null}
+            {isDemoMode && !file ? (
+              <span className="mt-4 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                Demo — sample patient data
+              </span>
+            ) : null}
           </label>
+
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={handleDemoClick}
+              disabled={isLoading}
+              className="text-sm font-medium text-slate-500 transition-colors hover:text-clinical-blue disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              or try a sample chart →
+            </button>
+          </div>
+          </div>
 
           <div className="rounded-lg border border-clinical-line bg-white p-6 shadow-sm">
             <div className="space-y-5">

@@ -1,14 +1,18 @@
 "use client";
+export const dynamic = 'force-dynamic';
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { ExtractedChartData, ExtractedChartDataWithValidation, GeneratePaResponse } from "@/lib/types";
+
+
 
 type ReviewData = GeneratePaResponse & {
   cptCode: string;
   payerName: string;
   providerName: string;
   practiceName?: string;
+  isDemo?: boolean;
 };
 
 type PaStrengthFactorKey = keyof ExtractedChartData["pa_strength"];
@@ -24,6 +28,8 @@ type ManualFixes = Partial<Record<PaStrengthFactorKey, ManualFix>>;
 type Suggestions = Partial<Record<PaStrengthFactorKey, string>>;
 
 type SuggestionLoading = Partial<Record<PaStrengthFactorKey, boolean>>;
+
+type SidebarTab = "pa-score" | "chart-data" | "denial-risks";
 
 const paStrengthWeights: Record<PaStrengthFactorKey, number> = {
   diagnosis_codes: 10,
@@ -83,6 +89,58 @@ const paStrengthFactors: Array<{
     }
   ];
 
+/**
+ * Maps each PA strength factor key to a list of keywords that will be
+ * highlighted in the letter preview when that factor is being remediated.
+ */
+const factorKeywordMap: Record<PaStrengthFactorKey, string[]> = {
+  diagnosis_codes: ["diagnosis", "ICD", "code", "condition"],
+  conservative_treatments_named: ["conservative", "treatment", "therapy", "physical therapy", "NSAIDs", "medication"],
+  conservative_treatment_duration: ["weeks", "months", "duration", "period", "course"],
+  imaging_findings: ["MRI", "X-ray", "CT", "imaging", "findings", "scan", "radiograph"],
+  functional_limitations: ["limitation", "unable", "cannot", "difficulty", "restricted", "impaired", "mobility"],
+  surgical_approach: ["surgical", "arthroscopic", "open", "approach", "procedure", "operation"],
+  cpt_code_valid: ["CPT", "procedure code"],
+  symptom_duration: ["symptom", "pain", "complaint", "duration", "onset", "years", "months", "weeks"]
+};
+
+function getHighlightedLetter(letterText: string, factorKey: PaStrengthFactorKey): string {
+  const keywords = factorKeywordMap[factorKey];
+  if (!keywords.length) return letterText;
+
+  // Build a regex that matches any keyword (case-insensitive, whole-word-ish)
+  const pattern = keywords
+    .map((kw) => kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|");
+  const regex = new RegExp(`(${pattern})`, "gi");
+
+  return letterText.replace(regex, "%%HIGHLIGHT_START%%$1%%HIGHLIGHT_END%%");
+}
+
+function SidebarTabButton({
+  isActive,
+  onClick,
+  children
+}: {
+  isActive: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${
+        isActive
+          ? "bg-clinical-navy text-white shadow-sm"
+          : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 export default function ReviewPage() {
   const [data, setData] = useState<ReviewData | null>(null);
   const [letter, setLetter] = useState("");
@@ -93,10 +151,26 @@ export default function ReviewPage() {
   const [suggestions, setSuggestions] = useState<Suggestions>({});
   const [isSuggesting, setIsSuggesting] = useState<SuggestionLoading>({});
   const [isRegenerating, setIsRegenerating] = useState(false);
-  const [remediationFactor, setRemediationFactor] = useState<PaStrengthFactorKey | null>(null);
+  const [remediationIndex, setRemediationIndex] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [animatedScorePercent, setAnimatedScorePercent] = useState(0);
+  const [activeTab, setActiveTab] = useState<SidebarTab>("pa-score");
+  const tabContentRef = useRef<HTMLDivElement>(null);
   const hasAnimatedScoreRef = useRef(false);
+  const suggestionCardRef = useRef<HTMLDivElement>(null);
+
+  // Derived: which factor key is active in remediation
+  const remediationFactor =
+    remediationIndex !== null ? paStrengthFactors[remediationIndex]?.key ?? null : null;
+
+  useEffect(() => {
+    if (remediationFactor && suggestions[remediationFactor]) {
+      const timer = setTimeout(() => {
+        suggestionCardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [suggestions, remediationFactor]);
 
   useEffect(() => {
     const stored = sessionStorage.getItem("pa-review-data");
@@ -158,6 +232,13 @@ export default function ReviewPage() {
       document.title = "Greenlit MD";
     };
   }, []);
+
+  // Scroll tab content area back to top when tab changes
+  useEffect(() => {
+    if (tabContentRef.current) {
+      tabContentRef.current.scrollTop = 0;
+    }
+  }, [activeTab]);
 
   function updateManualFix(key: PaStrengthFactorKey, value: string, source: ManualFix["source"] = "manual") {
     const trimmed = value.trim();
@@ -311,6 +392,26 @@ export default function ReviewPage() {
     }
   }
 
+  // ─── Open remediation at a specific factor index ────────────────────────────
+  function openRemediation(index: number) {
+    setRemediationIndex(index);
+  }
+
+  function closeRemediation() {
+    setRemediationIndex(null);
+  }
+
+  function goRemediationPrev() {
+    setRemediationIndex((current) => (current !== null && current > 0 ? current - 1 : current));
+  }
+
+  function goRemediationNext() {
+    setRemediationIndex((current) =>
+      current !== null && current < paStrengthFactors.length - 1 ? current + 1 : current
+    );
+  }
+
+  // ─── No-data state ───────────────────────────────────────────────────────────
   if (!data) {
     return (
       <main className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center bg-[#F8F9FB] px-6">
@@ -330,8 +431,25 @@ export default function ReviewPage() {
     );
   }
 
+  // ─── Highlighted letter segments for remediation preview ────────────────────
+  const highlightedParts: Array<{ text: string; highlighted: boolean }> =
+    remediationFactor
+      ? getHighlightedLetter(letter, remediationFactor)
+          .split(/(%%HIGHLIGHT_START%%.*?%%HIGHLIGHT_END%%)/g)
+          .map((part) => {
+            if (part.startsWith("%%HIGHLIGHT_START%%")) {
+              return {
+                text: part.replace("%%HIGHLIGHT_START%%", "").replace("%%HIGHLIGHT_END%%", ""),
+                highlighted: true
+              };
+            }
+            return { text: part, highlighted: false };
+          })
+      : [];
+
   return (
     <main className="min-h-[calc(100vh-3.5rem)] bg-[#F8F9FB]">
+      {/* Toast */}
       {toast ? (
         <div className="fixed right-6 top-6 z-50 flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-lg">
           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-100 text-green-700" aria-hidden="true">
@@ -342,10 +460,19 @@ export default function ReviewPage() {
           <span>{toast}</span>
         </div>
       ) : null}
+
+      {/* Header */}
       <header className="border-b border-clinical-line bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-5 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-clinical-blue">Review packet</p>
+            <div className="flex items-center gap-3">
+              <p className="text-sm font-semibold uppercase tracking-wide text-clinical-blue">Review packet</p>
+              {data.isDemo ? (
+                <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                  Demo &mdash; sample patient data
+                </span>
+              ) : null}
+            </div>
             <h1 className="mt-1 text-2xl font-semibold text-clinical-navy">Letter of Medical Necessity</h1>
           </div>
           <div className="flex gap-3">
@@ -364,8 +491,9 @@ export default function ReviewPage() {
             </button>
             <button
               onClick={handleDownload}
-              disabled={isDownloading}
-              className="rounded-md bg-clinical-navy px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-clinical-blue disabled:bg-slate-300"
+              disabled={isDownloading || Boolean(data.isDemo)}
+              title={data.isDemo ? "Download available with a real chart" : undefined}
+              className="rounded-md bg-clinical-navy px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-clinical-blue disabled:cursor-not-allowed disabled:bg-slate-300"
             >
               {isDownloading ? "Preparing..." : "Download PA Packet"}
             </button>
@@ -374,12 +502,31 @@ export default function ReviewPage() {
       </header>
 
       <div className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[360px_1fr]">
+
+        {/* ── Sidebar ─────────────────────────────────────────────────────────── */}
         <aside className="order-2 lg:order-1 flex flex-col h-[calc(100vh-3.5rem)] sticky top-14 min-w-0 rounded-lg border border-[#E2E8F0] bg-white p-4 lg:p-5">
 
-          <div className="flex-1 min-h-0 overflow-y-auto pr-1 pb-8">
-            <section>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-3">PA Strength Score</p>
-                <section className="rounded-lg border border-slate-200 bg-slate-50/80 p-4 pb-6">
+          {/* Tab pill container — shrink-0 so it never squishes */}
+          <div className="shrink-0 flex gap-1 rounded-lg bg-slate-100 p-1 mb-4">
+            <SidebarTabButton isActive={activeTab === "pa-score"} onClick={() => setActiveTab("pa-score")}>
+              PA Score
+            </SidebarTabButton>
+            <SidebarTabButton isActive={activeTab === "chart-data"} onClick={() => setActiveTab("chart-data")}>
+              Chart Data
+            </SidebarTabButton>
+            <SidebarTabButton isActive={activeTab === "denial-risks"} onClick={() => setActiveTab("denial-risks")}>
+              Denial Risks
+            </SidebarTabButton>
+          </div>
+
+          {/* Scrollable tab content area */}
+          <div ref={tabContentRef} className="flex-1 min-h-0 overflow-y-auto pr-1 pb-8">
+
+            {/* ── PA Score Tab ─────────────────────────────────────────────── */}
+            {activeTab === "pa-score" ? (
+              <section>
+                {/* Score card */}
+                <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4 pb-6">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">PA Strength Score</p>
@@ -411,97 +558,161 @@ export default function ReviewPage() {
                     </div>
                     <p className="mt-2 text-sm font-medium text-slate-600">{paScoreDescriptor}</p>
                   </div>
+
+                  {/* Expandable per-factor breakdown (inside card) */}
                   <div
-                    className={`mt-4 overflow-hidden transition-all duration-200 ease-in-out ${isScoreExpanded ? "max-h-[1400px] opacity-100" : "max-h-0 opacity-0"
-                      }`}
+                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                      isScoreExpanded ? "max-h-[900px] opacity-100 mt-4" : "max-h-0 opacity-0 mt-0"
+                    }`}
                   >
-                    <div className="space-y-3 pt-2">
+                    <div className="space-y-2 pt-2">
                       {paStrengthFactors.map((factor) => {
                         const baseScore = basePaStrength?.[factor.key]?.score ?? 0;
-                        const baseNote = basePaStrength?.[factor.key]?.note ?? "";
                         const manualFix = manualFixes[factor.key];
-                        const isManualResolved = Boolean(manualFix?.resolved);
-                        const displayNote = baseNote || "No note provided.";
+                        const isResolved = Boolean(manualFix?.resolved);
+                        const isOk = baseScore === 1;
 
                         return (
-                          <div key={factor.key} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-                            <div className="flex gap-3">
-                              <span
-                                className={`mt-0.5 flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold ${isManualResolved
-                                    ? "border-blue-200 bg-blue-50 text-blue-600"
-                                    : baseScore === 1
-                                      ? "border-green-200 bg-green-50 text-green-600"
-                                      : "border-red-200 bg-red-50 text-red-600"
-                                  }`}
-                              >
-                                {isManualResolved ? (
-                                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
-                                    <path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                                  </svg>
-                                ) : baseScore === 1 ? (
-                                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
-                                    <path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                                  </svg>
-                                ) : (
-                                  <span aria-hidden="true">!</span>
-                                )}
-                              </span>
-                              <div className="flex-1">
-                                <div className="flex items-center justify-between gap-3">
-                                  <p className="text-sm font-semibold text-slate-800">{factor.label}</p>
-                                  <span className="text-xs font-semibold text-slate-500">{isManualResolved ? "Resolved" : baseScore === 1 ? "OK" : "Missing"}</span>
-                                </div>
-                                <p className="mt-1 text-sm text-slate-600">{displayNote}</p>
-                                {baseScore === 0 && !isManualResolved ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setRemediationFactor(factor.key)}
-                                    className="mt-2 inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-clinical-navy hover:text-clinical-navy transition"
-                                  >
-                                    Fix this →
-                                  </button>
-                                ) : null}
-                              </div>
-                            </div>
+                          <div key={factor.key} className="flex items-center gap-2 text-xs">
+                            <span
+                              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
+                                isResolved
+                                  ? "bg-blue-50 text-blue-600 border border-blue-200"
+                                  : isOk
+                                  ? "bg-green-50 text-green-600 border border-green-200"
+                                  : "bg-red-50 text-red-500 border border-red-200"
+                              }`}
+                              aria-hidden="true"
+                            >
+                              {isResolved || isOk ? (
+                                <svg viewBox="0 0 16 16" className="h-2.5 w-2.5" fill="none">
+                                  <path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                </svg>
+                              ) : (
+                                <svg viewBox="0 0 16 16" className="h-2.5 w-2.5" fill="none">
+                                  <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                </svg>
+                              )}
+                            </span>
+                            <span className="flex-1 text-slate-700">{factor.label}</span>
+                            <span className={`font-semibold ${
+                              isResolved ? "text-blue-500" : isOk ? "text-green-600" : "text-red-500"
+                            }`}>
+                              {isResolved ? "Fixed" : isOk ? "OK" : "Missing"}
+                            </span>
                           </div>
                         );
                       })}
                     </div>
                   </div>
-                </section>
-            </section>
-            <div className="my-5 border-t border-slate-100" />
-            <section>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-3">Chart Data</p>
-                  <div className="flex items-start justify-between gap-3">
-                    <h2 className="text-base font-semibold text-clinical-navy">Chart data we found</h2>
-                    {missingFields.length ? <WarningBadge>{missingFields.length} missing</WarningBadge> : null}
-                  </div>
-                  <div className="mt-5 space-y-4">
-                    <DataRow label="Patient name" value={data.extracted.patient_name} />
-                    <DataRow label="Date of birth" value={data.extracted.date_of_birth} />
-                    <DataRow label="Diagnosis codes" value={data.extracted.diagnosis_codes} />
-                    <DataRow label="Primary complaint" value={data.extracted.primary_complaint} />
-                    <DataRow label="Symptom duration" value={data.extracted.symptom_duration} />
-                    <DataRow label="Requested procedure" value={data.extracted.requested_procedure} />
-                    <DataRow label="Surgical approach" value={data.extracted.surgical_approach_if_mentioned} />
-                    <DataRow label="Imaging findings"
-                      value={
-                        data.extracted.imaging_findings
-                          ? `${data.extracted.imaging_findings.modality ?? "Unknown modality"}: ${data.extracted.imaging_findings.key_findings ?? "Missing findings"
-                          }`
-                          : null
-                      }
-                    />
-                    <DataRow label="Objective measurements" value={data.extracted.objective_measurements?.length ? data.extracted.objective_measurements : null} />
-                    <DataRow label="Functional limitations" value={data.extracted.functional_limitations} />
-                    <Treatments treatments={data.extracted.conservative_treatments_attempted} />
-                  </div>
-                </section>
-            <div className="my-5 border-t border-slate-100" />
-            <section>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-3">Denial Risks</p>
-                <section className="rounded-lg border border-red-200 border-l-4 border-l-[#EF4444] bg-[#FEF2F2] p-5">
+                </div>
+
+                {/* Compact 8-factor summary list — clickable to jump to remediation */}
+                <ul className="mt-4 space-y-2">
+                  {paStrengthFactors.map((factor, index) => {
+                    const baseScore = basePaStrength?.[factor.key]?.score ?? 0;
+                    const manualFix = manualFixes[factor.key];
+                    const isResolved = Boolean(manualFix?.resolved);
+                    const isOk = baseScore === 1;
+
+                    return (
+                      <li key={factor.key}>
+                        <button
+                          type="button"
+                          onClick={() => openRemediation(index)}
+                          className="w-full flex items-center gap-2.5 rounded-md border border-slate-100 bg-white px-3 py-2 text-sm text-left hover:border-slate-300 hover:bg-slate-50 transition"
+                        >
+                          {/* Status icon */}
+                          <span
+                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                              isResolved
+                                ? "bg-blue-50 text-blue-600 border border-blue-200"
+                                : isOk
+                                ? "bg-green-50 text-green-600 border border-green-200"
+                                : "bg-red-50 text-red-500 border border-red-200"
+                            }`}
+                            aria-hidden="true"
+                          >
+                            {isResolved || isOk ? (
+                              <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none">
+                                <path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                              </svg>
+                            ) : (
+                              <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none">
+                                <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                              </svg>
+                            )}
+                          </span>
+                          {/* Label */}
+                          <span className={`flex-1 font-medium ${
+                            isResolved || isOk ? "text-slate-700" : "text-slate-800"
+                          }`}>
+                            {factor.label}
+                          </span>
+                          {/* Status badge */}
+                          <span className={`text-[10px] font-semibold ${
+                            isResolved ? "text-blue-500" : isOk ? "text-green-600" : "text-red-500"
+                          }`}>
+                            {isResolved ? "Fixed" : isOk ? "OK" : "Missing"}
+                          </span>
+                          {/* Chevron */}
+                          <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 shrink-0 text-slate-300" fill="none" aria-hidden="true">
+                            <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                          </svg>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+
+                {/* Unconditional Fix Issues button */}
+                <button
+                  type="button"
+                  onClick={() => openRemediation(0)}
+                  className="mt-4 w-full rounded-md bg-clinical-navy py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-clinical-blue"
+                >
+                  Fix Issues →
+                </button>
+              </section>
+            ) : null}
+
+            {/* ── Chart Data Tab ───────────────────────────────────────────── */}
+            {activeTab === "chart-data" ? (
+              <section>
+                <div className="flex items-start justify-between gap-3 mb-5">
+                  <h2 className="text-base font-semibold text-clinical-navy">Chart data we found</h2>
+                  {missingFields.length ? <WarningBadge>{missingFields.length} missing</WarningBadge> : null}
+                </div>
+                <div className="space-y-4">
+                  <DataRow label="Patient name" value={data.extracted.patient_name} copyable />
+                  <DataRow label="Date of birth" value={data.extracted.date_of_birth} copyable />
+                  <DataRow label="Diagnosis codes" value={data.extracted.diagnosis_codes} copyable />
+                  <DataRow label="Primary complaint" value={data.extracted.primary_complaint} copyable />
+                  <DataRow label="Symptom duration" value={data.extracted.symptom_duration} copyable />
+                  <DataRow label="Requested procedure" value={data.extracted.requested_procedure} copyable />
+                  <DataRow label="Surgical approach" value={data.extracted.surgical_approach_if_mentioned} />
+                  <DataRow
+                    label="Imaging findings"
+                    value={
+                      data.extracted.imaging_findings
+                        ? `${data.extracted.imaging_findings.modality ?? "Unknown modality"}: ${data.extracted.imaging_findings.key_findings ?? "Missing findings"}`
+                        : null
+                    }
+                  />
+                  <DataRow
+                    label="Objective measurements"
+                    value={data.extracted.objective_measurements?.length ? data.extracted.objective_measurements : null}
+                  />
+                  <DataRow label="Functional limitations" value={data.extracted.functional_limitations} copyable />
+                  <Treatments treatments={data.extracted.conservative_treatments_attempted} />
+                </div>
+              </section>
+            ) : null}
+
+            {/* ── Denial Risks Tab ─────────────────────────────────────────── */}
+            {activeTab === "denial-risks" ? (
+              <section>
+                <div className="rounded-lg border border-red-200 border-l-4 border-l-[#EF4444] bg-[#FEF2F2] p-5">
                   <h2 className="text-base font-semibold text-red-900">Denial Risk</h2>
                   {data.extracted.denial_risk_flags.length ? (
                     <ul className="mt-4 space-y-3">
@@ -523,68 +734,160 @@ export default function ReviewPage() {
                   ) : (
                     <p className="mt-3 text-sm text-red-800">No denial risk flags were returned from extraction.</p>
                   )}
-                </section>
-            </section>
+                </div>
+              </section>
+            ) : null}
+
           </div>
         </aside>
 
-        {remediationFactor ? (
+        {/* ── Right panel: Remediation or Letter ──────────────────────────────── */}
+        {remediationIndex !== null && remediationFactor ? (
+          /* Remediation panel — mobile: fixed full-screen overlay; desktop: right grid column */
           <section className="order-1 lg:order-2 rounded-lg border border-clinical-line bg-white shadow-sm flex flex-col h-[calc(100vh-3.5rem)] fixed inset-0 z-50 lg:static lg:z-auto lg:sticky lg:top-14">
+
+            {/* Top nav */}
             <div className="flex items-center gap-3 px-5 py-4 border-b border-clinical-line shrink-0">
               <button
-                onClick={() => setRemediationFactor(null)}
+                onClick={closeRemediation}
                 className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-800 transition"
               >
                 <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none">
                   <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                 </svg>
-                Back to letter
+                Back
               </button>
               <span className="text-slate-300">|</span>
-              <p className="text-sm font-semibold text-clinical-navy">
-                {paStrengthFactors.find((factor) => factor.key === remediationFactor)?.label}
+              <button
+                onClick={goRemediationPrev}
+                disabled={remediationIndex === 0}
+                className="text-xs font-semibold text-slate-400 hover:text-slate-700 disabled:opacity-30 transition"
+                aria-label="Previous factor"
+              >
+                ← Prev
+              </button>
+              <p className="text-xs text-slate-400 tabular-nums">
+                {remediationIndex + 1} / {paStrengthFactors.length}
               </p>
+              <button
+                onClick={goRemediationNext}
+                disabled={remediationIndex === paStrengthFactors.length - 1}
+                className="text-xs font-semibold text-slate-400 hover:text-slate-700 disabled:opacity-30 transition"
+                aria-label="Next factor"
+              >
+                Next →
+              </button>
+              {/* Factor title with status icon */}
+              <div className="ml-auto flex items-center gap-2">
+                {(() => {
+                  const baseScore = basePaStrength?.[remediationFactor]?.score ?? 0;
+                  const isResolved = Boolean(manualFixes[remediationFactor]?.resolved);
+                  const isOk = baseScore === 1;
+                  return (
+                    <span
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
+                        isResolved
+                          ? "bg-blue-100 text-blue-600 border border-blue-300"
+                          : isOk
+                          ? "bg-green-100 text-green-600 border border-green-300"
+                          : "bg-red-100 text-red-500 border border-red-300"
+                      }`}
+                      aria-hidden="true"
+                    >
+                      {isResolved || isOk ? (
+                        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none">
+                          <path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none">
+                          <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                        </svg>
+                      )}
+                    </span>
+                  );
+                })()}
+                <span className="text-sm font-semibold text-clinical-navy">
+                  {paStrengthFactors[remediationIndex].label}
+                </span>
+              </div>
             </div>
 
+            {/* Scrollable body */}
             <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
+
+              {/* Highlighted letter preview */}
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-1">Issue</p>
-                <p className="text-sm text-slate-700 leading-6">
-                  {basePaStrength?.[remediationFactor]?.note}
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">Letter Preview</p>
+                <p className="text-sm leading-6 text-slate-700 whitespace-pre-wrap font-[Georgia,serif] max-h-48 overflow-y-auto">
+                  {highlightedParts.map((part, i) =>
+                    part.highlighted ? (
+                      <mark
+                        key={i}
+                        className="rounded bg-yellow-200 px-0.5 text-yellow-900 not-italic"
+                      >
+                        {part.text}
+                      </mark>
+                    ) : (
+                      <span key={i}>{part.text}</span>
+                    )
+                  )}
                 </p>
               </div>
 
+              {/* Factor status / condition card */}
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Condition:</p>
+                  {(() => {
+                    const baseScore = basePaStrength?.[remediationFactor]?.score ?? 0;
+                    const isResolved = Boolean(manualFixes[remediationFactor]?.resolved);
+                    const isOk = isResolved || baseScore === 1;
+                    return isOk ? (
+                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-green-700">
+                        Strong
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-600">
+                        Weak
+                      </span>
+                    );
+                  })()}
+                </div>
+                <p className="text-sm text-slate-700 leading-6">
+                  {basePaStrength?.[remediationFactor]?.note ?? "No note provided."}
+                </p>
+              </div>
+
+              {/* Fix textarea */}
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wide text-slate-400">Your fix</label>
                 <textarea
                   value={manualFixes[remediationFactor]?.value ?? ""}
                   onChange={(event) => updateManualFix(remediationFactor, event.target.value)}
-                  placeholder={paStrengthFactors.find((factor) => factor.key === remediationFactor)?.placeholder}
+                  placeholder={paStrengthFactors[remediationIndex].placeholder}
                   rows={3}
                   className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none resize-none focus:border-clinical-blue focus:ring-2 focus:ring-blue-100"
                 />
               </div>
 
+              {/* Suggest fix button */}
               <button
                 type="button"
-                onClick={() =>
-                  handleSuggestFix(
-                    remediationFactor,
-                    paStrengthFactors.find((factor) => factor.key === remediationFactor)?.label ?? ""
-                  )
-                }
+                onClick={() => handleSuggestFix(remediationFactor, paStrengthFactors[remediationIndex].label)}
                 disabled={Boolean(isSuggesting[remediationFactor])}
                 className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:border-slate-300 hover:text-slate-800 disabled:cursor-not-allowed disabled:text-slate-400 transition"
               >
                 {isSuggesting[remediationFactor] ? "Suggesting..." : "✦ Suggest fix"}
               </button>
 
+              {/* Suggestion card */}
               {suggestions[remediationFactor] ? (
-                <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 space-y-3">
+                <div
+                  ref={suggestionCardRef}
+                  className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 space-y-3"
+                >
                   <p className="text-xs font-bold uppercase tracking-wide text-blue-400">Suggestion</p>
-                  <p className="text-sm text-blue-800 leading-6">
-                    {suggestions[remediationFactor]}
-                  </p>
+                  <p className="text-sm text-blue-800 leading-6">{suggestions[remediationFactor]}</p>
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -604,6 +907,7 @@ export default function ReviewPage() {
                 </div>
               ) : null}
 
+              {/* Resolved confirmation */}
               {manualFixes[remediationFactor]?.resolved ? (
                 <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2">
                   <span className="h-4 w-4 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-xs">✓</span>
@@ -612,36 +916,11 @@ export default function ReviewPage() {
                   </p>
                 </div>
               ) : null}
-            </div>
 
-            <div className="shrink-0 border-t border-slate-100 px-5 py-3 flex items-center justify-between">
-              <button
-                onClick={() => {
-                  const keys = paStrengthFactors.map((factor) => factor.key);
-                  const idx = keys.indexOf(remediationFactor);
-                  if (idx > 0) setRemediationFactor(keys[idx - 1]);
-                }}
-                className="text-xs font-semibold text-slate-400 hover:text-slate-700 transition"
-              >
-                ← Previous
-              </button>
-              <p className="text-xs text-slate-400">
-                {paStrengthFactors.findIndex((factor) => factor.key === remediationFactor) + 1}
-                {" / "}{paStrengthFactors.length}
-              </p>
-              <button
-                onClick={() => {
-                  const keys = paStrengthFactors.map((factor) => factor.key);
-                  const idx = keys.indexOf(remediationFactor);
-                  if (idx < keys.length - 1) setRemediationFactor(keys[idx + 1]);
-                }}
-                className="text-xs font-semibold text-slate-400 hover:text-slate-700 transition"
-              >
-                Next →
-              </button>
             </div>
           </section>
         ) : (
+          /* Letter textarea panel */
           <section className="order-1 lg:order-2 rounded-lg border border-clinical-line bg-white shadow-sm">
             <div className="p-5">
               <div className="flex flex-col gap-2 border-b border-clinical-line pb-4 md:flex-row md:items-end md:justify-between">
@@ -667,19 +946,52 @@ export default function ReviewPage() {
             </div>
           </section>
         )}
+
       </div>
     </main>
   );
 }
 
-function DataRow({ label, value }: { label: string; value: string | string[] | null }) {
+// ─── Sub-components ────────────────────────────────────────────────────────────
+
+function DataRow({ label, value, copyable }: { label: string; value: string | string[] | null; copyable?: boolean }) {
   const isMissing = value === null || (Array.isArray(value) && value.length === 0);
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    const textToCopy = Array.isArray(value) ? value.join(", ") : (value ?? "");
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
 
   return (
     <div className="border-l-2 border-clinical-navy py-1 pl-3">
       <div className="flex items-center justify-between gap-3">
         <dt className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#94A3B8]">{label}</dt>
-        {isMissing ? <WarningBadge>Missing</WarningBadge> : null}
+        <div className="flex items-center gap-1.5">
+          {!isMissing && copyable ? (
+            <button
+              type="button"
+              onClick={handleCopy}
+              aria-label={copied ? "Copied" : `Copy ${label}`}
+              className="flex h-5 w-5 items-center justify-center rounded text-slate-400 transition-colors hover:text-slate-700 focus:outline-none"
+            >
+              {copied ? (
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M3.5 8.5l3 3 6-7" stroke="#16A34A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <rect x="5" y="1" width="9" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
+                  <path d="M3 5H2a1 1 0 00-1 1v8a1 1 0 001 1h8a1 1 0 001-1v-1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
+              )}
+            </button>
+          ) : null}
+          {isMissing ? <WarningBadge>Missing</WarningBadge> : null}
+        </div>
       </div>
       <dd className="mt-1 text-sm leading-6 text-slate-800">
         {Array.isArray(value) ? (value.length ? value.join("; ") : "Not found") : value ?? "Not found"}
@@ -751,6 +1063,8 @@ function getOutcomeBadgeClass(outcome: string | null) {
 function WarningBadge({ children }: { children: React.ReactNode }) {
   return <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-700">{children}</span>;
 }
+
+// ─── Pure helpers ──────────────────────────────────────────────────────────────
 
 function findMissingFields(extracted: ExtractedChartData) {
   const missing: string[] = [];
