@@ -9,6 +9,8 @@ export const dynamic = "force-dynamic";
 
 const maxUploadSizeBytes = 10 * 1024 * 1024;
 const anthropicModel = "claude-sonnet-4-6";
+const aiHighTrafficMessage =
+  "The AI assistant is experiencing high traffic right now. Please wait a moment and try sending your message again.";
 
 type RequestDetails = {
   cptCode: string;
@@ -126,8 +128,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ extracted, letter });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to generate the PA packet.";
-    const status = message.includes("PDF") || message.includes("chart") ? 400 : 500;
+    const rawMessage = error instanceof Error ? error.message : "Unable to generate the PA packet.";
+    const isHighTraffic = isAnthropicOverloadedError(rawMessage);
+    const message = isHighTraffic ? aiHighTrafficMessage : rawMessage;
+    const status = isHighTraffic ? 503 : message.includes("PDF") || message.includes("chart") ? 400 : 500;
 
     return NextResponse.json({ error: message }, { status });
   }
@@ -893,13 +897,18 @@ function partialNameMatch(first: string, second: string) {
   return normalizedFirst.includes(normalizedSecond) || normalizedSecond.includes(normalizedFirst);
 }
 
+function isAnthropicOverloadedError(message: string) {
+  const normalized = message.toLowerCase();
+  return normalized.includes("overloaded_error") || normalized.includes("overloaded");
+}
+
 async function callAnthropicWithRetry(params: Parameters<typeof callAnthropic>[0], retries = 2): Promise<string> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       return await callAnthropic(params);
     } catch (err) {
       const message = err instanceof Error ? err.message : '';
-      const isOverloaded = message.includes('overloaded_error') || message.includes('overloaded');
+      const isOverloaded = isAnthropicOverloadedError(message);
       if (isOverloaded && attempt < retries) {
         await new Promise((res) => setTimeout(res, 3000 * (attempt + 1)));
         continue;
