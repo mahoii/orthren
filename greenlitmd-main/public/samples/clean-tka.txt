@@ -1,0 +1,45 @@
+PATIENT CHART - ORTHOPEDIC EVALUATION
+
+Patient Name: John Doe
+Date of Birth: 01/15/1960
+Age: 64
+Sex: Male
+Date of Visit: 05/10/2026
+
+CHIEF COMPLAINT:
+Right knee pain and functional decline over the past 18 months.
+
+HISTORY OF PRESENT ILLNESS:
+The patient is a 64-year-old male with progressive right knee osteoarthritis. He reports pain with walking, stairs, and prolonged standing. Functional limitations include inability to perform yard work, limited walking tolerance (approximately 15 minutes), and difficulty with recreational activities.
+
+DIAGNOSIS:
+- Right knee osteoarthritis, severe, with patellofemoral and tibiofemoral involvement
+- ICD-10: M17.11 (Primary osteoarthritis, right knee)
+
+CONSERVATIVE TREATMENTS ATTEMPTED:
+1. Physical therapy: 8 weeks from January 2026 to March 2026. Patient completed the course but reported minimal functional improvement.
+2. NSAIDs: Ibuprofen 400mg daily for 3 months. Provided temporary relief only.
+3. Corticosteroid injection (Kenalog): Single injection on April 2026. Minimal relief, lasted 2 weeks.
+4. Activity modification and bracing with knee sleeve: Ongoing since January 2026.
+
+IMAGING FINDINGS:
+Weight-bearing radiographs of bilateral knees performed 04/15/2026:
+- Right knee: Kellgren-Lawrence Grade III changes bilaterally with joint space narrowing, osteophyte formation, and subchondral sclerosis.
+- Left knee: Kellgren-Lawrence Grade II changes.
+
+FUNCTIONAL LIMITATIONS:
+- Walking limited to approximately 15 minutes
+- Unable to climb stairs without significant pain and handrail support
+- Unable to perform household chores (yard work, heavy lifting)
+- Sleep disturbance due to nighttime pain
+- Inability to drive long distances
+
+SURGICAL INDICATION:
+Right total knee arthroplasty (TKA) is recommended due to inadequate response to conservative measures and significant functional decline affecting activities of daily living.
+
+Requesting Provider: Jane Smith, MD
+Specialty: Orthopedic Surgery
+Practice: NYU Langone Orthopedics
+
+CPT Code Requested: 27447 (Total knee arthroplasty)
+Insurance Payer: Aetna

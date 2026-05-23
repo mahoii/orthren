@@ -1,0 +1,44 @@
+CLINICAL RECORD - SPORTS MEDICINE & ORTHOPEDICS
+
+Patient Name: Robert Miller
+Date of Birth: 05/12/1972
+Age: 54
+Sex: Male
+Date of Evaluation: 05/15/2026
+
+CHIEF COMPLAINT:
+Left shoulder pain and weakness, worsening over the last 6 months.
+
+HISTORY OF PRESENT ILLNESS:
+Mr. Miller is a 54-year-old active male who presents with persistent, severe left shoulder pain, particularly aggravated by overhead movement and sleeping on his left side. He reports the pain started after lifting a heavy cooler in November 2025. He describes the pain as a dull ache punctuated by sharp pain on elevation.
+
+DIAGNOSIS:
+- Left shoulder rotator cuff tear, complete, non-traumatic
+- ICD-10: M75.122 (Complete rotator cuff tear or rupture of left shoulder, not specified as traumatic)
+
+CONSERVATIVE MANAGEMENT TRIED:
+1. Physical therapy: Outpatient physical therapy attempted for 5 weeks starting in January 2026. Patient had to discontinue due to exacerbation of severe pain during resistive exercises.
+2. Oral Medications: Tried Aleve (naproxen) 220mg BID for 4 weeks. Developed mild gastrointestinal irritation/reflux, discontinued.
+3. Home Exercise Program: Attempted band exercises intermittently, but limited by pain.
+4. Note: No corticosteroid injection has been performed yet, as the patient was hesitant about steroid side effects.
+
+IMAGING STUDIES:
+MRI Left Shoulder performed on 02/20/2026:
+- Coronal and sagittal images reveal a full-thickness tear of the supraspinatus tendon measuring 1.8 cm with minimal retraction.
+- Moderate subacromial bursitis.
+- Mild AC joint arthrosis.
+
+FUNCTIONAL DEFICITS & OBJECTIVE MEASUREMENTS:
+- Left shoulder active abduction limited to 90 degrees due to pain and weakness (Passive ROM is intact to 160 degrees)
+- Left shoulder active forward flexion limited to 105 degrees
+- Positive Drop Arm Test on the left
+- Positive Empty Can Test (Jobe's test) on the left
+- Patient reports inability to reach overhead shelves, difficulty putting on a coat, and severe sleep disruption, waking up 3-4 times a night due to left shoulder pain.
+
+PLAN & SURGICAL RECOMMENDATION:
+Given the MRI evidence of a full-thickness supraspinatus tear, positive clinical signs, and the failure/intolerance of physical therapy and NSAIDs, we recommend surgical intervention.
+Plan: Left shoulder arthroscopic rotator cuff repair (CPT 29827) and subacromial decompression.
+
+Requesting Surgeon: Dr. Alex Mercer, MD
+Clinic/Practice: Brooklyn Sports Medicine
+Payer: UnitedHealthcare
