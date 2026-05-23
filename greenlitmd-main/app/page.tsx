@@ -72,9 +72,10 @@ export default function UploadPage() {
     const isDocx =
       selectedFile.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
       lowerName.endsWith(".docx");
+    const isTxt = selectedFile.type === "text/plain" || lowerName.endsWith(".txt");
 
-    if (!isPdf && !isDocx) {
-      setError("Only PDF and DOCX files are supported");
+    if (!isPdf && !isDocx && !isTxt) {
+      setError("Only PDF, DOCX, and TXT files are supported");
       return;
     }
 
@@ -88,14 +89,34 @@ export default function UploadPage() {
     setFile(selectedFile);
   }
 
-  function handleDemoClick() {
+  async function handleLoadSample(
+    filename: string,
+    metadata: { cptCode: string; payerName: string; providerName: string; practiceName: string }
+  ) {
     setError(null);
-    setFile(null);
-    setIsDemoMode(true);
-    setCptCode("27447");
-    setPayerName("BlueCross BlueShield");
-    setProviderName("Dr. R. Chambers, MD");
-    setPracticeName("Westbrook Orthopedic Surgery Center");
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/samples/${filename}`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch sample file: ${res.statusText}`);
+      }
+      const text = await res.text();
+      const sampleFile = new File([text], filename, { type: "text/plain" });
+
+      // Update component states precisely
+      setFile(sampleFile);
+      setCptCode(metadata.cptCode);
+      setPayerName(metadata.payerName);
+      setProviderName(metadata.providerName);
+      setPracticeName(metadata.practiceName);
+
+      // CRITICAL: Bypasses mock storage logic, forcing live API submission
+      setIsDemoMode(false);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Failed to load sample chart.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -231,7 +252,7 @@ export default function UploadPage() {
             <input
               className="sr-only"
               type="file"
-              accept="application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              accept="application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.txt,text/plain"
               onChange={handleFileChange}
             />
             <span className="rounded-full bg-clinical-navy px-4 py-2 text-sm font-semibold text-white shadow-sm">
@@ -245,9 +266,13 @@ export default function UploadPage() {
                 : "Drag and drop the patient chart here"}
             </span>
             <span className="mt-3 text-sm text-slate-500">
-              {isDemoMode ? "Sample chart loaded — ready to generate" : "or click to browse - PDF or DOCX supported"}
+              {file && !isDemoMode
+                ? "Chart loaded — ready to generate"
+                : isDemoMode
+                ? "Sample chart loaded — ready to generate"
+                : "or click to browse - PDF, DOCX, or TXT supported"}
             </span>
-            {file ? <span className="mt-4 text-sm text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</span> : null}
+            {file && !isDemoMode ? <span className="mt-4 text-sm text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</span> : null}
             {isDemoMode && !file ? (
               <span className="mt-4 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
                 Demo — sample patient data
@@ -255,15 +280,43 @@ export default function UploadPage() {
             ) : null}
           </label>
 
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={handleDemoClick}
-              disabled={isLoading}
-              className="text-sm font-medium text-slate-500 transition-colors hover:text-clinical-blue disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              or try a sample chart →
-            </button>
+          <div className="rounded-lg border border-clinical-line bg-white px-5 py-4">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-clinical-navy">
+              No chart handy? Load a synthetic sample:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {([
+                {
+                  label: "Clean TKA Chart",
+                  filename: "clean-tka.txt",
+                  metadata: { cptCode: "27447", payerName: "Aetna", providerName: "Jane Smith, MD", practiceName: "NYU Langone Orthopedics" }
+                },
+                {
+                  label: "Messy Rotator Cuff",
+                  filename: "messy-rotator-cuff.txt",
+                  metadata: { cptCode: "29827", payerName: "UnitedHealthcare", providerName: "Dr. Alex Mercer, MD", practiceName: "Brooklyn Sports Medicine" }
+                },
+                {
+                  label: "Incomplete Lumbar Fusion",
+                  filename: "incomplete-lumbar-fusion.txt",
+                  metadata: { cptCode: "22630", payerName: "Cigna", providerName: "Dr. Sarah Jenkins, MD", practiceName: "Spine & Joint Institute" }
+                }
+              ] as const).map(({ label, filename, metadata }) => (
+                <button
+                  key={filename}
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => handleLoadSample(filename, metadata)}
+                  className={`rounded-full border px-4 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                    file?.name === filename
+                      ? "border-clinical-navy bg-clinical-navy text-white"
+                      : "border-clinical-line bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
           </div>
 

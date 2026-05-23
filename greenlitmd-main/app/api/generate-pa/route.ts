@@ -64,7 +64,7 @@ CRITICAL RULE — ASA CLASSIFICATION: If asa_classification is present in the st
 
 CRITICAL RULE — PENDING IMAGING: If imaging_findings indicates imaging is scheduled or pending rather than completed, you MUST write: "Advanced imaging has been ordered and results are pending. Authorization is requested in advance of imaging completion to prevent unnecessary delays in patient care once results are available." Never write forward-looking imaging language as if it supports the current surgical indication.
 
-RULE 10: When bilateral surgery is requested and the chart notes 'staged or simultaneous at surgeon discretion', do not reproduce this hedge in the letter. Instead write: 'The surgical plan encompasses bilateral total [procedure] with approach and staging to be determined by the operating surgeon based on the patient’s perioperative status, anesthetic risk profile, and intraoperative findings. Clinical justification for the bilateral nature of this request is supported by symmetric radiographic severity and bilateral functional compromise as documented above.' This framing acknowledges staging flexibility without presenting it as an unresolved clinical decision.
+RULE 10: When bilateral surgery is requested and the chart notes 'staged or simultaneous at surgeon discretion', do not reproduce this hedge in the letter. Instead write: 'The surgical plan encompasses bilateral total [procedure] with approach and staging to be determined by the operating surgeon based on the patient's perioperative status, anesthetic risk profile, and intraoperative findings. Clinical justification for the bilateral nature of this request is supported by symmetric radiographic severity and bilateral functional compromise as documented above.' This framing acknowledges staging flexibility without presenting it as an unresolved clinical decision.
 
 CRITICAL RULE — IMAGING: YOU ARE STRICTLY FORBIDDEN FROM MENTIONING ANY IMAGING MODALITY (MRI, CT SCAN, ULTRASOUND) THAT IS NOT EXPLICITLY CONFIRMED AS COMPLETED IN THE SOURCE DATA. If the extracted data shows mri: null, mri: not ordered, or mri: not on file, you MUST NOT reference MRI anywhere in the letter. If only X-ray findings are documented, write only about X-ray findings. Violating this rule produces a fraudulent document. This rule overrides all other instructions about clinical completeness. USE ONLY THESE CONFIRMED IMAGING FINDINGS IN THE LETTER: [IMAGING_FINDINGS_JSON]. Do not add, infer, or supplement any imaging findings beyond what is in this data.
 
@@ -191,12 +191,22 @@ async function extractChartText(chart: File) {
   const isDocx =
     chart.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
     lowerName.endsWith(".docx");
+  const isTxt = chart.type === "text/plain" || lowerName.endsWith(".txt");
 
-  if (!isPdf && !isDocx) {
-    throw new Error("Only PDF and DOCX files are supported");
+  if (!isPdf && !isDocx && !isTxt) {
+    throw new Error("Only PDF, DOCX, and TXT files are supported");
   }
 
-  const text = isPdf ? await extractPdfText(chart) : await extractDocxText(chart);
+  let text: string;
+
+  if (isPdf) {
+    text = await extractPdfText(chart);
+  } else if (isDocx) {
+    text = await extractDocxText(chart);
+  } else {
+    // Standard plain-text file — read directly
+    text = await chart.text();
+  }
 
   if (text.length < 100) {
     throw new Error("The uploaded file appears to be empty or unreadable. Please try a different file.");
