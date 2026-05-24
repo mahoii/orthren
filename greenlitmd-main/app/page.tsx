@@ -1,13 +1,9 @@
-"use client";
-
 import Link from "next/link";
 import Image from "next/image";
 import WaitlistForm from "@/components/WaitlistForm";
+import ScrollButton from "@/components/ScrollButton";
 
 export default function LandingPage() {
-  const scrollToWaitlist = () => {
-    document.getElementById("waitlist-form")?.scrollIntoView({ behavior: "smooth" });
-  };
 
   return (
     <div className="min-h-screen bg-white text-slate-900 selection:bg-clinical-navy selection:text-white">
@@ -284,12 +280,7 @@ export default function LandingPage() {
           </div>
 
           <div className="mt-12 text-center">
-            <button
-              onClick={scrollToWaitlist}
-              className="rounded-lg border border-white/30 bg-white/10 px-8 py-3 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/20 hover:border-white/50"
-            >
-              Request Early Access →
-            </button>
+            <ScrollButton className="rounded-lg border border-white/30 bg-white/10 px-8 py-3 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/20 hover:border-white/50" />
           </div>
         </div>
       </section>
@@ -331,13 +322,13 @@ export default function LandingPage() {
                   ))}
                 </ul>
               </div>
-              <button
-                onClick={scrollToWaitlist}
+              <Link
+                href="/#waitlist-form"
                 id="pricing-solo-cta"
-                className="mt-8 w-full rounded-lg border-2 border-clinical-navy px-4 py-2.5 text-sm font-semibold text-clinical-navy transition hover:bg-slate-50"
+                className="mt-8 block w-full rounded-lg border-2 border-clinical-navy px-4 py-2.5 text-center text-sm font-semibold text-clinical-navy transition hover:bg-slate-50"
               >
                 Request Early Access
-              </button>
+              </Link>
             </div>
 
             {/* Small Practice */}
@@ -367,13 +358,13 @@ export default function LandingPage() {
                   ))}
                 </ul>
               </div>
-              <button
-                onClick={scrollToWaitlist}
+              <Link
+                href="/#waitlist-form"
                 id="pricing-practice-cta"
-                className="mt-8 w-full rounded-lg bg-clinical-navy px-4 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-clinical-blue"
+                className="mt-8 block w-full rounded-lg bg-clinical-navy px-4 py-2.5 text-center text-sm font-semibold text-white shadow transition hover:bg-clinical-blue"
               >
                 Request Early Access
-              </button>
+              </Link>
             </div>
           </div>
         </div>

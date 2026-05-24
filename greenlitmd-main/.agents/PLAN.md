@@ -1,45 +1,122 @@
-# Plan - Migrate Waitlist Operations to Production-Grade Server Action
+# Plan - Fix Waitlist Form Production Origin Issues & Optimize Client/Server Boundary
 
-This plan details the steps required to migrate the waitlist database and API logic into a production-grade React Server Action, ensuring credentials safety and removing redundant `/api/waitlist` client handlers.
+This plan outlines the steps to:
+1. Fix CSRF check failures in production by adding `allowedOrigins` to the Next.js configuration.
+2. Refactor `app/page.tsx` into a Server Component by extracting the client-side scrolling logic into a thin client component `components/ScrollButton.tsx`.
+3. Update CTAs on the landing page to use the new `ScrollButton` or standard Next.js `<Link>` components, avoiding unnecessary client rendering.
 
 ---
 
 ## 📋 Execution Checklist
 
-### 1. Environment Variable Safety Check
-- [ ] Inspect the environment setup. Ensure `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `RESEND_API_KEY` are kept strictly private on the server side.
-- [ ] Modify `lib/supabase/server.ts` to allow `process.env.SUPABASE_URL` to be checked first as a private server-side fallback:
-  ```typescript
-  export function createSupabaseServerClient() {
-    return createServerClient<Database>(
-      process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      ...
+### 1. Update Next.js Configuration (`next.config.mjs`)
+- [ ] Add the experimental serverActions configuration with `allowedOrigins` to allow Next.js to skip the CSRF check on production Vercel domains.
+  ```javascript
+  /** @type {import('next').NextConfig} */
+  const nextConfig = {
+    experimental: {
+      serverActions: {
+        allowedOrigins: [
+          "greenlitmd.app",
+          "www.greenlitmd.app",
+          "*.vercel.app",
+        ],
+      },
+    },
+  };
+
+  export default nextConfig;
+  ```
+
+### 2. Create the Thin Client Component `components/ScrollButton.tsx`
+- [ ] Create the file [components/ScrollButton.tsx](file:///c:/projects/health2/greenlitmd-main/components/ScrollButton.tsx) with `"use client"`.
+- [ ] Implement a reusable button that scrolls to the waitlist form smoothly:
+  ```tsx
+  "use client";
+
+  interface ScrollButtonProps {
+    className?: string;
+    children?: React.ReactNode;
+  }
+
+  export default function ScrollButton({ className, children }: ScrollButtonProps) {
+    return (
+      <button
+        onClick={() =>
+          document.getElementById("waitlist-form")?.scrollIntoView({ behavior: "smooth" })
+        }
+        className={className}
+      >
+        {children || "Request Early Access →"}
+      </button>
     );
   }
   ```
 
-### 2. Create the Server Action
-- [ ] Create the new server action file at [app/actions/waitlist.ts](file:///c:/projects/health2/greenlitmd-main/app/actions/waitlist.ts) (note: `app/` is at the root level in this workspace).
-- [ ] Implement `joinWaitlistAction(formData: FormData)` with `"use server"`:
-  - Extract email: `formData.get("email")`
-  - Extract optional practice name: `formData.get("practice_name")`
-  - Check honeypot field: `formData.get("honey")`
-  - Call `insertSignup(email, null, practice_name)`
-  - Catch Postgres unique error code `'23505'` and return:
-    `{ success: false, error: "You're already on the list!" }`
-  - Call `getSignupPosition(email)` and trigger `sendConfirmationEmail` via Resend.
-  - Return `{ success: true }`.
+### 3. Convert `app/page.tsx` to a Server Component
+- [ ] Open [app/page.tsx](file:///c:/projects/health2/greenlitmd-main/app/page.tsx).
+- [ ] Remove the `"use client";` directive from the very first line.
+- [ ] Import `ScrollButton` from `@/components/ScrollButton`.
+- [ ] Remove the `scrollToWaitlist` helper function inside `LandingPage()`.
+- [ ] Update the three waitlist trigger buttons:
+  - **Section 5 (How it works) Button (Lines 287-293)**:
+    Replace:
+    ```tsx
+    <button
+      onClick={scrollToWaitlist}
+      className="rounded-lg border border-white/30 bg-white/10 px-8 py-3 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/20 hover:border-white/50"
+    >
+      Request Early Access →
+    </button>
+    ```
+    With:
+    ```tsx
+    <ScrollButton className="rounded-lg border border-white/30 bg-white/10 px-8 py-3 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/20 hover:border-white/50" />
+    ```
+  - **Solo Practice Pricing CTA (Lines 334-340)**:
+    Replace:
+    ```tsx
+    <button
+      onClick={scrollToWaitlist}
+      id="pricing-solo-cta"
+      className="mt-8 w-full rounded-lg border-2 border-clinical-navy px-4 py-2.5 text-sm font-semibold text-clinical-navy transition hover:bg-slate-50"
+    >
+      Request Early Access
+    </button>
+    ```
+    With a `Link` component, using `block` and `text-center` styling for proper alignment:
+    ```tsx
+    <Link
+      href="/#waitlist-form"
+      id="pricing-solo-cta"
+      className="mt-8 block w-full rounded-lg border-2 border-clinical-navy px-4 py-2.5 text-center text-sm font-semibold text-clinical-navy transition hover:bg-slate-50"
+    >
+      Request Early Access
+    </Link>
+    ```
+  - **Small Practice Pricing CTA (Lines 370-376)**:
+    Replace:
+    ```tsx
+    <button
+      onClick={scrollToWaitlist}
+      id="pricing-practice-cta"
+      className="mt-8 w-full rounded-lg bg-clinical-navy px-4 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-clinical-blue"
+    >
+      Request Early Access
+    </button>
+    ```
+    With:
+    ```tsx
+    <Link
+      href="/#waitlist-form"
+      id="pricing-practice-cta"
+      className="mt-8 block w-full rounded-lg bg-clinical-navy px-4 py-2.5 text-center text-sm font-semibold text-white shadow transition hover:bg-clinical-blue"
+    >
+      Request Early Access
+    </Link>
+    ```
 
-### 3. Create the Reusable UI Component
-- [ ] Create a standalone component at [components/WaitlistForm.tsx](file:///c:/projects/health2/greenlitmd-main/components/WaitlistForm.tsx).
-- [ ] Code it with standard React hook states to consume `joinWaitlistAction` via `FormData` cleanly.
-- [ ] Build in twin styling options (`variant="hero"` or `variant="standalone"`) to slot perfectly into both pages.
-
-### 4. Page Integrations & API Cleanup
-- [ ] Update [app/page.tsx](file:///c:/projects/health2/greenlitmd-main/app/page.tsx) to import `WaitlistForm` and replace the inline hero form.
-- [ ] Update [app/waitlist/page.tsx](file:///c:/projects/health2/greenlitmd-main/app/waitlist/page.tsx) to import `WaitlistForm` and use `variant="standalone"`.
-- [ ] Delete the redundant API route folder [app/api/waitlist/route.ts](file:///c:/projects/health2/greenlitmd-main/app/api/waitlist/route.ts).
-
-### 5. Verification & Lint Checks
-- [ ] Run typescript/linter checks or boot development server to verify code compilation.
+### 4. Verification & Testing
+- [ ] Run `npx tsc --noEmit` from the root directory to confirm there are no TypeScript compilation errors.
+- [ ] Verify that the dev server compiles `app/page.tsx` successfully as a Server Component.
+- [ ] Verify that navigation and visual hierarchy remain completely unchanged.
