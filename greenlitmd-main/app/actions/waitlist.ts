@@ -53,9 +53,16 @@ export async function joinWaitlistAction(
     // Fire confirmation email — non-blocking; failure does not surface to user
     try {
       const position = await getSignupPosition(email);
-      await sendConfirmationEmail(email, position > 0 ? position : 1);
+      const resendResponse = await sendConfirmationEmail(email, position > 0 ? position : 1);
+      
+      // Explicitly check if Resend handed back a failure note
+      if (resendResponse.error) {
+        console.error("[joinWaitlistAction] Hidden Resend API Error:", resendResponse.error);
+      } else {
+        console.log("[joinWaitlistAction] Email successfully delivered:", resendResponse.data);
+      }
     } catch (emailErr) {
-      console.error("[joinWaitlistAction] Resend error:", emailErr);
+      console.error("[joinWaitlistAction] Network crash error:", emailErr);
     }
 
     return { success: true };
