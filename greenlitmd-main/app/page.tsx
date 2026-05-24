@@ -1,525 +1,506 @@
 "use client";
 
-import { ChangeEvent, DragEvent, FormEvent, ReactNode, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, FormEvent } from "react";
 import Link from "next/link";
-import type { GeneratePaResponse } from "@/lib/types";
-import { DEMO_PA_DATA } from "@/lib/demo-data";
+import Image from "next/image";
 
-const progressSteps = [
-  "Extracting chart data...",
-  "Analyzing medical necessity...",
-  "Building narrative...",
-  "Generating document..."
-];
-
-const maxUploadSizeBytes = 10 * 1024 * 1024;
-
-const commonOrthopedicCptCodes = [
-  { code: "27447", description: "Total knee arthroplasty" },
-  { code: "27130", description: "Total hip arthroplasty" },
-  { code: "27236", description: "ORIF femoral neck fracture" },
-  { code: "27244", description: "ORIF intertrochanteric fracture" },
-  { code: "29827", description: "Rotator cuff repair arthroscopic" },
-  { code: "29826", description: "Shoulder arthroscopy decompression" },
-  { code: "29881", description: "Knee arthroscopy meniscectomy" },
-  { code: "29880", description: "Knee arthroscopy meniscectomy both" },
-  { code: "27187", description: "Prophylactic femur nailing" },
-  { code: "22612", description: "Lumbar spinal fusion" },
-  { code: "22630", description: "Lumbar interbody fusion" },
-  { code: "63047", description: "Lumbar laminectomy" },
-  { code: "27370", description: "Knee arthroplasty revision" },
-  { code: "27134", description: "Hip arthroplasty revision" },
-  { code: "29823", description: "Shoulder arthroscopy debridement" },
-  { code: "29824", description: "Distal clavicle excision" },
-  { code: "27759", description: "Tibia ORIF" },
-  { code: "25600", description: "Closed radius fracture treatment" },
-  { code: "23472", description: "Total shoulder arthroplasty" },
-  { code: "27695", description: "Ankle ligament repair" }
-];
-
-export default function UploadPage() {
-  const router = useRouter();
-  const [file, setFile] = useState<File | null>(null);
-  const [isDemoMode, setIsDemoMode] = useState(false);
-  const [cptCode, setCptCode] = useState("");
-  const [payerName, setPayerName] = useState("");
-  const [providerName, setProviderName] = useState("");
-  const [practiceName, setPracticeName] = useState("");
-  const [isDragging, setIsDragging] = useState(false);
+export default function LandingPage() {
+  const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [activeStep, setActiveStep] = useState(0);
+  const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const hasRequiredFields = useMemo(
-    () => Boolean((file || isDemoMode) && cptCode.trim() && payerName.trim() && providerName.trim()),
-    [cptCode, file, isDemoMode, payerName, providerName]
-  );
-
-  const cptWarning = useMemo(() => getCptWarning(cptCode), [cptCode]);
-
-  const progressPercent = ((activeStep + 1) / progressSteps.length) * 100;
-
-  function selectChartFile(selectedFile: File | undefined) {
-    setError(null);
-
-    if (!selectedFile) {
-      return;
-    }
-
-    const lowerName = selectedFile.name.toLowerCase();
-    const isPdf = selectedFile.type === "application/pdf" || lowerName.endsWith(".pdf");
-    const isDocx =
-      selectedFile.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-      lowerName.endsWith(".docx");
-    const isTxt = selectedFile.type === "text/plain" || lowerName.endsWith(".txt");
-
-    if (!isPdf && !isDocx && !isTxt) {
-      setError("Only PDF, DOCX, and TXT files are supported");
-      return;
-    }
-
-    if (selectedFile.size > maxUploadSizeBytes) {
-      setError("File too large. Please upload a file under 10MB.");
-      return;
-    }
-
-    // A real file upload cancels demo mode
-    setIsDemoMode(false);
-    setFile(selectedFile);
-  }
-
-  async function handleLoadSample(
-    filename: string,
-    metadata: { cptCode: string; payerName: string; providerName: string; practiceName: string }
-  ) {
-    setError(null);
-    setIsLoading(true);
-    try {
-      const res = await fetch(`/samples/${filename}`);
-      if (!res.ok) {
-        throw new Error(`Failed to fetch sample file: ${res.statusText}`);
-      }
-      const text = await res.text();
-      const sampleFile = new File([text], filename, { type: "text/plain" });
-
-      // Update component states precisely
-      setFile(sampleFile);
-      setCptCode(metadata.cptCode);
-      setPayerName(metadata.payerName);
-      setProviderName(metadata.providerName);
-      setPracticeName(metadata.practiceName);
-
-      // CRITICAL: Bypasses mock storage logic, forcing live API submission
-      setIsDemoMode(false);
-    } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Failed to load sample chart.");
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    selectChartFile(event.target.files?.[0]);
-  }
-
-  function handleDrop(event: DragEvent<HTMLLabelElement>) {
-    event.preventDefault();
-    setIsDragging(false);
-    selectChartFile(event.dataTransfer.files?.[0]);
-  }
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (isLoading) {
-      return;
-    }
-
-    if (!isDemoMode && !file) {
-      setError("Upload a patient chart file before generating the packet.");
-      return;
-    }
-
-    if (!cptCode.trim() || !payerName.trim() || !providerName.trim()) {
-      setError("Complete all request details before generating the packet.");
-      return;
-    }
+  async function handleWaitlistSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!email || isLoading) return;
 
     setIsLoading(true);
     setError(null);
-    setActiveStep(0);
-
-    // Demo mode uses a 1000ms interval (4000ms total) for a snappy experience
-    const intervalTime = isDemoMode ? 1000 : 7000;
-    const progressTimer = window.setInterval(() => {
-      setActiveStep((current) => Math.min(current + 1, progressSteps.length - 1));
-    }, intervalTime);
 
     try {
-      if (isDemoMode) {
-        // Wait for the full animation cycle to complete
-        await new Promise<void>((resolve) =>
-          window.setTimeout(resolve, intervalTime * progressSteps.length)
-        );
-
-        sessionStorage.setItem(
-          "pa-review-data",
-          JSON.stringify({
-            ...DEMO_PA_DATA,
-            cptCode: cptCode.trim(),
-            payerName: payerName.trim(),
-            providerName: providerName.trim(),
-            practiceName: practiceName.trim(),
-            isDemo: true
-          })
-        );
-        router.push("/review");
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append("chart", file!);
-      formData.append("cptCode", cptCode.trim());
-      formData.append("payerName", payerName.trim());
-      formData.append("providerName", providerName.trim());
-      formData.append("practiceName", practiceName.trim());
-
-      const response = await fetch("/api/generate-pa", {
+      const res = await fetch("/api/waitlist", {
         method: "POST",
-        body: formData
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
       });
 
-      const payload = (await response.json()) as GeneratePaResponse | { error?: string };
+      const data = await res.json();
 
-      if (!response.ok) {
-        throw new Error("error" in payload && payload.error ? payload.error : "Unable to generate PA packet.");
+      if (!res.ok) {
+        throw new Error(data.error || "An error occurred. Please try again.");
       }
 
-      sessionStorage.setItem(
-        "pa-review-data",
-        JSON.stringify({
-          ...(payload as GeneratePaResponse),
-          cptCode: cptCode.trim(),
-          payerName: payerName.trim(),
-          providerName: providerName.trim(),
-          practiceName: practiceName.trim()
-        })
-      );
-      router.push("/review");
-    } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Unable to generate PA packet.");
+      setSuccess(true);
+      setEmail("");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
-      window.clearInterval(progressTimer);
       setIsLoading(false);
     }
   }
 
+  const scrollToWaitlist = () => {
+    document.getElementById("waitlist-form")?.scrollIntoView({ behavior: "smooth" });
+  };
+
   return (
-    <main className="min-h-[calc(100vh-3.5rem)] bg-[#F8F9FB]">
-      <section className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-5xl flex-col justify-center px-6 py-10">
-        <div className="mb-8">
-          <p className="text-sm font-semibold uppercase tracking-wide text-clinical-blue">Orthopedic PA Builder</p>
-          <h1 className="mt-3 text-3xl font-semibold text-clinical-navy md:text-4xl">
-            Orthopedic PA denials cost your practice $15K–$50K. Generate payer-ready packets in 60 seconds with Greenlit MD. 
-          </h1>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
-            Upload the chart, enter the request details, and review the AI-assisted draft before exporting the final packet.
-          </p>
-          <div className="mt-8 flex items-center gap-4">
-            <Link
-              href="/waitlist"
-              className="inline-flex items-center justify-center rounded-md border border-[#CBD5E1] bg-white px-5 py-2.5 text-sm font-semibold text-clinical-navy shadow-sm transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-clinical-blue focus:ring-offset-2"
-            >
-              Join the waitlist &rarr;
-            </Link>
-          </div>
+    <div className="min-h-screen bg-white text-slate-900 selection:bg-clinical-navy selection:text-white">
+
+      {/* ── 1. NAV ─────────────────────────────────────────────────────────── */}
+      {/* Note: The global sticky nav in layout.tsx is still rendered above this page.
+          This section intentionally overrides the home link CTA on the right only. */}
+
+      {/* ── 2. HERO ────────────────────────────────────────────────────────── */}
+      <section className="relative overflow-hidden bg-gradient-to-b from-slate-50 to-white px-6 pt-20 pb-24 lg:pt-32 lg:pb-36">
+        {/* Decorative background blob */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl"
+        >
+          <div
+            className="relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-blue-100 to-cyan-50 opacity-40 sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]"
+          />
         </div>
 
-        <form onSubmit={handleSubmit} className="grid gap-7 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="flex flex-col gap-3">
-          <label
-            onDragOver={(event) => {
-              event.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleDrop}
-            className={`flex min-h-80 cursor-pointer flex-col items-center justify-center rounded-lg border px-8 text-center transition duration-200 hover:shadow-[0_16px_40px_rgba(30,58,95,0.10)] ${
-              isDragging ? "border-clinical-navy bg-blue-50 shadow-[0_16px_40px_rgba(30,58,95,0.10)]" : "border-[#CBD5E1] bg-white"
-            }`}
-          >
-            <input
-              className="sr-only"
-              type="file"
-              accept="application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.txt,text/plain"
-              onChange={handleFileChange}
-            />
-            <span className="rounded-full bg-clinical-navy px-4 py-2 text-sm font-semibold text-white shadow-sm">
-              Chart upload
-            </span>
-            <span className="mt-5 text-xl font-semibold text-clinical-navy">
-              {file
-                ? file.name
-                : isDemoMode
-                ? "Maria_Delgado_Chart.pdf"
-                : "Drag and drop the patient chart here"}
-            </span>
-            <span className="mt-3 text-sm text-slate-500">
-              {file && !isDemoMode
-                ? "Chart loaded — ready to generate"
-                : isDemoMode
-                ? "Sample chart loaded — ready to generate"
-                : "or click to browse - PDF, DOCX, or TXT supported"}
-            </span>
-            {file && !isDemoMode ? <span className="mt-4 text-sm text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</span> : null}
-            {isDemoMode && !file ? (
-              <span className="mt-4 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
-                Demo — sample patient data
-              </span>
-            ) : null}
-          </label>
-
-          <div className="rounded-lg border border-clinical-line bg-white px-5 py-4">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-clinical-navy">
-              No chart handy? Load a synthetic sample:
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {([
-                {
-                  label: "Clean TKA Chart",
-                  filename: "clean-tka.txt",
-                  metadata: { cptCode: "27447", payerName: "Aetna", providerName: "Jane Smith, MD", practiceName: "NYU Langone Orthopedics" }
-                },
-                {
-                  label: "Messy Rotator Cuff",
-                  filename: "messy-rotator-cuff.txt",
-                  metadata: { cptCode: "29827", payerName: "UnitedHealthcare", providerName: "Dr. Alex Mercer, MD", practiceName: "Brooklyn Sports Medicine" }
-                },
-                {
-                  label: "Incomplete Lumbar Fusion",
-                  filename: "incomplete-lumbar-fusion.txt",
-                  metadata: { cptCode: "22630", payerName: "Cigna", providerName: "Dr. Sarah Jenkins, MD", practiceName: "Spine & Joint Institute" }
-                }
-              ] as const).map(({ label, filename, metadata }) => (
-                <button
-                  key={filename}
-                  type="button"
-                  disabled={isLoading}
-                  onClick={() => handleLoadSample(filename, metadata)}
-                  className={`rounded-full border px-4 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                    file?.name === filename
-                      ? "border-clinical-navy bg-clinical-navy text-white"
-                      : "border-clinical-line bg-white text-slate-700 hover:bg-slate-50"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
+        <div className="mx-auto max-w-4xl text-center">
+          {/* Pill badge */}
+          <div className="mx-auto mb-7 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-4 py-1.5 text-xs font-semibold tracking-wide text-clinical-navy shadow-sm">
+            <span className="flex h-2 w-2 rounded-full bg-blue-500 animate-pulse" aria-hidden="true" />
+            Orthopedic Prior Auth, Reimagined
           </div>
 
-          <div className="rounded-lg border border-clinical-line bg-white p-6 shadow-sm">
-            <div className="space-y-5">
-              <Field
-                label="Procedure CPT code"
-                value={cptCode}
-                onChange={setCptCode}
-                placeholder="e.g. 29827"
-                disabled={isLoading}
-              >
-                {cptWarning ? (
-                  <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-                    <p>
-                      CPT code {cptWarning.enteredCode} was not recognized as a common orthopedic surgical code. Please
-                      verify before continuing.
-                    </p>
-                    {cptWarning.closestMatch ? (
-                      <p className="mt-1 flex items-center gap-3 font-medium">
-                        <span>
-                          Closest match: CPT {cptWarning.closestMatch.code} - {cptWarning.closestMatch.description}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setCptCode(cptWarning.closestMatch!.code)}
-                          className="ml-auto inline-flex items-center rounded-md bg-clinical-navy px-2 py-1 text-xs font-semibold text-white hover:bg-clinical-blue"
-                        >
-                          Use
-                        </button>
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
-              </Field>
-              <Field
-                label="Insurance payer name"
-                value={payerName}
-                onChange={setPayerName}
-                placeholder="e.g. Aetna"
-                disabled={isLoading}
-              />
-              <Field
-                label="Requesting provider name"
-                value={providerName}
-                onChange={setProviderName}
-                placeholder="e.g. Jane Smith, MD"
-                disabled={isLoading}
-              />
-              <Field
-                label="Practice name"
-                value={practiceName}
-                onChange={setPracticeName}
-                placeholder="e.g. NYU Langone Orthopedics"
-                disabled={isLoading}
-                optional
-              />
-            </div>
+          <h1 className="text-4xl font-extrabold tracking-tight text-clinical-navy sm:text-5xl lg:text-6xl lg:leading-[1.1]">
+            Generate payer-ready orthopedic prior auth packets in{" "}
+            <span className="text-clinical-blue">60 seconds.</span>
+          </h1>
 
-            {error ? (
-              <div className="mt-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-            ) : null}
+          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-600 sm:text-xl">
+            Built for independent orthopedic practices.{" "}
+            <strong className="font-semibold text-slate-800">Fewer denials.</strong>{" "}
+            <strong className="font-semibold text-slate-800">Less staff time.</strong>
+          </p>
 
-            {isLoading ? (
-              <div className="mt-6 rounded-md border border-clinical-line bg-slate-50 p-4">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="flex gap-1">
-                    <span className="h-2 w-2 rounded-full bg-clinical-navy animate-bounce [animation-delay:0ms]" />
-                    <span className="h-2 w-2 rounded-full bg-clinical-navy animate-bounce [animation-delay:150ms]" />
-                    <span className="h-2 w-2 rounded-full bg-clinical-navy animate-bounce [animation-delay:300ms]" />
-                  </div>
-                  <p className="text-sm font-semibold text-clinical-navy">Generating packet</p>
+          {/* CTA Form */}
+          <div id="waitlist-form" className="mx-auto mt-10 max-w-md">
+            {success ? (
+              <div className="rounded-xl border border-green-200 bg-green-50 p-5 text-left shadow-sm">
+                <div className="flex items-center gap-2 font-semibold text-green-800 mb-1">
+                  <svg className="h-5 w-5 text-green-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Spot Reserved
                 </div>
-                <p className="text-xs text-slate-500 mb-4">
-                  AI analysis takes 20–40 seconds. Your packet is being built.
+                <p className="text-sm text-green-700 leading-relaxed">
+                  Welcome to early access. We&apos;ve sent a confirmation to your inbox and will be in touch with onboarding details soon.
                 </p>
-                <div className="space-y-3">
-                  {progressSteps.map((step, index) => (
-                    <div key={step} className="flex items-center gap-3 text-sm">
+              </div>
+            ) : (
+              <form
+                onSubmit={handleWaitlistSubmit}
+                className="flex flex-col gap-3 sm:flex-row sm:items-stretch"
+                aria-label="Early access request form"
+              >
+                <div className="flex-1">
+                  <label htmlFor="hero-email" className="sr-only">Work email address</label>
+                  <input
+                    id="hero-email"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your work email..."
+                    disabled={isLoading}
+                    className="w-full rounded-lg border border-clinical-line bg-white px-4 py-3 text-sm shadow-sm outline-none placeholder-slate-400 transition focus:border-clinical-navy focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLoading || !email}
+                  className="rounded-lg bg-clinical-navy px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-clinical-blue hover:shadow-md disabled:bg-slate-300 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? "Requesting..." : "Request Early Access →"}
+                </button>
+              </form>
+            )}
+            {error && (
+              <p className="mt-3 px-1 text-sm font-semibold text-red-600 text-left" role="alert">
+                ⚠ {error}
+              </p>
+            )}
+            {!success && (
+              <p className="mt-3 text-xs text-slate-400 text-center">
+                No credit card required. Limited early-access spots.
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* ── 3. PA STRENGTH SCORE MOCKUP ────────────────────────────────────── */}
+      <section className="bg-slate-50 border-y border-slate-200 px-6 py-16 lg:py-24">
+        <div className="mx-auto max-w-5xl">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl font-bold tracking-tight text-clinical-navy sm:text-3xl">
+              Know your authorization odds before you submit
+            </h2>
+            <p className="mt-3 max-w-xl mx-auto text-slate-600 text-sm sm:text-base">
+              Our clinical AI scores every request against payer-specific rules — and flags exactly what&apos;s missing before denials happen.
+            </p>
+          </div>
+
+          {/* Browser window mockup */}
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+            {/* Chrome bar */}
+            <div className="flex items-center gap-2.5 border-b border-slate-200 bg-slate-100 px-4 py-3">
+              <div className="flex gap-1.5" aria-hidden="true">
+                <span className="h-3 w-3 rounded-full bg-red-400" />
+                <span className="h-3 w-3 rounded-full bg-yellow-400" />
+                <span className="h-3 w-3 rounded-full bg-green-400" />
+              </div>
+              <div className="mx-auto max-w-sm w-full rounded-md border border-slate-200 bg-white py-1 px-3 text-center text-xs text-slate-400 font-mono select-none">
+                greenlitmd.app/review/doe-john-27447
+              </div>
+            </div>
+
+            {/* App chrome interior */}
+            <div className="grid lg:grid-cols-[300px_1fr] divide-y lg:divide-y-0 lg:divide-x divide-slate-200">
+
+              {/* Left: Score sidebar */}
+              <div className="bg-white p-5 lg:p-6 flex flex-col gap-5">
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-5">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">PA Strength Score</p>
+                  <p className="mt-2 text-4xl font-extrabold text-green-600">
+                    9.2
+                    <span className="ml-1 text-lg font-semibold text-slate-400">/ 10</span>
+                  </p>
+                  <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
+                    <div className="h-full w-[92%] rounded-full bg-green-500 transition-all" />
+                  </div>
+                  <p className="mt-2 text-xs font-medium text-slate-500">High probability of immediate approval</p>
+                </div>
+
+                <ul className="space-y-2.5">
+                  {[
+                    { label: "Diagnosis Codes (M17.11)", ok: true },
+                    { label: "Conservative Treatment — 8 wks PT", ok: true },
+                    { label: "Imaging Findings — K-L Grade III", ok: true },
+                    { label: "Symptom Duration (incomplete note)", ok: false },
+                  ].map(({ label, ok }) => (
+                    <li key={label} className="flex items-center gap-2.5 text-xs">
                       <span
-                        className={`h-2.5 w-2.5 rounded-full transition-colors duration-500 ${
-                          index < activeStep
-                            ? "bg-green-500"
-                            : index === activeStep
-                            ? "bg-clinical-blue animate-pulse"
-                            : "bg-slate-300"
+                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-bold ${
+                          ok
+                            ? "bg-green-100 text-green-600"
+                            : "bg-red-50 text-red-500"
                         }`}
-                      />
-                      <span className={`${
-                        index < activeStep
-                          ? "text-slate-400 line-through"
-                          : index === activeStep
-                          ? "text-slate-800 font-medium"
-                          : "text-slate-400"
-                      }`}>
-                        {step}
+                        aria-hidden="true"
+                      >
+                        {ok ? "✓" : "!"}
                       </span>
-                    </div>
+                      <span className={ok ? "text-slate-700 font-medium" : "text-slate-400"}>{label}</span>
+                    </li>
                   ))}
+                </ul>
+
+                <button
+                  className="mt-auto w-full rounded-md bg-clinical-navy py-2 text-xs font-semibold text-white hover:bg-clinical-blue transition"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                >
+                  Fix Issues →
+                </button>
+              </div>
+
+              {/* Right: Letter preview */}
+              <div className="bg-slate-50 p-5 lg:p-6 flex flex-col justify-between gap-4">
+                <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-inner text-[11px] font-mono leading-relaxed text-slate-700 max-h-[280px] overflow-y-auto space-y-3">
+                  <div className="flex justify-between items-start border-b border-slate-100 pb-3">
+                    <div>
+                      <p className="font-bold text-slate-900 not-italic">Dr. Jane Smith, MD</p>
+                      <p className="text-slate-400 text-[10px]">NYU Langone Orthopedics</p>
+                    </div>
+                    <p className="text-slate-400 text-[10px]">Date: 05/10/2026</p>
+                  </div>
+                  <p className="font-bold text-slate-900">RE: Letter of Medical Necessity — Right TKA (CPT 27447)</p>
+                  <p>Patient: John Doe &nbsp;|&nbsp; DOB: 01/15/1960 &nbsp;|&nbsp; Payer: Aetna</p>
+                  <p className="text-slate-500">
+                    Dear Medical Director,<br /><br />
+                    I am writing to request prior authorization for a right Total Knee Arthroplasty (CPT 27447) for Mr. John Doe. The patient presents with Kellgren-Lawrence Grade III osteoarthritis with severe joint space narrowing confirmed on weight-bearing radiographs dated 04/15/2026.
+                  </p>
+                  <div className="rounded-md border border-green-100 bg-green-50 p-3 text-green-800">
+                    <strong>Conservative Course Completed:</strong> The patient has failed a full 8-week course of physical therapy (Jan–Mar 2026), oral NSAIDs (Ibuprofen 400 mg daily × 3 months), and a corticosteroid injection on 04/15/2026 with only 2-week partial relief.
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 shrink-0">
+                  <span className="cursor-default rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 font-sans shadow-sm" aria-hidden="true">Edit Text</span>
+                  <span className="cursor-default rounded-md bg-clinical-navy px-4 py-1.5 text-xs font-semibold text-white shadow-sm font-sans" aria-hidden="true">Download PDF Packet</span>
                 </div>
               </div>
-            ) : null}
-
-            <button
-              type="submit"
-              disabled={!hasRequiredFields}
-              className="mt-6 w-full rounded-md bg-clinical-navy px-5 py-3 text-sm font-semibold text-white transition hover:bg-clinical-blue disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
-            >
-              {isLoading ? "Generating..." : "Generate PA Packet"}
-            </button>
-            {isLoading ? (
-              <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
-                <div
-                  className="h-full rounded-full bg-clinical-navy transition-[width] duration-500"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-            ) : null}
+            </div>
           </div>
-        </form>
+        </div>
       </section>
-    </main>
+
+      {/* ── 4. THE PAIN ────────────────────────────────────────────────────── */}
+      <section className="px-6 py-20 lg:py-32">
+        <div className="mx-auto max-w-5xl">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl font-bold tracking-tight text-clinical-navy sm:text-4xl">
+              Prior auth is quietly draining your practice
+            </h2>
+            <p className="mt-4 max-w-xl mx-auto text-slate-600">
+              Every manual submission is lost time and money. Every denial is a case that may never be rescheduled.
+            </p>
+          </div>
+
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              {
+                icon: "$",
+                color: "red",
+                title: "Lost Surgeon Revenue",
+                body: (
+                  <>
+                    Each denied orthopedic surgery costs your practice{" "}
+                    <strong className="text-red-700 font-bold">$15,000 to $50,000</strong>{" "}
+                    in completely unrecoverable lost revenue.
+                  </>
+                ),
+                stat: "• $15k–$50k lost per denial",
+              },
+              {
+                icon: "⏱",
+                color: "orange",
+                title: "Staff Efficiency Drain",
+                body: (
+                  <>
+                    Manual PA submissions burn{" "}
+                    <strong className="text-orange-700 font-bold">$13–$18</strong>{" "}
+                    in direct staff time costs — every single time, regardless of outcome.
+                  </>
+                ),
+                stat: "• $13–$18 per submission",
+              },
+              {
+                icon: "!",
+                color: "red",
+                title: "Compounding Denial Rate",
+                body: (
+                  <>
+                    The baseline orthopedic PA denial rate is{" "}
+                    <strong className="text-red-700 font-bold">8–10%</strong>.
+                    Greenlit MD targets{" "}
+                    <strong className="text-green-700 font-bold">under 1%</strong>.
+                  </>
+                ),
+                stat: "• 8–10% industry baseline",
+              },
+            ].map(({ icon, title, body, stat }) => (
+              <div
+                key={title}
+                className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow"
+              >
+                <div>
+                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-600 text-xl font-extrabold mb-4">
+                    {icon}
+                  </span>
+                  <h3 className="text-base font-bold text-clinical-navy">{title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-600">{body}</p>
+                </div>
+                <p className="mt-5 text-[11px] font-bold uppercase tracking-widest text-red-400">{stat}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── 5. HOW IT WORKS ────────────────────────────────────────────────── */}
+      <section className="relative overflow-hidden bg-clinical-navy px-6 py-20 lg:py-28 text-white">
+        <div aria-hidden="true" className="pointer-events-none absolute top-0 right-0 h-96 w-96 rounded-full bg-blue-400/10 blur-3xl" />
+        <div aria-hidden="true" className="pointer-events-none absolute bottom-0 left-0 h-72 w-72 rounded-full bg-blue-600/10 blur-3xl" />
+
+        <div className="relative z-10 mx-auto max-w-5xl">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+              Zero training. Zero friction.
+            </h2>
+            <p className="mt-3 max-w-xl mx-auto text-blue-200 text-sm sm:text-base">
+              A three-step pipeline that slots directly into your current billing workflow — no IT setup, no EMR integration required.
+            </p>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-3">
+            {[
+              {
+                num: "01",
+                title: "Upload Chart",
+                desc: "Drag and drop your orthopedic clinical notes or chart PDF directly into the secure builder interface.",
+              },
+              {
+                num: "02",
+                title: "AI Extracts & Scores",
+                desc: "The clinical agent extracts objective metrics and scores authorization strength against payer-specific rules.",
+              },
+              {
+                num: "03",
+                title: "Download Packet",
+                desc: "Retrieve a polished, payer-ready medical necessity narrative package formatted exactly for submission.",
+              },
+            ].map(({ num, title, desc }) => (
+              <div
+                key={num}
+                className="relative rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm"
+              >
+                <span
+                  aria-hidden="true"
+                  className="absolute top-4 right-4 text-5xl font-extrabold text-white/5 select-none font-sans"
+                >
+                  {num}
+                </span>
+                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/20 text-sm font-bold text-blue-300">
+                  {num.replace("0", "")}
+                </div>
+                <h3 className="text-lg font-bold">{title}</h3>
+                <p className="mt-2 text-sm text-blue-100 leading-relaxed">{desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-12 text-center">
+            <button
+              onClick={scrollToWaitlist}
+              className="rounded-lg border border-white/30 bg-white/10 px-8 py-3 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/20 hover:border-white/50"
+            >
+              Request Early Access →
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ── 6. PRICING ─────────────────────────────────────────────────────── */}
+      <section className="px-6 py-20 lg:py-32 bg-slate-50">
+        <div className="mx-auto max-w-4xl">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl font-bold tracking-tight text-clinical-navy sm:text-4xl">
+              Transparent, flat-rate pricing
+            </h2>
+            <p className="mt-4 max-w-md mx-auto text-slate-600">
+              Predictable costs that scale with your practice — no per-submission fees or surprise charges.
+            </p>
+          </div>
+
+          <div className="grid gap-8 md:grid-cols-2">
+            {/* Solo Practice */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5">
+              <div>
+                <h3 className="text-xl font-bold text-clinical-navy">Solo Practice</h3>
+                <p className="mt-1 text-sm text-slate-500">For single surgeons and solo practitioners</p>
+                <div className="mt-6 flex items-baseline gap-1">
+                  <span className="text-5xl font-extrabold tracking-tight text-slate-900">$299</span>
+                  <span className="text-sm font-semibold text-slate-500">/month</span>
+                </div>
+                <ul className="mt-8 space-y-3 text-sm text-slate-600">
+                  {[
+                    "1 active surgeon",
+                    "Unlimited prior authorization packets",
+                    "Core orthopedic templates (TKA, THA, Spine, Shoulder)",
+                    "Live PA Strength Score dashboard",
+                    "PDF export",
+                  ].map((f) => (
+                    <li key={f} className="flex items-start gap-3">
+                      <span className="mt-0.5 font-bold text-green-500 shrink-0">✓</span>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <button
+                onClick={scrollToWaitlist}
+                id="pricing-solo-cta"
+                className="mt-8 w-full rounded-lg border-2 border-clinical-navy px-4 py-2.5 text-sm font-semibold text-clinical-navy transition hover:bg-slate-50"
+              >
+                Request Early Access
+              </button>
+            </div>
+
+            {/* Small Practice */}
+            <div className="relative rounded-2xl border-2 border-clinical-navy bg-white p-8 shadow-lg flex flex-col justify-between transition-all hover:shadow-xl hover:-translate-y-0.5">
+              <span className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-clinical-navy px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-white shadow">
+                Most Popular
+              </span>
+              <div>
+                <h3 className="text-xl font-bold text-clinical-navy">Small Practice</h3>
+                <p className="mt-1 text-sm text-slate-500">For growing multi-surgeon clinics</p>
+                <div className="mt-6 flex items-baseline gap-1">
+                  <span className="text-5xl font-extrabold tracking-tight text-slate-900">$599</span>
+                  <span className="text-sm font-semibold text-slate-500">/month</span>
+                </div>
+                <ul className="mt-8 space-y-3 text-sm text-slate-600">
+                  {[
+                    "2–5 active surgeons",
+                    "Unlimited prior authorization packets",
+                    "Priority clinical agent throughput",
+                    "Shared clinician login portal",
+                    "Dedicated onboarding support",
+                  ].map((f) => (
+                    <li key={f} className="flex items-start gap-3">
+                      <span className="mt-0.5 font-bold text-green-500 shrink-0">✓</span>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <button
+                onClick={scrollToWaitlist}
+                id="pricing-practice-cta"
+                className="mt-8 w-full rounded-lg bg-clinical-navy px-4 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-clinical-blue"
+              >
+                Request Early Access
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── 7. FOOTER ──────────────────────────────────────────────────────── */}
+      <footer className="border-t border-slate-200 bg-white px-6 py-10 text-xs text-slate-500">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 sm:flex-row">
+          <div className="flex items-center gap-2">
+            <Image
+              src="/logo.png"
+              alt="Greenlit MD"
+              width={20}
+              height={20}
+              className="h-5 w-5 object-contain opacity-80"
+            />
+            <span className="font-bold text-clinical-navy">Greenlit MD</span>
+            <span className="text-slate-400">&copy; {new Date().getFullYear()}</span>
+          </div>
+
+          <nav className="flex flex-wrap justify-center gap-5 font-semibold" aria-label="Footer navigation">
+            <Link href="/privacy" className="hover:text-slate-800 transition-colors">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="hover:text-slate-800 transition-colors">
+              Terms of Service
+            </Link>
+            <a href="mailto:you@greenlitmd.app" className="hover:text-slate-800 transition-colors">
+              you@greenlitmd.app
+            </a>
+            <a
+              href="https://linkedin.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 hover:text-slate-800 transition-colors"
+            >
+              LinkedIn
+              <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.32 1.3v-1.11h-2.8v8.37h2.8v-4.87c0-.26.05-.52.13-.7a1.11 1.11 0 0 1 .97-.73c.6 0 .86.53.86 1.3v5h2.8M6.5 8.37a1.37 1.37 0 1 0 0-2.75 1.37 1.37 0 0 0 0 2.75M8 18.5V10.13H5v8.37h3z" />
+              </svg>
+            </a>
+          </nav>
+        </div>
+      </footer>
+    </div>
   );
-}
-
-type FieldProps = {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-  disabled: boolean;
-  children?: ReactNode;
-  optional?: boolean;
-};
-
-function Field({ label, value, onChange, placeholder, disabled, children, optional }: FieldProps) {
-  return (
-    <label className="block">
-      <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-        {label}
-        {optional ? (
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
-            Optional
-          </span>
-        ) : null}
-      </span>
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        disabled={disabled}
-        className="mt-2 w-full rounded-md border border-clinical-line px-3 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-clinical-blue focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
-      />
-      {children}
-    </label>
-  );
-}
-
-function getCptWarning(code: string) {
-  const enteredCode = code.trim();
-  const normalizedCode = normalizeCptCode(enteredCode);
-
-  if (!enteredCode || commonOrthopedicCptCodes.some((commonCode) => commonCode.code === normalizedCode)) {
-    return null;
-  }
-
-  return {
-    enteredCode,
-    closestMatch: normalizedCode ? findClosestCptCode(normalizedCode) : null
-  };
-}
-
-function normalizeCptCode(code: string) {
-  return code.replace(/\D/g, "");
-}
-
-function findClosestCptCode(code: string) {
-  return commonOrthopedicCptCodes.reduce((closest, candidate) => {
-    const candidateDistance = getLevenshteinDistance(code, candidate.code);
-    const closestDistance = getLevenshteinDistance(code, closest.code);
-
-    return candidateDistance < closestDistance ? candidate : closest;
-  }, commonOrthopedicCptCodes[0]);
-}
-
-function getLevenshteinDistance(firstValue: string, secondValue: string) {
-  const rows = Array.from({ length: firstValue.length + 1 }, (_, firstIndex) =>
-    Array.from({ length: secondValue.length + 1 }, (_, secondIndex) =>
-      firstIndex === 0 ? secondIndex : secondIndex === 0 ? firstIndex : 0
-    )
-  );
-
-  for (let firstIndex = 1; firstIndex <= firstValue.length; firstIndex += 1) {
-    for (let secondIndex = 1; secondIndex <= secondValue.length; secondIndex += 1) {
-      const substitutionCost = firstValue[firstIndex - 1] === secondValue[secondIndex - 1] ? 0 : 1;
-
-      rows[firstIndex][secondIndex] = Math.min(
-        rows[firstIndex - 1][secondIndex] + 1,
-        rows[firstIndex][secondIndex - 1] + 1,
-        rows[firstIndex - 1][secondIndex - 1] + substitutionCost
-      );
-    }
-  }
-
-  return rows[firstValue.length][secondValue.length];
 }

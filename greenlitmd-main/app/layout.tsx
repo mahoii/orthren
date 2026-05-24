@@ -5,7 +5,10 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Greenlit MD",
-  description: "AI-assisted prior authorization packet builder for orthopedic practices"
+  description: "AI-assisted prior authorization packet builder for orthopedic practices",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
@@ -47,10 +50,10 @@ export default function RootLayout({
             </div>
             <div className="flex items-center">
               <Link
-                href="/waitlist"
-                className="text-sm font-semibold text-clinical-blue hover:text-clinical-navy transition-colors"
+                href="/#waitlist-form"
+                className="rounded-md bg-clinical-navy px-4 py-2 text-sm font-semibold text-white transition hover:bg-clinical-blue hover:shadow-md"
               >
-                Join Waitlist
+                Request Early Access
               </Link>
             </div>
           </nav>
