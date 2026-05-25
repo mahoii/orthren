@@ -146,6 +146,12 @@ export default function UploadPage() {
       return;
     }
 
+    const MAX_FILE_SIZE = 4.5 * 1024 * 1024; // 4.5MB Vercel Serverless Limit
+    if (file && file.size > MAX_FILE_SIZE) {
+      alert("File size exceeds the maximum 4.5MB limit for single-session demo validation.");
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setActiveStep(0);
