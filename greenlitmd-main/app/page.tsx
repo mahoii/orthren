@@ -396,7 +396,7 @@ export default function LandingPage() {
               you@greenlitmd.app
             </a>
             <a
-              href="https://linkedin.com"
+              href="https://linkedin.com/company/greenlit-md/"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 hover:text-slate-800 transition-colors"
