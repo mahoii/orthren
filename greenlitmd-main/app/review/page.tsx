@@ -130,11 +130,10 @@ function SidebarTabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${
-        isActive
+      className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${isActive
           ? "bg-clinical-navy text-white shadow-sm"
           : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-      }`}
+        }`}
     >
       {children}
     </button>
@@ -435,16 +434,16 @@ export default function ReviewPage() {
   const highlightedParts: Array<{ text: string; highlighted: boolean }> =
     remediationFactor
       ? getHighlightedLetter(letter, remediationFactor)
-          .split(/(%%HIGHLIGHT_START%%.*?%%HIGHLIGHT_END%%)/g)
-          .map((part) => {
-            if (part.startsWith("%%HIGHLIGHT_START%%")) {
-              return {
-                text: part.replace("%%HIGHLIGHT_START%%", "").replace("%%HIGHLIGHT_END%%", ""),
-                highlighted: true
-              };
-            }
-            return { text: part, highlighted: false };
-          })
+        .split(/(%%HIGHLIGHT_START%%.*?%%HIGHLIGHT_END%%)/g)
+        .map((part) => {
+          if (part.startsWith("%%HIGHLIGHT_START%%")) {
+            return {
+              text: part.replace("%%HIGHLIGHT_START%%", "").replace("%%HIGHLIGHT_END%%", ""),
+              highlighted: true
+            };
+          }
+          return { text: part, highlighted: false };
+        })
       : [];
 
   return (
@@ -561,9 +560,8 @@ export default function ReviewPage() {
 
                   {/* Expandable per-factor breakdown (inside card) */}
                   <div
-                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                      isScoreExpanded ? "max-h-[900px] opacity-100 mt-4" : "max-h-0 opacity-0 mt-0"
-                    }`}
+                    className={`overflow-hidden transition-all duration-300 ease-in-out ${isScoreExpanded ? "max-h-[900px] opacity-100 mt-4" : "max-h-0 opacity-0 mt-0"
+                      }`}
                   >
                     <div className="space-y-2 pt-2">
                       {paStrengthFactors.map((factor) => {
@@ -575,13 +573,12 @@ export default function ReviewPage() {
                         return (
                           <div key={factor.key} className="flex items-center gap-2 text-xs">
                             <span
-                              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
-                                isResolved
+                              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${isResolved
                                   ? "bg-blue-50 text-blue-600 border border-blue-200"
                                   : isOk
-                                  ? "bg-green-50 text-green-600 border border-green-200"
-                                  : "bg-red-50 text-red-500 border border-red-200"
-                              }`}
+                                    ? "bg-green-50 text-green-600 border border-green-200"
+                                    : "bg-red-50 text-red-500 border border-red-200"
+                                }`}
                               aria-hidden="true"
                             >
                               {isResolved || isOk ? (
@@ -595,9 +592,8 @@ export default function ReviewPage() {
                               )}
                             </span>
                             <span className="flex-1 text-slate-700">{factor.label}</span>
-                            <span className={`font-semibold ${
-                              isResolved ? "text-blue-500" : isOk ? "text-green-600" : "text-red-500"
-                            }`}>
+                            <span className={`font-semibold ${isResolved ? "text-blue-500" : isOk ? "text-green-600" : "text-red-500"
+                              }`}>
                               {isResolved ? "Fixed" : isOk ? "OK" : "Missing"}
                             </span>
                           </div>
@@ -624,13 +620,12 @@ export default function ReviewPage() {
                         >
                           {/* Status icon */}
                           <span
-                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
-                              isResolved
+                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${isResolved
                                 ? "bg-blue-50 text-blue-600 border border-blue-200"
                                 : isOk
-                                ? "bg-green-50 text-green-600 border border-green-200"
-                                : "bg-red-50 text-red-500 border border-red-200"
-                            }`}
+                                  ? "bg-green-50 text-green-600 border border-green-200"
+                                  : "bg-red-50 text-red-500 border border-red-200"
+                              }`}
                             aria-hidden="true"
                           >
                             {isResolved || isOk ? (
@@ -644,15 +639,13 @@ export default function ReviewPage() {
                             )}
                           </span>
                           {/* Label */}
-                          <span className={`flex-1 font-medium ${
-                            isResolved || isOk ? "text-slate-700" : "text-slate-800"
-                          }`}>
+                          <span className={`flex-1 font-medium ${isResolved || isOk ? "text-slate-700" : "text-slate-800"
+                            }`}>
                             {factor.label}
                           </span>
                           {/* Status badge */}
-                          <span className={`text-[10px] font-semibold ${
-                            isResolved ? "text-blue-500" : isOk ? "text-green-600" : "text-red-500"
-                          }`}>
+                          <span className={`text-[10px] font-semibold ${isResolved ? "text-blue-500" : isOk ? "text-green-600" : "text-red-500"
+                            }`}>
                             {isResolved ? "Fixed" : isOk ? "OK" : "Missing"}
                           </span>
                           {/* Chevron */}
@@ -785,13 +778,12 @@ export default function ReviewPage() {
                   const isOk = baseScore === 1;
                   return (
                     <span
-                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
-                        isResolved
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${isResolved
                           ? "bg-blue-100 text-blue-600 border border-blue-300"
                           : isOk
-                          ? "bg-green-100 text-green-600 border border-green-300"
-                          : "bg-red-100 text-red-500 border border-red-300"
-                      }`}
+                            ? "bg-green-100 text-green-600 border border-green-300"
+                            : "bg-red-100 text-red-500 border border-red-300"
+                        }`}
                       aria-hidden="true"
                     >
                       {isResolved || isOk ? (
