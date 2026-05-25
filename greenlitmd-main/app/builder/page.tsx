@@ -4,7 +4,46 @@ import { ChangeEvent, DragEvent, FormEvent, ReactNode, useMemo, useState } from 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { GeneratePaResponse } from "@/lib/types";
-import { DEMO_PA_DATA } from "@/lib/demo-data";
+import { CLEAN_TKA, MESSY_ROTATOR_CUFF, INCOMPLETE_LUMBAR_FUSION } from "@/lib/demo-data";
+
+type ProfileKey = "CLEAN_TKA" | "MESSY_ROTATOR_CUFF" | "INCOMPLETE_LUMBAR_FUSION";
+
+const profileMap: Record<
+  ProfileKey,
+  {
+    data: typeof CLEAN_TKA;
+    cpt: string;
+    payer: string;
+    provider: string;
+    practice: string;
+    fileName: string;
+  }
+> = {
+  CLEAN_TKA: {
+    data: CLEAN_TKA,
+    cpt: "27447",
+    payer: "BlueCross BlueShield",
+    provider: "Dr. R. Chambers, MD",
+    practice: "Westbrook Orthopedic Surgery Center",
+    fileName: "Maria_Delgado_Chart.pdf"
+  },
+  MESSY_ROTATOR_CUFF: {
+    data: MESSY_ROTATOR_CUFF,
+    cpt: "29827",
+    payer: "UnitedHealthcare",
+    provider: "Dr. Alex Mercer, MD",
+    practice: "Brooklyn Sports Medicine",
+    fileName: "robert_chen_dictation.docx"
+  },
+  INCOMPLETE_LUMBAR_FUSION: {
+    data: INCOMPLETE_LUMBAR_FUSION,
+    cpt: "22630",
+    payer: "Cigna",
+    provider: "Dr. Sarah Jenkins, MD",
+    practice: "Spine & Joint Institute",
+    fileName: "eleanor_vance_chart.txt"
+  }
+};
 
 const progressSteps = [
   "Extracting chart data...",
@@ -42,6 +81,7 @@ export default function UploadPage() {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const [activeTestCase, setActiveTestCase] = useState<ProfileKey | null>(null);
   const [cptCode, setCptCode] = useState("");
   const [payerName, setPayerName] = useState("");
   const [providerName, setProviderName] = useState("");
@@ -52,8 +92,8 @@ export default function UploadPage() {
   const [error, setError] = useState<string | null>(null);
 
   const hasRequiredFields = useMemo(
-    () => Boolean((file || isDemoMode) && cptCode.trim() && payerName.trim() && providerName.trim()),
-    [cptCode, file, isDemoMode, payerName, providerName]
+    () => Boolean((file || isDemoMode || activeTestCase) && cptCode.trim() && payerName.trim() && providerName.trim()),
+    [cptCode, file, isDemoMode, activeTestCase, payerName, providerName]
   );
 
   const cptWarning = useMemo(() => getCptWarning(cptCode), [cptCode]);
@@ -84,37 +124,55 @@ export default function UploadPage() {
       return;
     }
 
-    // A real file upload cancels demo mode
+    // A real file upload cancels demo mode and clears any active test case
     setIsDemoMode(false);
+    setActiveTestCase(null);
     setFile(selectedFile);
   }
 
-  async function handleLoadSample(
-    filename: string,
-    metadata: { cptCode: string; payerName: string; providerName: string; practiceName: string }
-  ) {
+  async function triggerTestCase(key: ProfileKey) {
+    if (isLoading) return;
+
     setError(null);
     setIsLoading(true);
+    setActiveStep(0);
+    setActiveTestCase(key);
+    setIsDemoMode(true);
+    setFile(null);
+
+    const profile = profileMap[key];
+
+    // Auto-fill form fields from the profile metadata
+    setCptCode(profile.cpt);
+    setPayerName(profile.payer);
+    setProviderName(profile.provider);
+    setPracticeName(profile.practice);
+
+    // Simulate 1.5-second loading state — step through progress indicators
+    const stepInterval = Math.floor(1500 / progressSteps.length);
+    const progressTimer = window.setInterval(() => {
+      setActiveStep((current) => Math.min(current + 1, progressSteps.length - 1));
+    }, stepInterval);
+
     try {
-      const res = await fetch(`/samples/${filename}`);
-      if (!res.ok) {
-        throw new Error(`Failed to fetch sample file: ${res.statusText}`);
-      }
-      const text = await res.text();
-      const sampleFile = new File([text], filename, { type: "text/plain" });
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 1500));
 
-      // Update component states precisely
-      setFile(sampleFile);
-      setCptCode(metadata.cptCode);
-      setPayerName(metadata.payerName);
-      setProviderName(metadata.providerName);
-      setPracticeName(metadata.practiceName);
-
-      // CRITICAL: Bypasses mock storage logic, forcing live API submission
-      setIsDemoMode(false);
+      sessionStorage.setItem(
+        "pa-review-data",
+        JSON.stringify({
+          ...profile.data,
+          cptCode: profile.cpt,
+          payerName: profile.payer,
+          providerName: profile.provider,
+          practiceName: profile.practice,
+          isDemo: true
+        })
+      );
+      router.push("/review");
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Failed to load sample chart.");
+      setError(caughtError instanceof Error ? caughtError.message : "Failed to run simulation.");
     } finally {
+      window.clearInterval(progressTimer);
       setIsLoading(false);
     }
   }
@@ -156,23 +214,21 @@ export default function UploadPage() {
     setError(null);
     setActiveStep(0);
 
-    // Demo mode uses a 1000ms interval (4000ms total) for a snappy experience
-    const intervalTime = isDemoMode ? 1000 : 7000;
-    const progressTimer = window.setInterval(() => {
-      setActiveStep((current) => Math.min(current + 1, progressSteps.length - 1));
-    }, intervalTime);
+    // If a Test Case is active, simulate 1.5s and save its specific JSON profile
+    if (activeTestCase) {
+      const profile = profileMap[activeTestCase];
+      const stepInterval = Math.floor(1500 / progressSteps.length);
+      const progressTimer = window.setInterval(() => {
+        setActiveStep((current) => Math.min(current + 1, progressSteps.length - 1));
+      }, stepInterval);
 
-    try {
-      if (isDemoMode) {
-        // Wait for the full animation cycle to complete
-        await new Promise<void>((resolve) =>
-          window.setTimeout(resolve, intervalTime * progressSteps.length)
-        );
+      try {
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 1500));
 
         sessionStorage.setItem(
           "pa-review-data",
           JSON.stringify({
-            ...DEMO_PA_DATA,
+            ...profile.data,
             cptCode: cptCode.trim(),
             payerName: payerName.trim(),
             providerName: providerName.trim(),
@@ -181,8 +237,21 @@ export default function UploadPage() {
           })
         );
         router.push("/review");
-        return;
+      } catch (caughtError) {
+        setError(caughtError instanceof Error ? caughtError.message : "Failed to run simulation.");
+      } finally {
+        window.clearInterval(progressTimer);
+        setIsLoading(false);
       }
+      return;
+    }
+
+    const intervalTime = 7000;
+    const progressTimer = window.setInterval(() => {
+      setActiveStep((current) => Math.min(current + 1, progressSteps.length - 1));
+    }, intervalTime);
+
+    try {
 
       const formData = new FormData();
       formData.append("chart", file!);
@@ -267,19 +336,23 @@ export default function UploadPage() {
             <span className="mt-5 text-xl font-semibold text-clinical-navy">
               {file
                 ? file.name
+                : activeTestCase
+                ? profileMap[activeTestCase].fileName
                 : isDemoMode
                 ? "Maria_Delgado_Chart.pdf"
                 : "Drag and drop the patient chart here"}
             </span>
             <span className="mt-3 text-sm text-slate-500">
-              {file && !isDemoMode
+              {file && !isDemoMode && !activeTestCase
                 ? "Chart loaded — ready to generate"
+                : activeTestCase
+                ? "Test case loaded — ready to generate"
                 : isDemoMode
                 ? "Sample chart loaded — ready to generate"
                 : "or click to browse - PDF, DOCX, or TXT supported"}
             </span>
             {file && !isDemoMode ? <span className="mt-4 text-sm text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</span> : null}
-            {isDemoMode && !file ? (
+            {(isDemoMode || activeTestCase) && !file ? (
               <span className="mt-4 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
                 Demo — sample patient data
               </span>
@@ -288,33 +361,22 @@ export default function UploadPage() {
 
           <div className="rounded-lg border border-clinical-line bg-white px-5 py-4">
             <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-clinical-navy">
-              No chart handy? Load a synthetic sample:
+              Interactive Demo Test Cases (1.5s Mock Generation):
             </p>
             <div className="flex flex-wrap gap-2">
               {([
-                {
-                  label: "Clean TKA Chart",
-                  filename: "clean-tka.txt",
-                  metadata: { cptCode: "27447", payerName: "Aetna", providerName: "Jane Smith, MD", practiceName: "NYU Langone Orthopedics" }
-                },
-                {
-                  label: "Messy Rotator Cuff",
-                  filename: "messy-rotator-cuff.txt",
-                  metadata: { cptCode: "29827", payerName: "UnitedHealthcare", providerName: "Dr. Alex Mercer, MD", practiceName: "Brooklyn Sports Medicine" }
-                },
-                {
-                  label: "Incomplete Lumbar Fusion",
-                  filename: "incomplete-lumbar-fusion.txt",
-                  metadata: { cptCode: "22630", payerName: "Cigna", providerName: "Dr. Sarah Jenkins, MD", practiceName: "Spine & Joint Institute" }
-                }
-              ] as const).map(({ label, filename, metadata }) => (
+                { label: "Clean TKA", key: "CLEAN_TKA" as const },
+                { label: "Messy OCR (Rotator Cuff)", key: "MESSY_ROTATOR_CUFF" as const },
+                { label: "Incomplete Lumbar Fusion", key: "INCOMPLETE_LUMBAR_FUSION" as const }
+              ]).map(({ label, key }) => (
                 <button
-                  key={filename}
+                  key={key}
                   type="button"
+                  id={`test-case-${key.toLowerCase().replace(/_/g, "-")}`}
                   disabled={isLoading}
-                  onClick={() => handleLoadSample(filename, metadata)}
+                  onClick={() => triggerTestCase(key)}
                   className={`rounded-full border px-4 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                    file?.name === filename
+                    activeTestCase === key
                       ? "border-clinical-navy bg-clinical-navy text-white"
                       : "border-clinical-line bg-white text-slate-700 hover:bg-slate-50"
                   }`}

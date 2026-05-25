@@ -1,45 +1,36 @@
 PATIENT CHART - ORTHOPEDIC EVALUATION
 
-Patient Name: John Doe
-Date of Birth: 01/15/1960
-Age: 64
-Sex: Male
-Date of Visit: 05/10/2026
+Patient Name: Maria A. Delgado
+Date of Birth: 09/22/1959
+Date of Visit: 05/18/2026
 
 CHIEF COMPLAINT:
-Right knee pain and functional decline over the past 18 months.
+Bilateral knee pain, left worse than right. 
 
 HISTORY OF PRESENT ILLNESS:
-The patient is a 64-year-old male with progressive right knee osteoarthritis. He reports pain with walking, stairs, and prolonged standing. Functional limitations include inability to perform yard work, limited walking tolerance (approximately 15 minutes), and difficulty with recreational activities.
-
-DIAGNOSIS:
-- Right knee osteoarthritis, severe, with patellofemoral and tibiofemoral involvement
-- ICD-10: M17.11 (Primary osteoarthritis, right knee)
-
-CONSERVATIVE TREATMENTS ATTEMPTED:
-1. Physical therapy: 8 weeks from January 2026 to March 2026. Patient completed the course but reported minimal functional improvement.
-2. NSAIDs: Ibuprofen 400mg daily for 3 months. Provided temporary relief only.
-3. Corticosteroid injection (Kenalog): Single injection on April 2026. Minimal relief, lasted 2 weeks.
-4. Activity modification and bracing with knee sleeve: Ongoing since January 2026.
-
-IMAGING FINDINGS:
-Weight-bearing radiographs of bilateral knees performed 04/15/2026:
-- Right knee: Kellgren-Lawrence Grade III changes bilaterally with joint space narrowing, osteophyte formation, and subchondral sclerosis.
-- Left knee: Kellgren-Lawrence Grade II changes.
+64-year-old female presenting with a 24-month history of progressive bilateral knee pain. Symptoms are consistent with advanced degenerative joint disease. Pain is 8/10.
 
 FUNCTIONAL LIMITATIONS:
-- Walking limited to approximately 15 minutes
-- Unable to climb stairs without significant pain and handrail support
-- Unable to perform household chores (yard work, heavy lifting)
-- Sleep disturbance due to nighttime pain
-- Inability to drive long distances
+- Cannot walk more than half a block without stopping due to pain.
+- Unable to climb or descend stairs without bilateral rail support.
+- Significant difficulty with prolonged standing.
+- Unable to perform grocery shopping independently.
 
-SURGICAL INDICATION:
-Right total knee arthroplasty (TKA) is recommended due to inadequate response to conservative measures and significant functional decline affecting activities of daily living.
+CONSERVATIVE TREATMENTS:
+1. Physical therapy: Completed 4 weeks. Demonstrated mild improvement but discontinued due to pain.
+2. NSAIDs: Naproxen 500mg taken for 3 months (Jan-Mar 2024). Partial relief but developed GI discomfort.
+3. Injections: Corticosteroid injection administered to left knee (temporary 3-week relief) and right knee.
+4. Weight loss counseling: Patient was referred for weight management.
 
-Requesting Provider: Jane Smith, MD
-Specialty: Orthopedic Surgery
-Practice: NYU Langone Orthopedics
+IMAGING:
+Bilateral weight-bearing X-rays show Kellgren-Lawrence Grade 3 changes bilaterally, moderate joint space narrowing, and marginal osteophytes.
 
-CPT Code Requested: 27447 (Total knee arthroplasty)
-Insurance Payer: Aetna
+DIAGNOSIS:
+- Primary osteoarthritis, right knee (M17.11)
+- Primary osteoarthritis, left knee (M17.12)
+
+PLAN:
+Proceed with Bilateral Total Knee Arthroplasty (CPT 27447). Cemented bilateral implant approach. 
+
+Provider: Dr. R. Chambers, MD
+Practice: Westbrook Orthopedic Surgery Center

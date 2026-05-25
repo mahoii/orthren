@@ -1,37 +1,33 @@
 SPINE SPECIALIST CLINICAL NOTE
 
-Patient Name: Alice Thompson
-Date of Birth: 08/24/1968
-Age: 57
-Sex: Female
+Patient Name: Eleanor Vance
+Date of Birth: 04/05/1966
 Date of Visit: 05/18/2026
 
 HISTORY OF PRESENT ILLNESS:
-The patient is a 57-year-old female who presents with progressive, severe lower back pain radiating down both buttocks and posterior thighs to the calves. The symptoms have been present for over a year and are severely limiting her walking capacity (unable to walk more than 5 minutes without sitting). She describes the pain as 8/10 at worst.
+The patient is a 60-year-old female who presents with low back pain with bilateral leg radiation, left worse than right. The symptoms have been present for approximately 6 months.
 
 DIAGNOSIS:
-- Lumbar spondylolisthesis at L4-L5 with severe spinal stenosis
-- ICD-10: M51.36 (Other intervertebral disc degeneration, lumbar region)
+- Intervertebral disc displacement, lumbar region
+- ICD-10: M51.26
 
-CONSERVATIVE CONCERNS / ACTIONS:
-- Physical therapy: The patient reports she went to a physical therapist for only 2 sessions in March 2026 but stopped because she felt it was too painful. No formal course of PT was completed.
-- Medications: Patient takes over-the-counter Tylenol occasionally. No trials of prescription NSAIDs or neuropathic medications (gabapentin/lyrica) are documented.
-- Epidural Steroid Injections: Scheduled for next month, not yet performed.
+CONSERVATIVE CARE:
+- Physical therapy: None documented. 
+- Medications: None documented.
+- Epidural Steroid Injections: None documented.
 
-IMAGING AND DIAGNOSTICS:
-- Lumbar spine X-rays (04/02/2026): Demonstrates Grade I degenerative anterolisthesis of L4 on L5 with disc space narrowing and facet joint hypertrophy.
-- MRI Lumbar Spine: Ordered on 05/10/2026; currently pending authorization/scheduling. MRI results are not yet completed or on file.
+IMAGING:
+- X-ray (lumbar spine): L4-L5 disc space narrowing; moderate degenerative changes; foraminal stenosis suspected clinically. (No MRI or CT on file).
 
-PHYSICAL EXAMINATION / CLINICAL OUTCOMES:
-- Lumbar flexion restricted to 30 degrees due to severe low back pain
-- Diminished Achilles reflexes bilaterally (1+)
-- Bilateral straight leg raise test is positive at 45 degrees
-- Severe claudication symptoms: walking tolerance is less than 50 yards.
+FUNCTIONAL LIMITATIONS:
+- Unable to walk more than one city block without severe bilateral leg pain
+- Cannot sit for more than 20 minutes without increasing pain
+- Cannot perform bending, lifting, or prolonged standing
 
 PROPOSED PROCEDURE:
-L4-L5 posterior lumbar interbody fusion (PLIF) is recommended to stabilize the spondylolisthesis and decompress the neural elements.
+Posterior lumbar interbody fusion (PLIF) at L4-L5 is recommended.
 CPT Code Requested: 22630 (Lumbar interbody fusion)
 
-Requesting Provider: Dr. Sarah Jenkins, MD
-Practice Name: Spine & Joint Institute
-Payer Name: Cigna
+Provider: Dr. Sarah Jenkins, MD
+Practice: Spine & Joint Institute
+Payer: Cigna
