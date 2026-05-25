@@ -46,6 +46,17 @@ export default function LandingPage() {
           <div id="waitlist-form" className="mx-auto mt-10 max-w-md">
             <WaitlistForm variant="hero" />
           </div>
+
+          {/* Sandbox CTA */}
+          <div className="mt-4 flex justify-center">
+            <Link
+              href="/sandbox"
+              id="hero-sandbox-cta"
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-clinical-blue hover:border-clinical-blue focus:outline-none focus:ring-2 focus:ring-clinical-blue focus:ring-offset-2"
+            >
+              Try Interactive Sandbox Demo →
+            </Link>
+          </div>
         </div>
       </section>
 
