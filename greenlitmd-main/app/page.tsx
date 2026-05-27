@@ -403,8 +403,8 @@ export default function LandingPage() {
             <Link href="/terms" className="hover:text-slate-800 transition-colors">
               Terms of Service
             </Link>
-            <a href="mailto:you@greenlitmd.app" className="hover:text-slate-800 transition-colors">
-              you@greenlitmd.app
+            <a href="mailto:kamari@greenlitmd.app" className="hover:text-slate-800 transition-colors">
+              Email Us
             </a>
             <a
               href="https://linkedin.com/company/greenlit-md/"
