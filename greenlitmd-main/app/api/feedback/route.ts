@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { kv } from "@vercel/kv";
+import { Redis } from "@upstash/redis";
+
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+});
 
 export const runtime = "nodejs";
 
@@ -41,8 +46,8 @@ export async function POST(request: Request) {
       paScore,
     };
 
-    // Store in Vercel KV list "pa_outcomes"
-    await kv.lpush("pa_outcomes", JSON.stringify(record));
+    // Store in Upstash Redis list "pa_outcomes"
+    await redis.lpush("pa_outcomes", JSON.stringify(record));
 
     return NextResponse.json({ success: true });
   } catch (error) {
