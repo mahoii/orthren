@@ -1,221 +1,280 @@
-# Plan - Sandbox/Upload UI Demo-Case Integration
+# Plan - Lightweight Outcome Feedback Widget
 
-This plan implements three distinct Test Case buttons ("Clean TKA", "Messy OCR (Rotator Cuff)", and "Incomplete Lumbar Fusion") on the frontend upload page (`app/builder/page.tsx`). Clicking any of these buttons auto-fills the form fields with their respective profile metadata, simulates a 1.5-second loading state, saves the static mock response from `src/lib/demo-data.ts` to `sessionStorage`, and routes the user to `/review` without calling the real API. 
-
-The drag-and-drop file upload zone remains fully functional and continues to call the real API for user-provided clinical charts.
+This plan implements a lightweight outcome feedback widget on the Greenlit MD review page (`app/review/page.tsx`) to capture whether a submitted Prior Authorization (PA) was approved, denied, or pending. The feedback is persisted to Vercel KV using `@vercel/kv` and does not contain any Protected Health Information (PHI).
 
 ---
 
 ## 📋 Execution Checklist
 
-### 1. Update Imports and Setup Metadata Maps in `app/builder/page.tsx`
-- [ ] Open [app/builder/page.tsx](file:///c:/projects/health2/greenlitmd-main/app/builder/page.tsx).
-- [ ] Replace the import of `DEMO_PA_DATA` with the multi-profile imports from `@/lib/demo-data`:
-  ```typescript
-  import { CLEAN_TKA, MESSY_ROTATOR_CUFF, INCOMPLETE_LUMBAR_FUSION } from "@/lib/demo-data";
-  ```
-- [ ] Define the `ProfileKey` and `profileMap` structures outside the main `UploadPage` component:
-  ```typescript
-  type ProfileKey = "CLEAN_TKA" | "MESSY_ROTATOR_CUFF" | "INCOMPLETE_LUMBAR_FUSION";
+### 1. Install Dependencies
+- [ ] Run `npm install @vercel/kv` in the root of the workspace.
+- [ ] Ensure that it is successfully added to `package.json`.
 
-  const profileMap = {
-    CLEAN_TKA: {
-      data: CLEAN_TKA,
-      cpt: "27447",
-      payer: "BlueCross BlueShield",
-      provider: "Dr. R. Chambers, MD",
-      practice: "Westbrook Orthopedic Surgery Center",
-      fileName: "Maria_Delgado_Chart.pdf"
-    },
-    MESSY_ROTATOR_CUFF: {
-      data: MESSY_ROTATOR_CUFF,
-      cpt: "29827",
-      payer: "UnitedHealthcare",
-      provider: "Dr. Alex Mercer, MD",
-      practice: "Brooklyn Sports Medicine",
-      fileName: "robert_chen_dictation.docx"
-    },
-    INCOMPLETE_LUMBAR_FUSION: {
-      data: INCOMPLETE_LUMBAR_FUSION,
-      cpt: "22630",
-      payer: "Cigna",
-      provider: "Dr. Sarah Jenkins, MD",
-      practice: "Spine & Joint Institute",
-      fileName: "eleanor_vance_chart.txt"
+### 2. Create the Feedback API Route
+- [ ] Create a new file [app/api/feedback/route.ts](file:///c:/projects/health2/greenlitmd-main/app/api/feedback/route.ts).
+- [ ] Implement the `POST` handler with the following features:
+  - Export `runtime = "nodejs"`.
+  - Import `NextResponse` from `"next/server"`.
+  - Import `kv` from `"@vercel/kv"`.
+  - Accept and validate the payload:
+    - `cptCode`: string
+    - `payerName`: string
+    - `outcome`: `"approved"` | `"denied"` | `"pending"`
+    - `denialReason`: string | null | undefined
+    - `paScore`: number (the computed `paScore` value from review page)
+  - Generate a secure UUID via `crypto.randomUUID()` and timestamp.
+  - Store the record to Vercel KV: `await kv.lpush("pa_outcomes", JSON.stringify(record))`.
+  - Handle errors gracefully, returning appropriate HTTP status codes (400 for validation errors, 500 for server errors).
+
+#### `app/api/feedback/route.ts` Blueprint:
+```typescript
+import { NextResponse } from "next/server";
+import { kv } from "@vercel/kv";
+
+export const runtime = "nodejs";
+
+interface FeedbackPayload {
+  cptCode: string;
+  payerName: string;
+  outcome: "approved" | "denied" | "pending";
+  denialReason?: string | null;
+  paScore: number;
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = (await request.json()) as FeedbackPayload;
+    const { cptCode, payerName, outcome, denialReason, paScore } = body;
+
+    // Validate required fields
+    if (!cptCode || typeof cptCode !== "string") {
+      return NextResponse.json({ error: "cptCode is required and must be a string" }, { status: 400 });
     }
-  };
-  ```
+    if (!payerName || typeof payerName !== "string") {
+      return NextResponse.json({ error: "payerName is required and must be a string" }, { status: 400 });
+    }
+    if (!outcome || !["approved", "denied", "pending"].includes(outcome)) {
+      return NextResponse.json({ error: "outcome must be 'approved', 'denied', or 'pending'" }, { status: 400 });
+    }
+    if (typeof paScore !== "number" || isNaN(paScore)) {
+      return NextResponse.json({ error: "paScore is required and must be a number" }, { status: 400 });
+    }
 
-### 2. Introduce Component State Variables
-- [ ] Inside the `UploadPage` component, add a state variable for tracking the selected Test Case:
-  ```typescript
-  const [activeTestCase, setActiveTestCase] = useState<ProfileKey | null>(null);
-  ```
-- [ ] Ensure that when a custom file is dropped/uploaded, the `activeTestCase` is cleared:
-  - Inside `selectChartFile`:
-    ```typescript
-    setActiveTestCase(null);
-    ```
+    // Construct record (No Patient Name, No DOB to ensure zero PHI storage)
+    const record = {
+      id: crypto.randomUUID(),
+      timestamp: new Date().toISOString(),
+      cptCode: cptCode.trim(),
+      payerName: payerName.trim(),
+      outcome,
+      denialReason: outcome === "denied" ? (denialReason?.trim() || null) : null,
+      paScore,
+    };
 
-### 3. Implement the `triggerTestCase` Function
-- [ ] Create the `triggerTestCase` function inside the component to execute the auto-fill and simulated loading workflow:
-  ```typescript
-  async function triggerTestCase(key: ProfileKey) {
-    if (isLoading) return;
+    // Store in Vercel KV list "pa_outcomes"
+    await kv.lpush("pa_outcomes", JSON.stringify(record));
 
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Internal server error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+```
+
+### 3. Implement `FeedbackWidget` Component and Wire-up in `app/review/page.tsx`
+- [ ] Open [app/review/page.tsx](file:///c:/projects/health2/greenlitmd-main/app/review/page.tsx).
+- [ ] Implement a new `FeedbackWidget` component at the bottom of the file or above the other helper components.
+- [ ] Inside the `<header>` element, right after the main controls `div` (the one containing "Download PA Packet"), render the `<FeedbackWidget />`.
+- [ ] Ensure that `FeedbackWidget` only renders when `data` is not null (which is already true since `data` is checked at the top of `ReviewPage`).
+
+#### `FeedbackWidget` Blueprint:
+```typescript
+interface FeedbackWidgetProps {
+  cptCode: string;
+  payerName: string;
+  paScore: number;
+  setToast: (message: string | null) => void;
+}
+
+function FeedbackWidget({ cptCode, payerName, paScore, setToast }: FeedbackWidgetProps) {
+  const [outcome, setOutcome] = useState<"approved" | "denied" | "pending" | null>(null);
+  const [denialReason, setDenialReason] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(selectedOutcome: "approved" | "denied" | "pending", reason?: string) {
+    setIsSubmitting(true);
     setError(null);
-    setIsLoading(true);
-    setActiveStep(0);
-    setActiveTestCase(key);
-    setIsDemoMode(true);
-    setFile(null);
-
-    const profile = profileMap[key];
-    
-    // Auto-fill fields
-    setCptCode(profile.cpt);
-    setPayerName(profile.payer);
-    setProviderName(profile.provider);
-    setPracticeName(profile.practice);
-
-    // Simulate 1.5-second loading state (375ms per step for 4 steps)
-    const stepInterval = 1500 / progressSteps.length;
-    const progressTimer = window.setInterval(() => {
-      setActiveStep((current) => Math.min(current + 1, progressSteps.length - 1));
-    }, stepInterval);
-
     try {
-      await new Promise<void>((resolve) =>
-        window.setTimeout(resolve, 1500)
-      );
-
-      sessionStorage.setItem(
-        "pa-review-data",
-        JSON.stringify({
-          ...profile.data,
-          cptCode: profile.cpt,
-          payerName: profile.payer,
-          providerName: profile.provider,
-          practiceName: profile.practice,
-          isDemo: true
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cptCode,
+          payerName,
+          outcome: selectedOutcome,
+          denialReason: reason || null,
+          paScore
         })
-      );
-      router.push("/review");
-    } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Failed to run simulation.");
+      });
+
+      if (!response.ok) {
+        const errPayload = await response.json();
+        throw new Error(errPayload.error || "Failed to submit feedback.");
+      }
+
+      setSubmitted(true);
+      setToast("Thanks — your feedback helps improve Greenlit MD.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to submit feedback.");
     } finally {
-      window.clearInterval(progressTimer);
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   }
-  ```
 
-### 4. Update the Form Submit Handler `handleSubmit` for Safety & Redundancy
-- [ ] Modify `handleSubmit` in `app/builder/page.tsx` to safely handle submitting when `activeTestCase` is active:
-  ```typescript
-  // If an active test case is selected, simulate the 1.5-second loading state and save the correct JSON profile
-  if (activeTestCase) {
-    const stepInterval = 1500 / progressSteps.length;
-    const progressTimer = window.setInterval(() => {
-      setActiveStep((current) => Math.min(current + 1, progressSteps.length - 1));
-    }, stepInterval);
-
-    try {
-      await new Promise<void>((resolve) =>
-        window.setTimeout(resolve, 1500)
-      );
-
-      const profile = profileMap[activeTestCase];
-      sessionStorage.setItem(
-        "pa-review-data",
-        JSON.stringify({
-          ...profile.data,
-          cptCode: cptCode.trim(),
-          payerName: payerName.trim(),
-          providerName: providerName.trim(),
-          practiceName: practiceName.trim(),
-          isDemo: true
-        })
-      );
-      router.push("/review");
-    } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Failed to run simulation.");
-    } finally {
-      window.clearInterval(progressTimer);
-      setIsLoading(false);
-    }
-    return;
+  if (submitted) {
+    return (
+      <div className="border-t border-clinical-line bg-slate-50 px-6 py-3">
+        <div className="mx-auto max-w-7xl text-sm font-semibold text-slate-700">
+          Thanks — your feedback helps improve Greenlit MD.
+        </div>
+      </div>
+    );
   }
-  ```
 
-### 5. Update UI Labels, Dropzone, and Test Case Buttons
-- [ ] Update the drag-and-drop zone labels to reflect the active Test Case:
-  - File name display:
-    ```typescript
-    {file
-      ? file.name
-      : activeTestCase
-      ? profileMap[activeTestCase].fileName
-      : isDemoMode
-      ? "Maria_Delgado_Chart.pdf"
-      : "Drag and drop the patient chart here"}
-    ```
-  - Subtext display:
-    ```typescript
-    {file && !isDemoMode
-      ? "Chart loaded — ready to generate"
-      : activeTestCase
-      ? "Test case loaded — ready to generate"
-      : isDemoMode
-      ? "Sample chart loaded — ready to generate"
-      : "or click to browse - PDF, DOCX, or TXT supported"}
-    ```
-  - Demo mode tag block:
-    ```typescript
-    {(isDemoMode || activeTestCase) && !file ? (
-      <span className="mt-4 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
-        Demo — sample patient data
-      </span>
-    ) : null}
-    ```
-- [ ] Replace the legacy "No chart handy? Load a synthetic sample:" section with the new "Interactive Demo Test Cases" layout:
-  ```tsx
-  <div className="rounded-lg border border-clinical-line bg-white px-5 py-4">
-    <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-clinical-navy">
-      Interactive Demo Test Cases (1.5s Mock Generation):
-    </p>
-    <div className="flex flex-wrap gap-2">
-      {([
-        {
-          label: "Clean TKA",
-          key: "CLEAN_TKA"
-        },
-        {
-          label: "Messy OCR (Rotator Cuff)",
-          key: "MESSY_ROTATOR_CUFF"
-        },
-        {
-          label: "Incomplete Lumbar Fusion",
-          key: "INCOMPLETE_LUMBAR_FUSION"
-        }
-      ] as const).map(({ label, key }) => (
-        <button
-          key={key}
-          type="button"
-          disabled={isLoading}
-          onClick={() => triggerTestCase(key)}
-          className={`rounded-full border px-4 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-            activeTestCase === key
-              ? "border-clinical-navy bg-clinical-navy text-white"
-              : "border-clinical-line bg-white text-slate-700 hover:bg-slate-50"
-          }`}
-        >
-          {label}
-        </button>
-      ))}
+  return (
+    <div className="border-t border-clinical-line bg-slate-50 px-6 py-3">
+      <div className="mx-auto flex max-w-7xl flex-col gap-3 md:flex-row md:items-center">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-sm font-semibold text-clinical-navy">Did this PA get approved?</span>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={isSubmitting || (outcome !== null && outcome !== "approved")}
+              onClick={() => {
+                setOutcome("approved");
+                handleSubmit("approved");
+              }}
+              className={`rounded border border-clinical-line px-3 py-1.5 text-xs font-semibold transition-colors ${
+                outcome === "approved"
+                  ? "bg-clinical-navy text-white"
+                  : "bg-white text-slate-700 hover:bg-slate-50"
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              ✓ Approved
+            </button>
+            <button
+              type="button"
+              disabled={isSubmitting || (outcome !== null && outcome !== "denied")}
+              onClick={() => {
+                setOutcome("denied");
+              }}
+              className={`rounded border border-clinical-line px-3 py-1.5 text-xs font-semibold transition-colors ${
+                outcome === "denied"
+                  ? "bg-clinical-navy text-white"
+                  : "bg-white text-slate-700 hover:bg-slate-50"
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              ✗ Denied
+            </button>
+            <button
+              type="button"
+              disabled={isSubmitting || (outcome !== null && outcome !== "pending")}
+              onClick={() => {
+                setOutcome("pending");
+                handleSubmit("pending");
+              }}
+              className={`rounded border border-clinical-line px-3 py-1.5 text-xs font-semibold transition-colors ${
+                outcome === "pending"
+                  ? "bg-clinical-navy text-white"
+                  : "bg-white text-slate-700 hover:bg-slate-50"
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              ⏳ Pending
+            </button>
+          </div>
+        </div>
+
+        {outcome === "denied" && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSubmit("denied", denialReason);
+            }}
+            className="flex flex-1 items-center gap-2 mt-2 md:mt-0 md:ml-4"
+          >
+            <label htmlFor="denial-reason-input" className="text-xs font-semibold text-clinical-navy whitespace-nowrap">
+              Denial reason (optional):
+            </label>
+            <input
+              id="denial-reason-input"
+              type="text"
+              placeholder="e.g. Missing conservative treatment details"
+              value={denialReason}
+              disabled={isSubmitting}
+              onChange={(e) => setDenialReason(e.target.value)}
+              className="flex-1 max-w-xs rounded border border-clinical-line bg-white px-3 py-1 text-xs font-medium text-slate-800 focus:border-clinical-blue focus:ring-1 focus:ring-blue-100 outline-none"
+            />
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="rounded bg-clinical-navy px-3 py-1 text-xs font-semibold text-white hover:bg-clinical-blue transition-colors disabled:opacity-50"
+            >
+              {isSubmitting ? "Submitting..." : "Submit"}
+            </button>
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => {
+                setOutcome(null);
+                setError(null);
+              }}
+              className="rounded border border-clinical-line bg-white px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </form>
+        )}
+
+        {error && (
+          <div className="text-xs font-semibold text-red-600 flex items-center gap-2">
+            <span>Error: {error}</span>
+            <button
+              type="button"
+              onClick={() => {
+                if (outcome) {
+                  handleSubmit(outcome, outcome === "denied" ? denialReason : undefined);
+                }
+              }}
+              className="text-clinical-blue underline hover:text-clinical-navy font-semibold"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+      </div>
     </div>
-  </div>
-  ```
+  );
+}
+```
 
-### 6. Verification and Type Checking
+#### Placement inside `app/review/page.tsx` Header:
+```tsx
+      {/* Header */}
+      <header className="border-b border-clinical-line bg-white">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-5 md:flex-row md:items-center md:justify-between">
+          ...
+        </div>
+        <FeedbackWidget
+          cptCode={data.cptCode}
+          payerName={data.payerName}
+          paScore={paScore}
+          setToast={setToast}
+        />
+      </header>
+```
+
+### 4. Verification and Type Checking
 - [ ] Run `npx tsc --noEmit` from the root directory to confirm the build succeeds with zero compiler/TypeScript errors.

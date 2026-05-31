@@ -498,6 +498,12 @@ export default function ReviewPage() {
             </button>
           </div>
         </div>
+        <FeedbackWidget
+          cptCode={data.cptCode}
+          payerName={data.payerName}
+          paScore={paScore}
+          setToast={setToast}
+        />
       </header>
 
       <div className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[360px_1fr]">
@@ -945,6 +951,181 @@ export default function ReviewPage() {
 }
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
+
+function FeedbackWidget({
+  cptCode,
+  payerName,
+  paScore,
+  setToast,
+}: {
+  cptCode: string;
+  payerName: string;
+  paScore: number;
+  setToast: (message: string | null) => void;
+}) {
+  const [outcome, setOutcome] = useState<"approved" | "denied" | "pending" | null>(null);
+  const [denialReason, setDenialReason] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(selectedOutcome: "approved" | "denied" | "pending", reason?: string) {
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cptCode,
+          payerName,
+          outcome: selectedOutcome,
+          denialReason: reason || null,
+          paScore,
+        }),
+      });
+
+      if (!response.ok) {
+        const errPayload = (await response.json()) as { error?: string };
+        throw new Error(errPayload.error ?? "Failed to submit feedback.");
+      }
+
+      setSubmitted(true);
+      setToast("Thanks — your feedback helps improve Greenlit MD.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to submit feedback.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  if (submitted) {
+    return (
+      <div className="border-t border-clinical-line bg-slate-50 px-6 py-3">
+        <div className="mx-auto max-w-7xl text-sm font-semibold text-slate-700">
+          Thanks — your feedback helps improve Greenlit MD.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-t border-clinical-line bg-slate-50 px-6 py-3">
+      <div className="mx-auto flex max-w-7xl flex-col gap-3 md:flex-row md:items-center">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-sm font-semibold text-clinical-navy">Did this PA get approved?</span>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={isSubmitting || (outcome !== null && outcome !== "approved")}
+              onClick={() => {
+                setOutcome("approved");
+                handleSubmit("approved");
+              }}
+              className={`rounded border border-clinical-line px-3 py-1.5 text-xs font-semibold transition-colors ${
+                outcome === "approved"
+                  ? "bg-clinical-navy text-white"
+                  : "bg-white text-slate-700 hover:bg-slate-50"
+              } disabled:cursor-not-allowed disabled:opacity-50`}
+            >
+              ✓ Approved
+            </button>
+            <button
+              type="button"
+              disabled={isSubmitting || (outcome !== null && outcome !== "denied")}
+              onClick={() => {
+                setOutcome("denied");
+              }}
+              className={`rounded border border-clinical-line px-3 py-1.5 text-xs font-semibold transition-colors ${
+                outcome === "denied"
+                  ? "bg-clinical-navy text-white"
+                  : "bg-white text-slate-700 hover:bg-slate-50"
+              } disabled:cursor-not-allowed disabled:opacity-50`}
+            >
+              ✗ Denied
+            </button>
+            <button
+              type="button"
+              disabled={isSubmitting || (outcome !== null && outcome !== "pending")}
+              onClick={() => {
+                setOutcome("pending");
+                handleSubmit("pending");
+              }}
+              className={`rounded border border-clinical-line px-3 py-1.5 text-xs font-semibold transition-colors ${
+                outcome === "pending"
+                  ? "bg-clinical-navy text-white"
+                  : "bg-white text-slate-700 hover:bg-slate-50"
+              } disabled:cursor-not-allowed disabled:opacity-50`}
+            >
+              ⏳ Pending
+            </button>
+          </div>
+        </div>
+
+        {outcome === "denied" ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSubmit("denied", denialReason);
+            }}
+            className="flex flex-1 items-center gap-2 mt-2 md:mt-0 md:ml-4"
+          >
+            <label
+              htmlFor="denial-reason-input"
+              className="whitespace-nowrap text-xs font-semibold text-clinical-navy"
+            >
+              Denial reason (optional):
+            </label>
+            <input
+              id="denial-reason-input"
+              type="text"
+              placeholder="e.g. Missing conservative treatment details"
+              value={denialReason}
+              disabled={isSubmitting}
+              onChange={(e) => setDenialReason(e.target.value)}
+              className="flex-1 max-w-xs rounded border border-clinical-line bg-white px-3 py-1 text-xs font-medium text-slate-800 outline-none focus:border-clinical-blue focus:ring-1 focus:ring-blue-100"
+            />
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="rounded bg-clinical-navy px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-clinical-blue disabled:opacity-50"
+            >
+              {isSubmitting ? "Submitting..." : "Submit"}
+            </button>
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => {
+                setOutcome(null);
+                setError(null);
+              }}
+              className="rounded border border-clinical-line bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+          </form>
+        ) : null}
+
+        {error ? (
+          <div className="flex items-center gap-2 text-xs font-semibold text-red-600">
+            <span>Error: {error}</span>
+            <button
+              type="button"
+              onClick={() => {
+                if (outcome) {
+                  handleSubmit(outcome, outcome === "denied" ? denialReason : undefined);
+                }
+              }}
+              className="font-semibold text-clinical-blue underline hover:text-clinical-navy"
+            >
+              Retry
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 function DataRow({ label, value, copyable }: { label: string; value: string | string[] | null; copyable?: boolean }) {
   const isMissing = value === null || (Array.isArray(value) && value.length === 0);
