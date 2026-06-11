@@ -1,0 +1,39 @@
+{
+  "goal": "Fix waitlist signup by updating Resend sender email and aligning Supabase schema.",
+  "thinking_level_used": "medium",
+  "steps": [
+    {
+      "id": 1,
+      "action": "Update verified email sender in lib/resend.ts from hello@greenlitmd.app to hello@contact.greenlitmd.app.",
+      "target_file": "lib/resend.ts",
+      "depends_on": [],
+      "success_criteria": "The file contains hello@contact.greenlitmd.app as the sender address.",
+      "risk": "low",
+      "notes": "Must match the verified Resend domain from AGENTS.md."
+    },
+    {
+      "id": 2,
+      "action": "Update supabase_setup.sql schema definition to include name and unsubscribed columns.",
+      "target_file": "supabase_setup.sql",
+      "depends_on": [],
+      "success_criteria": "The file supabase_setup.sql contains definition for name text and unsubscribed boolean DEFAULT false.",
+      "risk": "low",
+      "notes": "User confirmation is required for SQL changes as per AGENTS.md rules."
+    },
+    {
+      "id": 3,
+      "action": "Inform the user to unpause their Supabase database at https://zvarxrjfjxghclarvoux.supabase.co and run the SQL migration for waitlist_signups.",
+      "target_file": null,
+      "depends_on": [2],
+      "success_criteria": "User unpauses the database and runs the SQL commands to add name and unsubscribed columns.",
+      "risk": "medium",
+      "notes": "External dependency on user database restoration."
+    }
+  ],
+  "constraints": [
+    "Do not modify Supabase database schema on the live database directly without human confirmation.",
+    "Do not hardcode keys or secrets.",
+    "Use server-side Supabase client actions only."
+  ],
+  "rollback": "Revert changes in lib/resend.ts and supabase_setup.sql using git checkout."
+}

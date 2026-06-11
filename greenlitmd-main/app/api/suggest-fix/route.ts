@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import type { ExtractedChartDataWithValidation } from "@/lib/types";
+import { rateLimiter } from "@/lib/rate-limit";
+import { callAnthropicWithRetry } from "@/lib/anthropic";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const anthropicModel = "claude-sonnet-4-6";
-
 export async function POST(request: Request) {
   try {
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "127.0.0.1";
+    const { success } = await rateLimiter.limit(ip);
+    if (!success) {
+      return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
+    }
+
     if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
         { error: "ANTHROPIC_API_KEY is not configured. Add it before generating a packet." },
@@ -28,7 +34,8 @@ export async function POST(request: Request) {
       system: "You are a clinical documentation assistant.",
       prompt: `Based on this patient chart context: ${JSON.stringify(
         body.extracted
-      )}, suggest a clinically appropriate value for the missing field: ${body.factor}. Return only the suggested value as a short plain text string, no explanation.`
+      )}, suggest a clinically appropriate value for the missing field: ${body.factor}. Return only the suggested value as a short plain text string, no explanation.`,
+      maxTokens: 200
     });
 
     return NextResponse.json({ suggestion: content.trim() });
@@ -36,63 +43,4 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : "Unable to generate a suggestion.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}
-
-  async function callAnthropicWithRetry(params: Parameters<typeof callAnthropic>[0], retries = 2): Promise<string> {
-    for (let attempt = 0; attempt <= retries; attempt++) {
-      try {
-        return await callAnthropic(params);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : '';
-        const isOverloaded = message.includes('overloaded_error') || message.includes('overloaded');
-        if (isOverloaded && attempt < retries) {
-          await new Promise((res) => setTimeout(res, 3000 * (attempt + 1)));
-          continue;
-        }
-        throw err;
-      }
-    }
-    throw new Error('Max retries exceeded');
-  }
-
-async function callAnthropic({
-  system,
-  prompt
-}: {
-  system: string;
-  prompt: string;
-}) {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
-      "anthropic-version": "2023-06-01"
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 200,
-      system,
-      messages: [
-        {
-          role: "user",
-          content: prompt
-        }
-      ]
-    })
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Anthropic API request failed. ${text}`);
-  }
-
-  const data = await response.json();
-  const text = data.content?.[0]?.text?.trim();
-
-  if (!text) {
-    throw new Error("Anthropic did not return a usable response.");
-  }
-
-  return text;
 }

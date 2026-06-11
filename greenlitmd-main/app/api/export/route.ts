@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     }
 
     const patientName = body.extracted.patient_name ?? "Patient name not documented";
-    const practiceName = body.practiceName?.trim() || "Orthopedic Practice";
+    const practiceName = body.practiceName?.trim() || "";
     const generatedDate = formatLetterDate(new Date());
     const providerName = body.providerName?.trim() || "Requesting provider not documented";
     const payerName = body.payerName?.trim() || "Payer not specified";

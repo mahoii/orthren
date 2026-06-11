@@ -1353,7 +1353,7 @@ function buildUpdatedPayload(data: ReviewData, manualFixes: ManualFixes) {
       cptCode: cptOverride || data.cptCode,
       payerName: data.payerName,
       providerName: data.providerName,
-      practiceName: data.practiceName ?? "Orthopedic Practice"
+      practiceName: data.practiceName ?? ""
     }
   };
 }

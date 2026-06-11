@@ -157,7 +157,7 @@ export default function LandingPage() {
                 </div>
                 <div className="flex justify-end gap-2 shrink-0">
                   <span className="cursor-default rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 font-sans shadow-sm" aria-hidden="true">Edit Text</span>
-                  <span className="cursor-default rounded-md bg-clinical-navy px-4 py-1.5 text-xs font-semibold text-white shadow-sm font-sans" aria-hidden="true">Download PDF Packet</span>
+                  <span className="cursor-default rounded-md bg-clinical-navy px-4 py-1.5 text-xs font-semibold text-white shadow-sm font-sans" aria-hidden="true">Download PA Packet</span>
                 </div>
               </div>
             </div>
@@ -324,7 +324,7 @@ export default function LandingPage() {
                     "Unlimited prior authorization packets",
                     "Core orthopedic templates (TKA, THA, Spine, Shoulder)",
                     "Live PA Strength Score dashboard",
-                    "PDF export",
+                    "DOCX export",
                   ].map((f) => (
                     <li key={f} className="flex items-start gap-3">
                       <span className="mt-0.5 font-bold text-green-500 shrink-0">✓</span>
