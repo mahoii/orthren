@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { ExtractedChartData, ExtractedChartDataWithValidation, GeneratePaResponse } from "@/lib/types";
+import EHRAddendumGenerator from "@/components/EHRAddendumGenerator";
 
 
 
@@ -734,6 +735,12 @@ export default function ReviewPage() {
                     <p className="mt-3 text-sm text-red-800">No denial risk flags were returned from extraction.</p>
                   )}
                 </div>
+                <EHRAddendumGenerator
+                  hardBlocks={data.extracted.validation?.hard_blocks ?? []}
+                  softWarnings={data.extracted.validation?.soft_warnings ?? []}
+                  denialRiskFlags={data.extracted.denial_risk_flags ?? []}
+                  providerName={data.providerName}
+                />
               </section>
             ) : null}
 
