@@ -1,0 +1,32 @@
+{
+  "Maria A. Delgado": {
+    "Conservative Treatment Duration": "6 weeks of structured outpatient physical therapy completed prior to surgical evaluation, with documented functional assessment at completion.",
+    "Conservative Treatments Named": "Physical therapy (4 weeks), NSAIDs (naproxen 500mg, 3 months), corticosteroid injection left knee, corticosteroid injection right knee, weight loss counseling.",
+    "Diagnosis Codes": "M17.11 — Primary osteoarthritis, right knee; M17.12 — Primary osteoarthritis, left knee.",
+    "Imaging Findings": "Weight-bearing AP and lateral X-rays of bilateral knees: Kellgren-Lawrence Grade 3 bilaterally with moderate-to-severe joint space narrowing and marginal osteophyte formation.",
+    "Functional Limitations": "Cannot walk more than half a block without stopping; unable to climb stairs without bilateral rail support; significant difficulty with prolonged standing exceeding 10 minutes; unable to perform grocery shopping independently.",
+    "Surgical Approach": "Cemented implant, bilateral simultaneous total knee arthroplasty.",
+    "CPT Code Valid": "27447 — Total knee arthroplasty.",
+    "Symptom Duration": "24 months of progressive bilateral knee pain, left worse than right."
+  },
+  "Robert Chen": {
+    "Surgical Approach": "Arthroscopic rotator cuff repair using a double-row suture anchor construct via standard posterior and anterolateral portals, with acromioplasty as indicated.",
+    "Symptom Duration": "Approximately 4 months of progressive right shoulder pain and weakness following a lifting injury at work, with documented functional decline over the past 6 weeks.",
+    "Conservative Treatment Duration": "6 weeks of structured rotator cuff strengthening and periscapular stabilization physical therapy completed prior to surgical consultation.",
+    "Conservative Treatments Named": "Physical therapy (6 weeks rotator cuff protocol), NSAIDs — meloxicam 15mg (6 weeks), subacromial corticosteroid injection under ultrasound guidance (x1).",
+    "Diagnosis Codes": "M75.121 — Complete rotator cuff tear, right shoulder, not specified as traumatic.",
+    "Imaging Findings": "MRI right shoulder (March 2026): full-thickness supraspinatus tear, 2.1 cm AP dimension with mild retraction; mild AC joint degenerative change; no biceps tendon pathology.",
+    "Functional Limitations": "Unable to perform overhead lifting beyond shoulder height; significant difficulty with grooming and dressing; sleep disruption due to positional shoulder pain; reduced grip strength limiting daily activities.",
+    "CPT Code Valid": "29827 — Arthroscopic rotator cuff repair."
+  },
+  "Eleanor Vance": {
+    "Conservative Treatments Named": "Physical therapy (6 weeks lumbar stabilization program), chiropractic manipulation (8 visits), epidural steroid injection at L4-L5 (x1), NSAIDs — meloxicam 15mg (6 weeks).",
+    "Conservative Treatment Duration": "6 weeks of structured lumbar stabilization physical therapy completed, with documented functional outcome assessment at discharge.",
+    "Imaging Findings": "MRI lumbar spine: L4-L5 disc herniation with moderate-to-severe foraminal stenosis and evidence of left-sided nerve root compression consistent with neurogenic claudication.",
+    "Symptom Duration": "6 months of progressively worsening low back pain with bilateral lower extremity radiation, with significant symptom escalation over the past 6 weeks despite conservative management.",
+    "Diagnosis Codes": "M51.26 — Intervertebral disc displacement, lumbar region.",
+    "Functional Limitations": "Unable to walk more than one city block without severe bilateral leg pain; cannot sit for more than 20 minutes without increasing pain; unable to perform bending, lifting, or prolonged standing.",
+    "Surgical Approach": "Posterior lumbar interbody fusion (PLIF) at L4-L5 with pedicle screw fixation and interbody cage placement.",
+    "CPT Code Valid": "22630 — Lumbar interbody fusion, posterior."
+  }
+}
