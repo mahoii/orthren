@@ -95,9 +95,11 @@ export default function ReviewPage() {
   const [chartModalOpen, setChartModalOpen] = useState(false);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [acknowledgedRisks, setAcknowledgedRisks] = useState<number[]>([]);
+  const [letterIsStale, setLetterIsStale] = useState(false);
 
   const railRef = useRef<HTMLElement>(null);
   const hasAnimatedScoreRef = useRef(false);
+  const hasMountedScoreRef = useRef(false);
 
   useEffect(() => {
     const stored = sessionStorage.getItem("pa-review-data");
@@ -141,6 +143,17 @@ export default function ReviewPage() {
     }
     setAnimatedScorePercent(paScorePercent);
   }, [data, paScorePercent]);
+
+  // Mark letter stale when PA score reaches 10 (skip on first mount)
+  useEffect(() => {
+    if (!hasMountedScoreRef.current) {
+      hasMountedScoreRef.current = true;
+      return;
+    }
+    if (paScore === 10) {
+      setLetterIsStale(true);
+    }
+  }, [paScore]);
 
   // Scroll right rail to newly expanded card
   useEffect(() => {
@@ -269,6 +282,7 @@ export default function ReviewPage() {
           ? { ...cur, extracted: updatedExtracted, cptCode: updatedRequestDetails.cptCode }
           : cur
       );
+      setLetterIsStale(false);
       setToast("Letter regenerated with your updates");
     } catch (error) {
       setToast(error instanceof Error ? error.message : "Unable to regenerate the letter.");
@@ -435,7 +449,9 @@ export default function ReviewPage() {
               type="button"
               onClick={handleRegenerateLetter}
               disabled={!hasAppliedFixes || isRegenerating}
-              className="rounded-lg border border-[#d7dee8] bg-white px-[15px] py-[9px] text-sm font-semibold text-[#334155] transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+              className={`rounded-lg border border-[#d7dee8] bg-white px-[15px] py-[9px] text-sm font-semibold text-[#334155] transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300${
+                letterIsStale && hasAppliedFixes && !isRegenerating ? " glow-pulse" : ""
+              }`}
             >
               {isRegenerating ? "Regenerating..." : "Regenerate letter"}
             </button>

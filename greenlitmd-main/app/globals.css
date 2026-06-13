@@ -15,3 +15,12 @@ body {
 * {
   box-sizing: border-box;
 }
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(29, 79, 122, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(29, 79, 122, 0); }
+}
+
+.glow-pulse {
+  animation: glow-pulse 2.8s ease-in-out infinite;
+}
