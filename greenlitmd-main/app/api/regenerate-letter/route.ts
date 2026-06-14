@@ -33,6 +33,8 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       extracted?: ExtractedChartDataWithValidation;
       requestDetails?: RequestDetails;
+      resolutionContext?: string;
+      softWarningResolutions?: Record<string, 'unresolved' | 'resolved' | 'cant_resolve'>;
     };
 
     if (!body?.extracted || !body.requestDetails) {
@@ -46,9 +48,12 @@ export async function POST(request: Request) {
     });
 
     const imagingFindingsJson = JSON.stringify(body.extracted.imaging_findings || null);
-    const systemPromptWithContext = letterSystemPrompt
+    const baseSystemPrompt = letterSystemPrompt
       .replace("[LETTER_DATE]", today)
       .replace("[IMAGING_FINDINGS_JSON]", imagingFindingsJson);
+    const systemPromptWithContext = body.resolutionContext
+      ? `${baseSystemPrompt}\n\n${body.resolutionContext}`
+      : baseSystemPrompt;
 
     const { validation, pa_strength, ...chartDataOnly } = body.extracted as any;
     const objectiveMeasurementsStr = (body.extracted.objective_measurements ?? []).length
@@ -65,7 +70,7 @@ Insurance payer: ${body.requestDetails.payerName}
 Requesting provider: ${body.requestDetails.providerName}
 Practice name: ${body.requestDetails.practiceName}
 
-Letter date: ${today}${objectiveMeasurementsStr}`,
+Letter date: ${today}${objectiveMeasurementsStr}${buildSoftWarningContext(body.softWarningResolutions)}`,
       maxTokens: 6000
     });
 
@@ -83,4 +88,32 @@ Letter date: ${today}${objectiveMeasurementsStr}`,
     const message = error instanceof Error ? error.message : "Unable to regenerate the letter.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+function buildSoftWarningContext(
+  resolutions: Record<string, string> | undefined
+): string {
+  if (!resolutions) return '';
+  const labelMap: Record<string, string> = {
+    surgical_approach_if_mentioned: 'Surgical approach details',
+    imaging_findings: 'Imaging findings',
+    conservative_treatments_attempted: 'Conservative treatment history',
+    functional_limitations: 'Functional limitations',
+    payer_mismatch: 'Payer name mismatch',
+  };
+  const lines: string[] = [];
+  for (const [field, state] of Object.entries(resolutions)) {
+    if (state === 'resolved') {
+      lines.push(`- ${labelMap[field] ?? field}: User has confirmed this is addressed.`);
+    } else if (state === 'cant_resolve') {
+      lines.push(
+        `- ${labelMap[field] ?? field}: User has confirmed this cannot be resolved. ` +
+        `Write the letter to acknowledge this limitation professionally and frame it ` +
+        `as a known clinical constraint rather than omitting it or implying it is present.`
+      );
+    }
+  }
+  return lines.length
+    ? `\n\nSOFT WARNING RESOLUTIONS (incorporate these into the letter):\n${lines.join('\n')}`
+    : '';
 }

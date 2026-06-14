@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import type { ExtractedChartData, ExtractedChartDataWithValidation, GeneratePaResponse } from "@/lib/types";
+import type { ExtractedChartData, ExtractedChartDataWithValidation, GeneratePaResponse, ValidationBlock } from "@/lib/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,15 +38,18 @@ type GapItem = {
   done: boolean;
 };
 
-type RiskItem = {
-  kind: "risk";
-  id: string;
-  riskIndex: number;
-  label: string;
-  done: boolean;
-};
+type DenialOverride = { isDismissed: boolean; regenerationInProgress: boolean };
 
-type AttentionItem = GapItem | RiskItem;
+
+type FlagStatus = 'unresolved' | 'resolved' | 'cannot_resolve'
+
+type FlagResolution = {
+  flag: string
+  status: FlagStatus
+  note: string
+}
+
+type AttentionItem = GapItem;
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -94,8 +97,11 @@ export default function ReviewPage() {
   const [viewMode, setViewMode] = useState<"review" | "edit">("review");
   const [chartModalOpen, setChartModalOpen] = useState(false);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
-  const [acknowledgedRisks, setAcknowledgedRisks] = useState<number[]>([]);
+  const [denialRiskOverrides, setDenialRiskOverrides] = useState<Record<string, DenialOverride>>({});
   const [letterIsStale, setLetterIsStale] = useState(false);
+  const [flagResolutions, setFlagResolutions] = useState<FlagResolution[]>([]);
+  const [isResolutionRegenerating, setIsResolutionRegenerating] = useState(false);
+  const [softWarningStates, setSoftWarningStates] = useState<Record<string, boolean>>({});
 
   const railRef = useRef<HTMLElement>(null);
   const hasAnimatedScoreRef = useRef(false);
@@ -111,7 +117,42 @@ export default function ReviewPage() {
     } catch {
       sessionStorage.removeItem("pa-review-data");
     }
+    const storedOverrides = sessionStorage.getItem("pa-denial-overrides");
+    if (storedOverrides) {
+      try {
+        setDenialRiskOverrides(JSON.parse(storedOverrides) as Record<string, DenialOverride>);
+      } catch {
+        sessionStorage.removeItem("pa-denial-overrides");
+      }
+    }
   }, []);
+
+  useEffect(() => {
+    sessionStorage.setItem("pa-denial-overrides", JSON.stringify(denialRiskOverrides));
+  }, [denialRiskOverrides]);
+
+  useEffect(() => {
+    if (data?.extracted?.denial_risk_flags?.length) {
+      const stored = sessionStorage.getItem('flagResolutions')
+      if (stored) {
+        setFlagResolutions(JSON.parse(stored))
+      } else {
+        setFlagResolutions(
+          data.extracted.denial_risk_flags.map(flag => ({
+            flag,
+            status: 'unresolved' as FlagStatus,
+            note: ''
+          }))
+        )
+      }
+    }
+  }, [data]);
+
+  useEffect(() => {
+    if (flagResolutions.length) {
+      sessionStorage.setItem('flagResolutions', JSON.stringify(flagResolutions))
+    }
+  }, [flagResolutions]);
 
   useEffect(() => {
     document.title = "Review PA Packet — Greenlit MD";
@@ -126,8 +167,8 @@ export default function ReviewPage() {
 
   const basePaStrength = data?.extracted.pa_strength;
   const paScore = useMemo(
-    () => computePaStrengthScore(basePaStrength, manualFixes),
-    [basePaStrength, manualFixes]
+    () => computePaStrengthScore(basePaStrength, manualFixes, softWarningStates),
+    [basePaStrength, manualFixes, softWarningStates]
   );
   const paScorePercent = Math.min(100, Math.max(0, (paScore / 10) * 100));
 
@@ -175,7 +216,7 @@ export default function ReviewPage() {
     [data]
   );
 
-  // Build ordered attention items: undone risks → undone gaps → done risks → done gaps
+  // Build ordered attention items: undone gaps → done gaps
   const attentionItems = useMemo((): AttentionItem[] => {
     if (!data) return [];
     const gaps: GapItem[] = paStrengthFactors
@@ -190,22 +231,22 @@ export default function ReviewPage() {
         anchor: f.anchor,
         done: Boolean(manualFixes[f.key]?.resolved),
       }));
-    const risks: RiskItem[] = (data.extracted.denial_risk_flags ?? []).map((flag, i) => ({
-      kind: "risk",
-      id: `risk-${i}`,
-      riskIndex: i,
-      label: flag,
-      done: acknowledgedRisks.includes(i),
-    }));
-    return [
-      ...risks.filter((r) => !r.done),
-      ...gaps.filter((g) => !g.done),
-      ...risks.filter((r) => r.done),
-      ...gaps.filter((g) => g.done),
-    ];
-  }, [data, basePaStrength, manualFixes, acknowledgedRisks]);
+    return [...gaps.filter((g) => !g.done), ...gaps.filter((g) => g.done)];
+  }, [data, basePaStrength, manualFixes]);
 
-  const openCount = attentionItems.filter((item) => !item.done).length;
+  const openCount = useMemo(() => {
+    const gaps = attentionItems.filter((i) => !i.done).length;
+    const hardBlocks = (data?.extracted.validation?.hard_blocks ?? []).filter(
+      (b) => !denialRiskOverrides[`hard-block-${b.field}`]?.isDismissed
+    ).length;
+    const softWarnings = (data?.extracted.validation?.soft_warnings ?? []).filter(
+      (w) => !denialRiskOverrides[`soft-warning-${w.field}`]?.isDismissed
+    ).length;
+    const flags = (data?.extracted.denial_risk_flags ?? []).filter(
+      (_, i) => !denialRiskOverrides[`risk-${i}`]?.isDismissed
+    ).length;
+    return gaps + hardBlocks + softWarnings + flags;
+  }, [attentionItems, data, denialRiskOverrides]);
   const okFactors = paStrengthFactors.filter(
     (f) => (basePaStrength?.[f.key]?.score ?? 0) === 1
   );
@@ -330,9 +371,144 @@ export default function ReviewPage() {
     }
   }
 
-  function handleAcknowledgeRisk(riskIndex: number) {
-    setAcknowledgedRisks((cur) => (cur.includes(riskIndex) ? cur : [...cur, riskIndex]));
-    setToast("Marked as reviewed");
+  function toggleSoftWarningAcknowledged(field: string) {
+    setSoftWarningStates(current => ({ ...current, [field]: !current[field] }));
+  }
+
+  const acknowledgedCount = Object.values(softWarningStates).filter(Boolean).length;
+
+  async function handleRegenerateWithWarnings() {
+    if (!data || isRegenerating) return;
+    setIsRegenerating(true);
+    try {
+      const { updatedExtracted, updatedRequestDetails } = buildUpdatedPayload(data, manualFixes);
+      const response = await fetch('/api/regenerate-letter', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          extracted: updatedExtracted,
+          requestDetails: updatedRequestDetails,
+          softWarningResolutions: Object.fromEntries(
+            Object.entries(softWarningStates).map(([k, v]) => [k, v ? 'resolved' : 'unresolved'])
+          ),
+        })
+      });
+      const payload = await response.json() as { letter?: string; error?: string };
+      if (!response.ok) throw new Error(payload.error ?? 'Unable to regenerate the letter.');
+      if (payload.letter) setLetter(payload.letter);
+      setToast('Letter regenerated with warning resolutions applied');
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : 'Unable to regenerate the letter.');
+    } finally {
+      setIsRegenerating(false);
+    }
+  }
+
+  function updateResolution(flag: string, patch: Partial<FlagResolution>) {
+    setFlagResolutions(prev =>
+      prev.map(r => r.flag === flag ? { ...r, ...patch } : r)
+    )
+  }
+
+  const resolvedCount = flagResolutions.filter(r => r.status !== 'unresolved').length
+  const totalFlags = flagResolutions.length
+  const canRegenerate = resolvedCount > 0
+
+  async function handleRegenerateWithResolutions() {
+    if (!canRegenerate || isResolutionRegenerating || !data) return
+    setIsResolutionRegenerating(true)
+
+    const resolutionBlock = JSON.stringify(
+      flagResolutions.map(r => ({ flag: r.flag, status: r.status, note: r.note })),
+      null,
+      2
+    )
+
+    const resolutionContext = `
+DENIAL FLAG RESOLUTIONS — apply these before writing this letter:
+${resolutionBlock}
+
+Resolution rules:
+- resolved: treat the note as physician-verified clinical fact; incorporate naturally in the relevant section without attribution
+- cannot_resolve: acknowledge gracefully using the note as context; do not fabricate missing data
+- unresolved: insert [REQUIRES PHYSICIAN REVIEW: <flag text>] at the most relevant paragraph in the letter
+`.trim()
+
+    try {
+      const { updatedExtracted, updatedRequestDetails } = buildUpdatedPayload(data, manualFixes)
+      const res = await fetch('/api/regenerate-letter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          extracted: updatedExtracted,
+          requestDetails: updatedRequestDetails,
+          resolutionContext,
+        })
+      })
+      if (!res.ok) throw new Error('Regeneration failed')
+      const result = await res.json() as { letter?: string }
+      if (result.letter) setLetter(result.letter)
+      setToast('Letter regenerated with your flag resolutions')
+    } catch {
+      setDownloadError('Regeneration failed. Please try again.')
+    } finally {
+      setIsResolutionRegenerating(false)
+    }
+  }
+
+  function handleDismissRisk(id: string) {
+    setDenialRiskOverrides((cur) => ({
+      ...cur,
+      [id]: { isDismissed: true, regenerationInProgress: false },
+    }));
+  }
+
+  function handleAcknowledgeHardBlock(field: string) {
+    setDenialRiskOverrides((cur) => ({
+      ...cur,
+      [`hard-block-${field}`]: { isDismissed: true, regenerationInProgress: false },
+    }));
+  }
+
+  async function handleRegenerateDenialFix(
+    id: string,
+    fieldOrFlag: string,
+    denialRiskType: "soft_warning" | "hard_block" | "denial_flag"
+  ) {
+    if (!data || denialRiskOverrides[id]?.regenerationInProgress) return;
+    setDenialRiskOverrides((cur) => ({
+      ...cur,
+      [id]: { isDismissed: cur[id]?.isDismissed ?? false, regenerationInProgress: true },
+    }));
+    try {
+      const response = await fetch("/api/regenerate-denial-fix", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          denialRiskType,
+          fieldOrFlag,
+          currentLetter: letter,
+          extractedData: data.extracted,
+          requestDetails: {
+            cptCode: data.cptCode,
+            payerName: data.payerName,
+            providerName: data.providerName,
+            practiceName: data.practiceName ?? "",
+          },
+        }),
+      });
+      const payload = (await response.json()) as { regeneratedLetter?: string; error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "Unable to regenerate the letter.");
+      if (payload.regeneratedLetter) setLetter(payload.regeneratedLetter);
+      setToast(`Letter regenerated to address: ${fieldOrFlag}`);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Unable to regenerate the letter.");
+    } finally {
+      setDenialRiskOverrides((cur) => ({
+        ...cur,
+        [id]: { isDismissed: cur[id]?.isDismissed ?? false, regenerationInProgress: false },
+      }));
+    }
   }
 
   // ─── Empty state ──────────────────────────────────────────────────────────
@@ -557,6 +733,179 @@ export default function ReviewPage() {
             </p>
           </div>
 
+          {/* Hard Blocks */}
+          {(data?.extracted.validation?.hard_blocks ?? []).length > 0 ? (
+            <DenialSection
+              title="Hard blocks"
+              titleColor="#991b1b"
+              items={(data.extracted.validation.hard_blocks).map((block) => ({
+                id: `hard-block-${block.field}`,
+                block,
+                type: "hard_block" as const,
+              }))}
+              denialRiskOverrides={denialRiskOverrides}
+              onRegenerate={handleRegenerateDenialFix}
+              onDismiss={handleDismissRisk}
+              onAcknowledge={handleAcknowledgeHardBlock}
+              borderColor="border-red-600"
+              bgColor="bg-red-50"
+            />
+          ) : null}
+
+          {/* Denial Risk Flags */}
+          {(data?.extracted.validation?.soft_warnings ?? []).length > 0 ? (
+            <div className="mt-4 lg:mt-0">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-[.1em] text-[#92400e]">
+                Denial Risk Flags
+              </p>
+              <div className="flex flex-col gap-3">
+                {data.extracted.validation.soft_warnings.map((w) => {
+                  const isAcknowledged = softWarningStates[w.field] ?? false;
+                  return (
+                    <div
+                      key={w.field}
+                      className="border-l-4 border-amber-500 bg-amber-50 rounded-r-xl py-4 px-4 flex flex-col gap-[10px]"
+                    >
+                      <div className="flex items-start gap-[9px]">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-600 w-4 h-4 flex-shrink-0 mt-0.5" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                        <div className="min-w-0">
+                          <p className="text-[12.5px] font-bold leading-snug text-[#92400e]">{w.label}</p>
+                          <p className="mt-[3px] text-[12px] leading-[1.5] text-[#475569]">{w.message}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => toggleSoftWarningAcknowledged(w.field)}
+                          className={`text-xs font-medium px-3 py-1.5 rounded-md cursor-pointer transition ${
+                            isAcknowledged
+                              ? 'bg-amber-500 text-white'
+                              : 'border border-amber-300 text-amber-700 bg-white hover:bg-amber-50'
+                          }`}
+                        >
+                          {isAcknowledged ? 'Acknowledged ✓' : 'Acknowledge risk'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {(() => {
+                const total = data.extracted.validation.soft_warnings.length;
+                return (
+                  <>
+                    {acknowledgedCount > 0 && acknowledgedCount < total ? (
+                      <p className="mt-2 text-sm text-gray-500">{acknowledgedCount} of {total} risks acknowledged</p>
+                    ) : acknowledgedCount === total ? (
+                      <p className="mt-2 text-sm text-green-600 font-medium">✓ All {total} risks acknowledged</p>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={acknowledgedCount === 0 || isRegenerating}
+                      onClick={handleRegenerateWithWarnings}
+                      className={`mt-3 w-full rounded-md py-2.5 text-sm font-medium transition ${
+                        acknowledgedCount > 0 && !isRegenerating
+                          ? 'bg-clinical-navy text-white hover:bg-clinical-blue'
+                          : 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-40 pointer-events-none'
+                      }`}
+                    >
+                      {isRegenerating ? 'Regenerating...' : 'Regenerate letter with fixes'}
+                    </button>
+                  </>
+                );
+              })()}
+            </div>
+          ) : null}
+
+          {/* Denial Risk Flags — Flag Resolution Queue */}
+          {flagResolutions.length > 0 ? (
+            <div className="mt-4 lg:mt-0">
+              <div className="mb-2 flex items-center justify-between border-l-4 border-l-[#EF4444] pl-3">
+                <p className="text-[10px] font-bold uppercase tracking-[.1em] text-[#991b1b]">
+                  Denial risk flags
+                </p>
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                  resolvedCount === totalFlags
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-red-100 text-red-800'
+                }`}>
+                  {resolvedCount} of {totalFlags} addressed
+                </span>
+              </div>
+              <div className="flex flex-col gap-[9px]">
+                {flagResolutions.map((r) => (
+                  <div
+                    key={r.flag}
+                    className="border border-red-100 rounded-md bg-white shadow-sm p-3 space-y-2"
+                  >
+                    {/* Flag text row */}
+                    <div className="flex items-start gap-[9px]">
+                      <span className="shrink-0 mt-[1px] text-[13px] font-bold text-red-600" aria-hidden="true">!</span>
+                      <p className="text-sm text-red-800">{r.flag}</p>
+                    </div>
+                    {/* Status toggle row */}
+                    <div className="flex gap-1.5">
+                      {(
+                        [
+                          { status: 'unresolved', label: 'Unresolved' },
+                          { status: 'resolved', label: 'Resolved' },
+                          { status: 'cannot_resolve', label: "Can't resolve" },
+                        ] as { status: FlagStatus; label: string }[]
+                      ).map(({ status, label }) => {
+                        const isActive = r.status === status
+                        const activeClass =
+                          status === 'unresolved'
+                            ? 'bg-red-50 text-red-700 border border-red-200'
+                            : status === 'resolved'
+                            ? 'bg-green-50 text-green-700 border border-green-200'
+                            : 'bg-amber-50 text-amber-700 border border-amber-200'
+                        return (
+                          <button
+                            key={status}
+                            type="button"
+                            onClick={() => updateResolution(r.flag, { status })}
+                            className={`text-xs font-medium px-2.5 py-1 rounded-md cursor-pointer ${
+                              isActive ? activeClass : 'bg-white text-slate-400 border border-slate-200'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {/* Note textarea */}
+                    {r.status !== 'unresolved' ? (
+                      <textarea
+                        rows={2}
+                        value={r.note}
+                        placeholder={
+                          r.status === 'resolved'
+                            ? "Describe the correction — e.g. 'Patient completed 12 weeks PT Jan–Mar 2024, 24 sessions per attached log'"
+                            : "Explain why — e.g. 'BMI not recorded; patient declined measurement'"
+                        }
+                        onChange={(e) => updateResolution(r.flag, { note: e.target.value })}
+                        className="w-full text-sm border border-clinical-line rounded-md p-2 resize-none focus:border-clinical-blue focus:ring-2 focus:ring-blue-100 outline-none"
+                      />
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+              {/* Regenerate button */}
+              <button
+                type="button"
+                disabled={!canRegenerate || isResolutionRegenerating}
+                onClick={handleRegenerateWithResolutions}
+                className={`mt-3 w-full rounded-md py-2.5 text-sm font-medium ${
+                  canRegenerate && !isResolutionRegenerating
+                    ? 'bg-clinical-navy text-white hover:bg-clinical-blue'
+                    : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                }`}
+              >
+                {isResolutionRegenerating ? 'Regenerating...' : 'Regenerate with resolutions'}
+              </button>
+            </div>
+          ) : null}
+
           {/* Needs attention section */}
           {attentionItems.length > 0 ? (
             <div className="mt-4 lg:mt-0">
@@ -589,7 +938,6 @@ export default function ReviewPage() {
                     onSuggestFix={handleSuggestFix}
                     onApplySuggestion={handleApplySuggestion}
                     onDismissSuggestion={handleDismissSuggestion}
-                    onAcknowledgeRisk={handleAcknowledgeRisk}
                   />
                 ))}
               </div>
@@ -772,9 +1120,8 @@ function AttentionCard({
   onSuggestFix,
   onApplySuggestion,
   onDismissSuggestion,
-  onAcknowledgeRisk,
 }: {
-  item: AttentionItem;
+  item: GapItem;
   expanded: boolean;
   onToggle: () => void;
   manualFixes: ManualFixes;
@@ -785,23 +1132,19 @@ function AttentionCard({
   onSuggestFix: (key: PaStrengthFactorKey, label: string) => void;
   onApplySuggestion: (key: PaStrengthFactorKey) => void;
   onDismissSuggestion: (key: PaStrengthFactorKey) => void;
-  onAcknowledgeRisk: (riskIndex: number) => void;
 }) {
-  const isGap = item.kind === "gap";
   const isDone = item.done;
 
-  const statusColor = isDone ? "#16a34a" : isGap ? "#d97706" : "#dc2626";
-  const borderColor = expanded ? statusColor : isDone ? "#bbf7d0" : isGap ? "#fde68a" : "#fecaca";
+  const statusColor = isDone ? "#16a34a" : "#d97706";
+  const borderColor = expanded ? statusColor : isDone ? "#bbf7d0" : "#fde68a";
   const iconBg = isDone
     ? "bg-green-50 border-green-200 text-green-600"
-    : isGap
-    ? "bg-amber-50 border-amber-200 text-amber-600"
-    : "bg-red-50 border-red-200 text-red-600";
+    : "bg-amber-50 border-amber-200 text-amber-600";
 
-  const fixValue = isGap ? (manualFixes[item.factorKey]?.value ?? "") : "";
-  const resolved = isGap && Boolean(manualFixes[item.factorKey]?.resolved);
-  const suggestion = isGap ? (suggestions[item.factorKey] ?? "") : "";
-  const suggesting = isGap && Boolean(isSuggesting[item.factorKey]);
+  const fixValue = manualFixes[item.factorKey]?.value ?? "";
+  const resolved = Boolean(manualFixes[item.factorKey]?.resolved);
+  const suggestion = suggestions[item.factorKey] ?? "";
+  const suggesting = Boolean(isSuggesting[item.factorKey]);
 
   return (
     <div
@@ -832,22 +1175,22 @@ function AttentionCard({
           className={`mt-[1px] flex h-5 w-5 shrink-0 items-center justify-center rounded-[7px] border text-[11px] font-bold ${iconBg}`}
           aria-hidden="true"
         >
-          {isDone ? "✓" : isGap ? "△" : "!"}
+          {isDone ? "✓" : "△"}
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex items-center gap-2">
             <span className="truncate text-[13.5px] font-semibold text-clinical-navy">
-              {isGap ? item.label : "Denial risk"}
+              {item.label}
             </span>
             <span
               className="shrink-0 text-[9.5px] font-bold uppercase tracking-[.06em]"
               style={{ color: statusColor }}
             >
-              {isDone ? "Done" : isGap ? "Gap" : "Risk"}
+              {isDone ? "Done" : "Gap"}
             </span>
           </span>
           <span className="mt-[3px] line-clamp-2 text-[12px] leading-[1.45] text-[#64748b]">
-            {isGap ? item.note : item.label}
+            {item.note}
           </span>
         </span>
         <span
@@ -874,8 +1217,7 @@ function AttentionCard({
             gap: "11px",
           }}
         >
-          {isGap ? (
-            <>
+          <>
               {/* Why payers flag this */}
               <div>
                 <p className="mb-1 text-[10px] font-bold uppercase tracking-[.08em] text-amber-600">
@@ -955,34 +1297,183 @@ function AttentionCard({
                 </>
               )}
             </>
-          ) : (
-            <>
-              {/* Risk detail */}
-              <div>
-                <p className="mb-1 text-[10px] font-bold uppercase tracking-[.08em] text-[#b91c1c]">
-                  Payer risk
-                </p>
-                <p className="text-[12.5px] leading-[1.6] text-[#475569]">{item.label}</p>
-              </div>
-
-              {item.done ? (
-                <div className="flex items-center gap-2 rounded-[9px] border border-green-200 bg-green-50 px-3 py-[9px]">
-                  <span className="text-[13px] font-bold text-green-600">✓</span>
-                  <span className="text-[12px] font-semibold text-[#15803d]">Reviewed</span>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => onAcknowledgeRisk(item.riskIndex)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-[9px] text-[12px] font-semibold text-[#475569] transition hover:border-slate-300 hover:bg-slate-50"
-                >
-                  Mark as reviewed
-                </button>
-              )}
-            </>
-          )}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+// ─── DenialSection (hard blocks + soft warnings) ─────────────────────────────
+
+function DenialSection({
+  title,
+  titleColor,
+  items,
+  denialRiskOverrides,
+  onRegenerate,
+  onDismiss,
+  onAcknowledge,
+  borderColor,
+  bgColor,
+}: {
+  title: string;
+  titleColor: string;
+  items: Array<{ id: string; block: ValidationBlock; type: "hard_block" | "soft_warning" }>;
+  denialRiskOverrides: Record<string, DenialOverride>;
+  onRegenerate: (id: string, fieldOrFlag: string, type: "soft_warning" | "hard_block" | "denial_flag") => Promise<void>;
+  onDismiss: (id: string) => void;
+  onAcknowledge: (field: string) => void;
+  borderColor: string;
+  bgColor: string;
+}) {
+  const visible = items.filter((i) => !denialRiskOverrides[i.id]?.isDismissed);
+  if (visible.length === 0) return null;
+
+  return (
+    <div className="mt-4 lg:mt-0">
+      <p className="mb-2 text-[10px] font-bold uppercase tracking-[.1em]" style={{ color: titleColor }}>
+        {title}
+      </p>
+      <div className="flex flex-col gap-[9px]">
+        {visible.map(({ id, block, type }) => {
+          const isRegen = denialRiskOverrides[id]?.regenerationInProgress ?? false;
+          const isAcknowledged = denialRiskOverrides[id]?.isDismissed ?? false;
+          return (
+            <div
+              key={id}
+              className={`border-l-4 ${borderColor} ${bgColor} rounded-r-xl p-[14px] flex flex-col gap-[10px]`}
+            >
+              <div className="flex items-start gap-[9px]">
+                <span className="shrink-0 mt-[1px] text-[13px]" aria-hidden="true">
+                  {type === "hard_block" ? "⚠️" : "!"}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[12.5px] font-bold leading-snug" style={{ color: titleColor }}>
+                    {block.label}
+                  </p>
+                  <p className="mt-[3px] text-[12px] leading-[1.5] text-[#475569]">
+                    {block.message}
+                  </p>
+                </div>
+              </div>
+              {isAcknowledged ? (
+                <span className="text-[11.5px] font-semibold text-green-700">✓ Acknowledged</span>
+              ) : type === "hard_block" ? (
+                <button
+                  type="button"
+                  onClick={() => onAcknowledge(block.field)}
+                  className="self-start rounded-lg border border-red-300 bg-white px-3 py-[7px] text-[12px] font-semibold text-[#991b1b] transition hover:bg-red-50"
+                >
+                  Acknowledge
+                </button>
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onRegenerate(id, block.label, type)}
+                    disabled={isRegen}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#15803d] px-3 py-[7px] text-[12px] font-semibold text-white transition hover:bg-[#166534] disabled:cursor-not-allowed disabled:bg-slate-300"
+                  >
+                    {isRegen ? (
+                      <>
+                        <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                        </svg>
+                        Regenerating…
+                      </>
+                    ) : (
+                      "Regenerate letter addressing this"
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDismiss(id)}
+                    disabled={isRegen}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-[7px] text-[12px] font-semibold text-[#475569] transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── DenialFlagsSection ───────────────────────────────────────────────────────
+
+function DenialFlagsSection({
+  flags,
+  denialRiskOverrides,
+  onRegenerate,
+  onDismiss,
+}: {
+  flags: string[];
+  denialRiskOverrides: Record<string, DenialOverride>;
+  onRegenerate: (id: string, fieldOrFlag: string, type: "soft_warning" | "hard_block" | "denial_flag") => Promise<void>;
+  onDismiss: (id: string) => void;
+}) {
+  const visible = flags
+    .map((flag, i) => ({ flag, id: `risk-${i}` }))
+    .filter(({ id }) => !denialRiskOverrides[id]?.isDismissed);
+
+  if (visible.length === 0) return null;
+
+  return (
+    <div className="mt-4 lg:mt-0">
+      <p className="mb-2 text-[10px] font-bold uppercase tracking-[.1em] text-[#991b1b]">
+        Denial risk flags
+      </p>
+      <div className="flex flex-col gap-[9px]">
+        {visible.map(({ flag, id }) => {
+          const isRegen = denialRiskOverrides[id]?.regenerationInProgress ?? false;
+          return (
+            <div
+              key={id}
+              className="border-l-4 border-red-500 bg-red-50 rounded-r-xl p-[14px] flex flex-col gap-[10px]"
+            >
+              <div className="flex items-start gap-[9px]">
+                <span className="shrink-0 mt-[1px] text-[13px] font-bold text-red-600" aria-hidden="true">
+                  !
+                </span>
+                <p className="text-[12.5px] leading-[1.5] text-[#7f1d1d]">{flag}</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => onRegenerate(id, flag, "denial_flag")}
+                  disabled={isRegen}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#15803d] px-3 py-[7px] text-[12px] font-semibold text-white transition hover:bg-[#166534] disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {isRegen ? (
+                    <>
+                      <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                      </svg>
+                      Regenerating…
+                    </>
+                  ) : (
+                    "Regenerate letter addressing this"
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDismiss(id)}
+                  disabled={isRegen}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-[7px] text-[12px] font-semibold text-[#475569] transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed"
+                >
+                  Override
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1419,17 +1910,36 @@ function buildDownloadName(patientName: string | null, cptCode: string) {
   return `${safePatient}-pa-packet-cpt-${cptCode}.docx`;
 }
 
+// Maps soft warning field names to the PA strength factor keys they correspond to.
+// payer_mismatch and provider_mismatch have no PA factor — excluded intentionally.
+const softWarningToFactorKey: Partial<Record<string, PaStrengthFactorKey>> = {
+  surgical_approach_if_mentioned: 'surgical_approach',
+  imaging_findings: 'imaging_findings',
+  conservative_treatments_attempted: 'conservative_treatments_named',
+  functional_limitations: 'functional_limitations',
+};
+
 function computePaStrengthScore(
   base: ExtractedChartData["pa_strength"] | undefined,
-  manualFixes: ManualFixes
+  manualFixes: ManualFixes,
+  softWarningStates: Record<string, boolean> = {}
 ) {
+  // Build a set of factor keys boosted by acknowledged soft warnings
+  const softBoostedFactors = new Set<PaStrengthFactorKey>();
+  for (const [field, acknowledged] of Object.entries(softWarningStates)) {
+    if (acknowledged) {
+      const factorKey = softWarningToFactorKey[field];
+      if (factorKey) softBoostedFactors.add(factorKey);
+    }
+  }
+
   let totalWeight = 0;
   let weightedScore = 0;
   Object.entries(paStrengthWeights).forEach(([key, weight]) => {
     const factorKey = key as PaStrengthFactorKey;
     const manual = manualFixes[factorKey];
     const baseScore = base?.[factorKey]?.score ?? 0;
-    const score = manual?.resolved ? 1 : baseScore;
+    const score = manual?.resolved || softBoostedFactors.has(factorKey) ? 1 : baseScore;
     weightedScore += score * weight;
     totalWeight += weight;
   });
