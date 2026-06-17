@@ -3,7 +3,7 @@ import crypto from "crypto";
 
 export const resend = new Resend(process.env.RESEND_API_KEY!);
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://greenlitmd.app";
+const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://orthren.com";
 const secret = process.env.UNSUBSCRIBE_SECRET ?? "fallback-secret";
 
 export function createUnsubscribeToken(email: string): string {
@@ -65,13 +65,13 @@ export async function sendConfirmationEmail(email: string, position: number) {
     <h1>You're on the Orthren waitlist.</h1>
     <p>Thanks for signing up. You're <strong>#${position}</strong> on the list.</p>
     <p>Orthren reads a patient chart and generates a complete prior authorization packet — letter of medical necessity, PA score, and submission checklist — in under 60 seconds. No templates. No copy-paste.</p>
-    <p>We'll let you know the moment we launch. In the meantime, <a href="https://greenlitmd.app">see how it works →</a></p>
+    <p>We'll let you know the moment we launch. In the meantime, <a href="https://orthren.com">see how it works →</a></p>
     <p style="color:#94a3b8;font-size:13px">— The Orthren Team</p>
   `, email);
 
   return resend.emails.send({
-    // TODO: update sending domain to hello@orthren.app once DNS/Resend domain verification is complete
-    from: "Kamari at Orthren <hello@greenlitmd.app>",
+    // TODO: update sending domain to hello@orthren.com once DNS/Resend domain verification is complete
+    from: "Kamari at Orthren <hello@orthren.com>",
     to: email,
     subject: `You're #${position} on the Orthren waitlist`,
     html
@@ -91,12 +91,12 @@ export async function sendUpdateEmail(
     <h1>${opts.headline}</h1>
     <ul>${bulletItems}</ul>
     ${screenshotBlock}
-    <p>Know someone at an orthopedic practice? <a href="https://greenlitmd.app/waitlist">Send them this link</a> to join the waitlist.</p>
+    <p>Know someone at an orthopedic practice? <a href="https://orthren.com/waitlist">Send them this link</a> to join the waitlist.</p>
   `, email);
 
   return resend.emails.send({
-    // TODO: update sending domain to hello@orthren.app once DNS/Resend domain verification is complete
-    from: "Kamari at Orthren <hello@greenlitmd.app>",
+    // TODO: update sending domain to hello@orthren.com once DNS/Resend domain verification is complete
+    from: "Kamari at Orthren <hello@orthren.com>",
     to: email,
     subject: opts.subject,
     html
@@ -112,8 +112,8 @@ export async function sendLaunchEmail(email: string, launchUrl: string) {
   `, email);
 
   return resend.emails.send({
-    // TODO: update sending domain to hello@orthren.app once DNS/Resend domain verification is complete
-    from: "Kamari at Orthren <hello@greenlitmd.app>",
+    // TODO: update sending domain to hello@orthren.com once DNS/Resend domain verification is complete
+    from: "Kamari at Orthren <hello@orthren.com>",
     to: email,
     subject: "Your early access to Orthren is ready",
     html
