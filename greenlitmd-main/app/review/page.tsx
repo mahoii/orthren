@@ -3,7 +3,8 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import type { ExtractedChartData, ExtractedChartDataWithValidation, GeneratePaResponse, ValidationBlock } from "@/lib/types";
+import AnnotatedLetterComponent, { type AnnotationItem } from "@/components/AnnotatedLetter";
+import type { DenialRiskFlag, ExtractedChartData, ExtractedChartDataWithValidation, GeneratePaResponse } from "@/lib/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,32 +25,21 @@ type ManualFix = {
 };
 
 type ManualFixes = Partial<Record<PaStrengthFactorKey, ManualFix>>;
-type Suggestions = Partial<Record<PaStrengthFactorKey, string>>;
 type SuggestionLoading = Partial<Record<PaStrengthFactorKey, boolean>>;
 
-type GapItem = {
-  kind: "gap";
+type IssueKind = 'fix' | 'risk';
+
+interface AttentionItem {
   id: string;
-  factorKey: PaStrengthFactorKey;
+  kind: IssueKind;
   label: string;
   note: string;
-  placeholder: string;
   anchor?: string;
+  factorKey?: PaStrengthFactorKey;
+  addendum?: string;
+  placeholder?: string;
   done: boolean;
-};
-
-type DenialOverride = { isDismissed: boolean; regenerationInProgress: boolean };
-
-
-type FlagStatus = 'unresolved' | 'resolved' | 'cannot_resolve'
-
-type FlagResolution = {
-  flag: string
-  status: FlagStatus
-  note: string
 }
-
-type AttentionItem = GapItem;
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -64,48 +54,49 @@ const paStrengthWeights: Record<PaStrengthFactorKey, number> = {
   symptom_duration: 10,
 };
 
-// anchor: first exact substring (case-insensitive) to underline in the letter for this factor
 const paStrengthFactors: Array<{
   key: PaStrengthFactorKey;
   label: string;
   placeholder: string;
-  anchor?: string;
 }> = [
-  { key: "diagnosis_codes", label: "Diagnosis Codes", placeholder: "e.g. M17.11, M16.12", anchor: "Primary diagnoses" },
-  { key: "conservative_treatments_named", label: "Conservative Treatments Named", placeholder: "e.g. Physical therapy, NSAIDs", anchor: "CONSERVATIVE TREATMENT" },
-  { key: "conservative_treatment_duration", label: "Conservative Treatment Duration", placeholder: "e.g. 8 weeks of PT", anchor: "Physical Therapy (" },
-  { key: "imaging_findings", label: "Imaging Findings", placeholder: "e.g. MRI: full thickness tear", anchor: "Radiographic" },
-  { key: "functional_limitations", label: "Functional Limitations", placeholder: "e.g. cannot climb stairs", anchor: "FUNCTIONAL LIMITATIONS" },
-  { key: "surgical_approach", label: "Surgical Approach", placeholder: "e.g. arthroscopic", anchor: "Surgical Approach:" },
-  { key: "cpt_code_valid", label: "CPT Code Valid", placeholder: "e.g. 29827", anchor: "CPT Code:" },
-  { key: "symptom_duration", label: "Symptom Duration", placeholder: "e.g. 6 months", anchor: "history of progressive" },
+  { key: "diagnosis_codes", label: "Diagnosis Codes", placeholder: "e.g. M17.11, M16.12" },
+  { key: "conservative_treatments_named", label: "Conservative Treatments Named", placeholder: "e.g. Physical therapy, NSAIDs" },
+  { key: "conservative_treatment_duration", label: "Conservative Treatment Duration", placeholder: "e.g. 8 weeks of PT" },
+  { key: "imaging_findings", label: "Imaging Findings", placeholder: "e.g. MRI: full thickness tear" },
+  { key: "functional_limitations", label: "Functional Limitations", placeholder: "e.g. cannot climb stairs" },
+  { key: "surgical_approach", label: "Surgical Approach", placeholder: "e.g. arthroscopic" },
+  { key: "cpt_code_valid", label: "CPT Code Valid", placeholder: "e.g. 29827" },
+  { key: "symptom_duration", label: "Symptom Duration", placeholder: "e.g. 6 months" },
 ];
+
+const FACTOR_LABELS: Record<PaStrengthFactorKey, string> = Object.fromEntries(
+  paStrengthFactors.map(f => [f.key, f.label])
+) as Record<PaStrengthFactorKey, string>;
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function ReviewPage() {
   const [data, setData] = useState<ReviewData | null>(null);
-  const [letter, setLetter] = useState("");
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [manualFixes, setManualFixes] = useState<ManualFixes>({});
-  const [suggestions, setSuggestions] = useState<Suggestions>({});
-  const [isSuggesting, setIsSuggesting] = useState<SuggestionLoading>({});
   const [isRegenerating, setIsRegenerating] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
-  const [animatedScorePercent, setAnimatedScorePercent] = useState(0);
-  const [viewMode, setViewMode] = useState<"review" | "edit">("review");
-  const [chartModalOpen, setChartModalOpen] = useState(false);
-  const [expandedCard, setExpandedCard] = useState<string | null>(null);
-  const [denialRiskOverrides, setDenialRiskOverrides] = useState<Record<string, DenialOverride>>({});
-  const [letterIsStale, setLetterIsStale] = useState(false);
-  const [flagResolutions, setFlagResolutions] = useState<FlagResolution[]>([]);
-  const [isResolutionRegenerating, setIsResolutionRegenerating] = useState(false);
-  const [softWarningStates, setSoftWarningStates] = useState<Record<string, boolean>>({});
 
-  const railRef = useRef<HTMLElement>(null);
-  const hasAnimatedScoreRef = useRef(false);
-  const hasMountedScoreRef = useRef(false);
+  // Attention stream state
+  const [mode, setMode] = useState<'review' | 'edit'>('review');
+  const [editedLetter, setEditedLetter] = useState("");
+  const [activeIssue, setActiveIssue] = useState<string | null>(null);
+  const [hoverAnchor, setHoverAnchor] = useState<string | null>(null);
+  const [resolved, setResolved] = useState<string[]>([]);
+  const [acknowledged, setAcknowledged] = useState<string[]>([]);
+  const [fixDrafts, setFixDrafts] = useState<Record<string, string>>({});
+  const [isSuggesting, setIsSuggesting] = useState<SuggestionLoading>({});
+  const [strengthOpen, setStrengthOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [animatedScore, setAnimatedScore] = useState(0);
+
+  const letterRef = useRef<HTMLDivElement>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasAnimated = useRef(false);
 
   useEffect(() => {
     const stored = sessionStorage.getItem("pa-review-data");
@@ -113,220 +104,198 @@ export default function ReviewPage() {
     try {
       const parsed = JSON.parse(stored) as ReviewData;
       setData(parsed);
-      setLetter(parsed.letter);
+      setEditedLetter(parsed.letter);
     } catch {
       sessionStorage.removeItem("pa-review-data");
     }
-    const storedOverrides = sessionStorage.getItem("pa-denial-overrides");
-    if (storedOverrides) {
-      try {
-        setDenialRiskOverrides(JSON.parse(storedOverrides) as Record<string, DenialOverride>);
-      } catch {
-        sessionStorage.removeItem("pa-denial-overrides");
-      }
-    }
   }, []);
-
-  useEffect(() => {
-    sessionStorage.setItem("pa-denial-overrides", JSON.stringify(denialRiskOverrides));
-  }, [denialRiskOverrides]);
-
-  useEffect(() => {
-    if (data?.extracted?.denial_risk_flags?.length) {
-      const stored = sessionStorage.getItem('flagResolutions')
-      if (stored) {
-        setFlagResolutions(JSON.parse(stored))
-      } else {
-        setFlagResolutions(
-          data.extracted.denial_risk_flags.map(flag => ({
-            flag,
-            status: 'unresolved' as FlagStatus,
-            note: ''
-          }))
-        )
-      }
-    }
-  }, [data]);
-
-  useEffect(() => {
-    if (flagResolutions.length) {
-      sessionStorage.setItem('flagResolutions', JSON.stringify(flagResolutions))
-    }
-  }, [flagResolutions]);
 
   useEffect(() => {
     document.title = "Review PA Packet — Greenlit MD";
     return () => { document.title = "Greenlit MD"; };
   }, []);
 
-  useEffect(() => {
-    if (!toast) return;
-    const t = window.setTimeout(() => setToast(null), 2400);
-    return () => window.clearTimeout(t);
-  }, [toast]);
+  // ─── Derived data ─────────────────────────────────────────────────────────
 
-  const basePaStrength = data?.extracted.pa_strength;
-  const paScore = useMemo(
-    () => computePaStrengthScore(basePaStrength, manualFixes, softWarningStates),
-    [basePaStrength, manualFixes, softWarningStates]
+  const paStrength = data?.extracted.pa_strength;
+
+  const scoreFactors = useMemo(() =>
+    paStrengthFactors.map(f => ({
+      key: f.key,
+      label: f.label,
+      placeholder: f.placeholder,
+      score: paStrength?.[f.key]?.score ?? 0,
+      maxScore: 1 as const,
+      weight: paStrengthWeights[f.key],
+      note: paStrength?.[f.key]?.note ?? '',
+      anchorText: paStrength?.[f.key]?.anchorText,
+    })),
+    [paStrength]
   );
-  const paScorePercent = Math.min(100, Math.max(0, (paScore / 10) * 100));
 
-  useEffect(() => {
-    if (!data) return;
-    if (!hasAnimatedScoreRef.current) {
-      setAnimatedScorePercent(0);
-      const t = window.setTimeout(() => {
-        setAnimatedScorePercent(paScorePercent);
-        hasAnimatedScoreRef.current = true;
-      }, 40);
-      return () => window.clearTimeout(t);
-    }
-    setAnimatedScorePercent(paScorePercent);
-  }, [data, paScorePercent]);
+  const denialFlags: DenialRiskFlag[] = data?.extracted.denial_risk_flags ?? [];
 
-  // Mark letter stale when PA score reaches 10 (skip on first mount)
-  useEffect(() => {
-    if (!hasMountedScoreRef.current) {
-      hasMountedScoreRef.current = true;
-      return;
+  const attentionItems: AttentionItem[] = useMemo(() => {
+    const items: AttentionItem[] = [];
+    for (const f of scoreFactors) {
+      if (f.score < f.maxScore) {
+        items.push({
+          id: f.key,
+          kind: 'fix',
+          label: f.label,
+          note: f.note,
+          anchor: f.anchorText,
+          factorKey: f.key,
+          placeholder: f.placeholder,
+          done: resolved.includes(f.key),
+        });
+      }
     }
-    if (paScore === 10) {
-      setLetterIsStale(true);
+    for (const r of denialFlags) {
+      items.push({
+        id: r.id,
+        kind: 'risk',
+        label: r.label,
+        note: r.explanation,
+        anchor: r.anchorText || undefined,
+        addendum: r.recommendation,
+        done: acknowledged.includes(r.id),
+      });
     }
-  }, [paScore]);
+    return items;
+  }, [scoreFactors, denialFlags, resolved, acknowledged]);
 
-  // Scroll right rail to newly expanded card
+  const openCount = attentionItems.filter(i => !i.done).length;
+
+  const earnedScore = useMemo(() => {
+    let e = 0;
+    for (const f of scoreFactors) {
+      if (f.score >= f.maxScore || resolved.includes(f.key)) e += f.weight;
+    }
+    return e; // out of 100
+  }, [scoreFactors, resolved]);
+
+  const displayScore = (earnedScore / 10).toFixed(1);
+
+  const scoreMeta = useMemo(() => {
+    const v = earnedScore / 10;
+    if (v >= 8) return { color: '#16a34a', label: openCount > 0 ? 'Strong — clear the open items' : 'Ready to submit' };
+    if (v >= 5) return { color: '#d97706', label: 'Moderate — address gaps before submitting' };
+    return { color: '#dc2626', label: 'High denial risk — major gaps' };
+  }, [earnedScore, openCount]);
+
+  // Animate score bar on load
   useEffect(() => {
-    if (!expandedCard || !railRef.current) return;
+    if (!data || hasAnimated.current) return;
     const t = setTimeout(() => {
-      const el = railRef.current?.querySelector(`[data-card-id="${expandedCard}"]`);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      setAnimatedScore(earnedScore);
+      hasAnimated.current = true;
     }, 80);
     return () => clearTimeout(t);
-  }, [expandedCard]);
+  }, [data, earnedScore]);
 
-  const hasAppliedFixes = useMemo(
-    () => Object.values(manualFixes).some((fix) => fix?.resolved),
-    [manualFixes]
-  );
+  useEffect(() => {
+    if (hasAnimated.current) setAnimatedScore(earnedScore);
+  }, [earnedScore]);
 
-  const missingFields = useMemo(
-    () => (data ? findMissingFields(data.extracted) : []),
-    [data]
-  );
+  // ─── Helpers ──────────────────────────────────────────────────────────────
 
-  // Build ordered attention items: undone gaps → done gaps
-  const attentionItems = useMemo((): AttentionItem[] => {
-    if (!data) return [];
-    const gaps: GapItem[] = paStrengthFactors
-      .filter((f) => (basePaStrength?.[f.key]?.score ?? 0) === 0)
-      .map((f) => ({
-        kind: "gap",
-        id: f.key,
-        factorKey: f.key,
-        label: f.label,
-        note: basePaStrength?.[f.key]?.note ?? "",
-        placeholder: f.placeholder,
-        anchor: f.anchor,
-        done: Boolean(manualFixes[f.key]?.resolved),
-      }));
-    return [...gaps.filter((g) => !g.done), ...gaps.filter((g) => g.done)];
-  }, [data, basePaStrength, manualFixes]);
+  function showToast(msg: string) {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(msg);
+    toastTimer.current = setTimeout(() => setToast(null), 2600);
+  }
 
-  const openCount = useMemo(() => {
-    const gaps = attentionItems.filter((i) => !i.done).length;
-    const hardBlocks = (data?.extracted.validation?.hard_blocks ?? []).filter(
-      (b) => !denialRiskOverrides[`hard-block-${b.field}`]?.isDismissed
-    ).length;
-    const softWarnings = (data?.extracted.validation?.soft_warnings ?? []).filter(
-      (w) => !denialRiskOverrides[`soft-warning-${w.field}`]?.isDismissed
-    ).length;
-    const flags = (data?.extracted.denial_risk_flags ?? []).filter(
-      (_, i) => !denialRiskOverrides[`risk-${i}`]?.isDismissed
-    ).length;
-    return gaps + hardBlocks + softWarnings + flags;
-  }, [attentionItems, data, denialRiskOverrides]);
-  const okFactors = paStrengthFactors.filter(
-    (f) => (basePaStrength?.[f.key]?.score ?? 0) === 1
-  );
+  function slug(s: string) {
+    return s.replace(/[^a-z0-9]/gi, '').slice(0, 24);
+  }
+
+  function scrollToAnchor(id: string) {
+    const anchor = attentionItems.find(i => i.id === id)?.anchor;
+    if (!anchor) return;
+    setTimeout(() => {
+      const container = letterRef.current;
+      const el = document.getElementById('anno-' + slug(anchor));
+      if (container && el) {
+        container.scrollTo({ top: Math.max(0, el.offsetTop - container.clientHeight / 2 + 30), behavior: 'smooth' });
+      }
+    }, 30);
+  }
+
+  function openIssue(id: string) {
+    setActiveIssue(id);
+    scrollToAnchor(id);
+    setTimeout(() => {
+      document.getElementById('rail-card-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 80);
+  }
+
+  function applyFix(factorKey: string) {
+    const draft = (fixDrafts[factorKey] || '').trim();
+    if (!draft) { showToast('Add a fix note or use Suggest first'); return; }
+    setResolved(prev => prev.includes(factorKey) ? prev : [...prev, factorKey]);
+    showToast('Gap resolved — regenerate to fold it into the letter');
+  }
+
+  function acknowledge(id: string) {
+    setAcknowledged(prev => prev.includes(id) ? prev : [...prev, id]);
+    showToast('Marked as reviewed');
+  }
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
 
-  function updateManualFix(key: PaStrengthFactorKey, value: string) {
-    setManualFixes((cur) => ({
-      ...cur,
-      [key]: { value, resolved: cur[key]?.resolved ?? false, source: "manual" },
-    }));
-  }
-
-  function applyResolvedFix(
-    key: PaStrengthFactorKey,
-    value: string,
-    source: ManualFix["source"] = "manual"
-  ) {
-    const trimmed = value.trim();
-    if (!trimmed) return;
-    setManualFixes((cur) => ({ ...cur, [key]: { value, resolved: true, source } }));
-  }
-
-  async function handleSuggestFix(key: PaStrengthFactorKey, label: string) {
-    if (!data || isSuggesting[key]) return;
-    setIsSuggesting((cur) => ({ ...cur, [key]: true }));
-    setSuggestions((cur) => ({ ...cur, [key]: "" }));
+  async function handleSuggestFix(factorKey: PaStrengthFactorKey, label: string) {
+    if (!data || isSuggesting[factorKey]) return;
+    setIsSuggesting(cur => ({ ...cur, [factorKey]: true }));
     try {
-      const response = await fetch("/api/suggest-fix", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
+      const res = await fetch('/api/suggest-fix', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ extracted: data.extracted, factor: label }),
       });
-      const payload = (await response.json()) as { suggestion?: string; error?: string };
-      if (!response.ok) throw new Error(payload.error ?? "Unable to generate a suggestion.");
-      setSuggestions((cur) => ({ ...cur, [key]: payload.suggestion ?? "" }));
-    } catch (error) {
-      setSuggestions((cur) => ({ ...cur, [key]: "" }));
-      setToast(error instanceof Error ? error.message : "Unable to generate a suggestion.");
+      const payload = await res.json() as { suggestion?: string; error?: string };
+      if (!res.ok) throw new Error(payload.error ?? 'Unable to generate a suggestion.');
+      if (payload.suggestion) {
+        setFixDrafts(cur => ({ ...cur, [factorKey]: payload.suggestion! }));
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Unable to generate a suggestion.');
     } finally {
-      setIsSuggesting((cur) => ({ ...cur, [key]: false }));
+      setIsSuggesting(cur => ({ ...cur, [factorKey]: false }));
     }
   }
 
-  function handleApplySuggestion(key: PaStrengthFactorKey) {
-    const suggestion = suggestions[key];
-    if (!suggestion) return;
-    applyResolvedFix(key, suggestion, "ai");
-    setSuggestions((cur) => ({ ...cur, [key]: "" }));
-  }
-
-  function handleDismissSuggestion(key: PaStrengthFactorKey) {
-    setSuggestions((cur) => ({ ...cur, [key]: "" }));
-  }
-
-  async function handleRegenerateLetter() {
-    if (!data || isRegenerating) return;
+  async function handleRegenerate() {
+    if (!data || resolved.length === 0 || isRegenerating) return;
+    const mfMap: ManualFixes = {};
+    for (const key of resolved) {
+      mfMap[key as PaStrengthFactorKey] = {
+        value: fixDrafts[key] ?? '',
+        resolved: true,
+        source: 'manual',
+      };
+    }
+    const resolutionContext = resolved
+      .map(k => `${FACTOR_LABELS[k as PaStrengthFactorKey]}: ${fixDrafts[k] ?? ''}`)
+      .join('\n');
+    const { updatedExtracted, updatedRequestDetails } = buildUpdatedPayload(data, mfMap);
     setIsRegenerating(true);
     try {
-      const { updatedExtracted, updatedRequestDetails } = buildUpdatedPayload(data, manualFixes);
-      const response = await fetch("/api/regenerate-letter", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          extracted: updatedExtracted,
-          requestDetails: updatedRequestDetails,
-        }),
+      const res = await fetch('/api/regenerate-letter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ extracted: updatedExtracted, requestDetails: updatedRequestDetails, resolutionContext }),
       });
-      const payload = (await response.json()) as { letter?: string; error?: string };
-      if (!response.ok) throw new Error(payload.error ?? "Unable to regenerate the letter.");
-      if (payload.letter) setLetter(payload.letter);
-      setData((cur) =>
-        cur
-          ? { ...cur, extracted: updatedExtracted, cptCode: updatedRequestDetails.cptCode }
-          : cur
-      );
-      setLetterIsStale(false);
-      setToast("Letter regenerated with your updates");
-    } catch (error) {
-      setToast(error instanceof Error ? error.message : "Unable to regenerate the letter.");
+      const json = await res.json() as { letter?: string; error?: string };
+      if (!res.ok) throw new Error(json.error ?? 'Unable to regenerate the letter.');
+      if (json.letter) {
+        setEditedLetter(json.letter);
+        setResolved([]);
+        setActiveIssue(null);
+        showToast('Letter regenerated with your updates');
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Regeneration failed — please try again');
     } finally {
       setIsRegenerating(false);
     }
@@ -337,177 +306,35 @@ export default function ReviewPage() {
     setIsDownloading(true);
     setDownloadError(null);
     try {
-      const response = await fetch("/api/export", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
+      const res = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           extracted: data.extracted,
-          letter,
+          letter: editedLetter,
           cptCode: data.cptCode,
           payerName: data.payerName,
           providerName: data.providerName,
           practiceName: data.practiceName,
         }),
       });
-      if (!response.ok) {
-        const payload = (await response.json()) as { error?: string };
-        throw new Error(payload.error ?? "Unable to export the PA packet.");
+      if (!res.ok) {
+        const payload = await res.json() as { error?: string };
+        throw new Error(payload.error ?? 'Unable to export the PA packet.');
       }
-      const blob = await response.blob();
+      const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = buildDownloadName(data.extracted.patient_name, data.cptCode);
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = buildDownloadName(data.extracted.patient_name, data.cptCode);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
       URL.revokeObjectURL(url);
-    } catch (error) {
-      setDownloadError(
-        error instanceof Error ? error.message : "Unable to export the PA packet."
-      );
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : 'Unable to export the PA packet.');
     } finally {
       setIsDownloading(false);
-    }
-  }
-
-  function toggleSoftWarningAcknowledged(field: string) {
-    setSoftWarningStates(current => ({ ...current, [field]: !current[field] }));
-  }
-
-  const acknowledgedCount = Object.values(softWarningStates).filter(Boolean).length;
-
-  async function handleRegenerateWithWarnings() {
-    if (!data || isRegenerating) return;
-    setIsRegenerating(true);
-    try {
-      const { updatedExtracted, updatedRequestDetails } = buildUpdatedPayload(data, manualFixes);
-      const response = await fetch('/api/regenerate-letter', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          extracted: updatedExtracted,
-          requestDetails: updatedRequestDetails,
-          softWarningResolutions: Object.fromEntries(
-            Object.entries(softWarningStates).map(([k, v]) => [k, v ? 'resolved' : 'unresolved'])
-          ),
-        })
-      });
-      const payload = await response.json() as { letter?: string; error?: string };
-      if (!response.ok) throw new Error(payload.error ?? 'Unable to regenerate the letter.');
-      if (payload.letter) setLetter(payload.letter);
-      setToast('Letter regenerated with warning resolutions applied');
-    } catch (error) {
-      setToast(error instanceof Error ? error.message : 'Unable to regenerate the letter.');
-    } finally {
-      setIsRegenerating(false);
-    }
-  }
-
-  function updateResolution(flag: string, patch: Partial<FlagResolution>) {
-    setFlagResolutions(prev =>
-      prev.map(r => r.flag === flag ? { ...r, ...patch } : r)
-    )
-  }
-
-  const resolvedCount = flagResolutions.filter(r => r.status !== 'unresolved').length
-  const totalFlags = flagResolutions.length
-  const canRegenerate = resolvedCount > 0
-
-  async function handleRegenerateWithResolutions() {
-    if (!canRegenerate || isResolutionRegenerating || !data) return
-    setIsResolutionRegenerating(true)
-
-    const resolutionBlock = JSON.stringify(
-      flagResolutions.map(r => ({ flag: r.flag, status: r.status, note: r.note })),
-      null,
-      2
-    )
-
-    const resolutionContext = `
-DENIAL FLAG RESOLUTIONS — apply these before writing this letter:
-${resolutionBlock}
-
-Resolution rules:
-- resolved: treat the note as physician-verified clinical fact; incorporate naturally in the relevant section without attribution
-- cannot_resolve: acknowledge gracefully using the note as context; do not fabricate missing data
-- unresolved: insert [REQUIRES PHYSICIAN REVIEW: <flag text>] at the most relevant paragraph in the letter
-`.trim()
-
-    try {
-      const { updatedExtracted, updatedRequestDetails } = buildUpdatedPayload(data, manualFixes)
-      const res = await fetch('/api/regenerate-letter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          extracted: updatedExtracted,
-          requestDetails: updatedRequestDetails,
-          resolutionContext,
-        })
-      })
-      if (!res.ok) throw new Error('Regeneration failed')
-      const result = await res.json() as { letter?: string }
-      if (result.letter) setLetter(result.letter)
-      setToast('Letter regenerated with your flag resolutions')
-    } catch {
-      setDownloadError('Regeneration failed. Please try again.')
-    } finally {
-      setIsResolutionRegenerating(false)
-    }
-  }
-
-  function handleDismissRisk(id: string) {
-    setDenialRiskOverrides((cur) => ({
-      ...cur,
-      [id]: { isDismissed: true, regenerationInProgress: false },
-    }));
-  }
-
-  function handleAcknowledgeHardBlock(field: string) {
-    setDenialRiskOverrides((cur) => ({
-      ...cur,
-      [`hard-block-${field}`]: { isDismissed: true, regenerationInProgress: false },
-    }));
-  }
-
-  async function handleRegenerateDenialFix(
-    id: string,
-    fieldOrFlag: string,
-    denialRiskType: "soft_warning" | "hard_block" | "denial_flag"
-  ) {
-    if (!data || denialRiskOverrides[id]?.regenerationInProgress) return;
-    setDenialRiskOverrides((cur) => ({
-      ...cur,
-      [id]: { isDismissed: cur[id]?.isDismissed ?? false, regenerationInProgress: true },
-    }));
-    try {
-      const response = await fetch("/api/regenerate-denial-fix", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          denialRiskType,
-          fieldOrFlag,
-          currentLetter: letter,
-          extractedData: data.extracted,
-          requestDetails: {
-            cptCode: data.cptCode,
-            payerName: data.payerName,
-            providerName: data.providerName,
-            practiceName: data.practiceName ?? "",
-          },
-        }),
-      });
-      const payload = (await response.json()) as { regeneratedLetter?: string; error?: string };
-      if (!response.ok) throw new Error(payload.error ?? "Unable to regenerate the letter.");
-      if (payload.regeneratedLetter) setLetter(payload.regeneratedLetter);
-      setToast(`Letter regenerated to address: ${fieldOrFlag}`);
-    } catch (error) {
-      setToast(error instanceof Error ? error.message : "Unable to regenerate the letter.");
-    } finally {
-      setDenialRiskOverrides((cur) => ({
-        ...cur,
-        [id]: { isDismissed: cur[id]?.isDismissed ?? false, regenerationInProgress: false },
-      }));
     }
   }
 
@@ -516,16 +343,12 @@ Resolution rules:
   if (!data) {
     return (
       <main className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center bg-[#F8F9FB] px-6">
-        <div className="max-w-md rounded-lg border border-clinical-line p-6 text-center shadow-sm">
-          <h1 className="text-xl font-semibold text-clinical-navy">No packet ready for review</h1>
+        <div className="max-w-md rounded-lg border border-[#e2e8f0] p-6 text-center shadow-sm">
+          <h1 className="text-xl font-semibold text-[#1E3A5F]">No packet ready for review</h1>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Generate a packet from a chart PDF first. Patient data is not stored after this
-            browser session.
+            Generate a packet from a chart PDF first. Patient data is not stored after this browser session.
           </p>
-          <Link
-            href="/"
-            className="mt-5 inline-flex rounded-md bg-clinical-navy px-4 py-2 text-sm font-semibold text-white hover:bg-clinical-blue"
-          >
+          <Link href="/" className="mt-5 inline-flex rounded-md bg-[#1E3A5F] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1d4f7a]">
             Back to upload
           </Link>
         </div>
@@ -533,1028 +356,720 @@ Resolution rules:
     );
   }
 
+  // ─── Attention items as AnnotationItems for the letter component ──────────
+  const annotationItems: AnnotationItem[] = attentionItems
+    .filter(i => i.anchor)
+    .map(i => ({ id: i.id, kind: i.kind, anchor: i.anchor, done: i.done }));
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <main className="min-h-[calc(100vh-3.5rem)] bg-[#F8F9FB]">
-      {/* Toast */}
-      {toast ? (
-        <div className="fixed right-5 top-20 z-50 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-lg">
+    <div
+      style={{
+        height: 'calc(100vh - 3.5rem)',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        fontFamily: "'DM Sans', system-ui, sans-serif",
+        color: '#172033',
+        background: '#eef1f5',
+      }}
+    >
+      {/* ── HEADER ────────────────────────────────────────────────────────── */}
+      <header
+        style={{
+          height: 60,
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          background: '#fff',
+          borderBottom: '1px solid #e2e8f0',
+          padding: '0 24px',
+          zIndex: 30,
+        }}
+      >
+        {/* Left: label + divider + title */}
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#1d4f7a' }}>
+          Review packet
+        </span>
+        <div style={{ width: 1, height: 18, background: '#e2e8f0', flexShrink: 0 }} />
+        <h1 style={{ fontSize: 16, fontWeight: 600, color: '#1E3A5F', margin: 0 }}>
+          Letter of Medical Necessity
+        </h1>
+
+        {/* Patient pills */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          {data.extracted.patient_name && (
+            <span style={{ background: '#f1f5f9', borderRadius: 999, padding: '4px 11px', fontSize: 12, fontWeight: 600, color: '#475569' }}>
+              {data.extracted.patient_name}
+            </span>
+          )}
+          <span style={{ background: '#f1f5f9', borderRadius: 999, padding: '4px 11px', fontSize: 12, fontWeight: 600, color: '#475569' }}>
+            CPT {data.cptCode}
+          </span>
+          {data.isDemo && (
+            <span style={{ background: '#fef3c7', borderRadius: 999, padding: '4px 11px', fontSize: 12, fontWeight: 600, color: '#92400e' }}>
+              Demo
+            </span>
+          )}
+        </div>
+
+        {/* Right: controls */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* Review / Edit toggle */}
+          <div style={{ background: '#f1f5f9', borderRadius: 8, padding: 3, display: 'flex', gap: 2 }}>
+            {(['review', 'edit'] as const).map(m => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMode(m)}
+                style={{
+                  padding: '6px 12px',
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  borderRadius: 6,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: mode === m ? '#fff' : 'transparent',
+                  color: mode === m ? '#1E3A5F' : '#94a3b8',
+                  boxShadow: mode === m ? '0 1px 2px rgba(15,31,51,0.1)' : 'none',
+                  fontFamily: 'inherit',
+                  textTransform: 'capitalize',
+                }}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+
+          {/* Regenerate */}
+          <button
+            type="button"
+            onClick={handleRegenerate}
+            disabled={resolved.length === 0 || isRegenerating}
+            style={{
+              background: '#fff',
+              border: '1px solid #e2e8f0',
+              borderRadius: 8,
+              padding: '9px 15px',
+              fontSize: 13,
+              fontWeight: 600,
+              color: resolved.length > 0 && !isRegenerating ? '#1d4f7a' : '#cbd5e1',
+              cursor: resolved.length > 0 && !isRegenerating ? 'pointer' : 'not-allowed',
+              fontFamily: 'inherit',
+            }}
+          >
+            {isRegenerating ? 'Regenerating…' : `Regenerate${resolved.length > 0 ? ` (${resolved.length})` : ''}`}
+          </button>
+
+          {/* Download */}
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={isDownloading || Boolean(data.isDemo)}
+            title={data.isDemo ? 'Download available with a real chart' : undefined}
+            style={{
+              background: '#1E3A5F',
+              color: '#fff',
+              borderRadius: 8,
+              padding: '9px 18px',
+              fontSize: 13,
+              fontWeight: 600,
+              border: 'none',
+              cursor: isDownloading || data.isDemo ? 'not-allowed' : 'pointer',
+              opacity: isDownloading || data.isDemo ? 0.5 : 1,
+              fontFamily: 'inherit',
+            }}
+          >
+            {isDownloading ? 'Preparing…' : 'Download PA Packet'}
+          </button>
+        </div>
+      </header>
+
+      {/* ── BODY ──────────────────────────────────────────────────────────── */}
+      <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '1fr 384px' }}>
+
+        {/* LEFT — Letter hero */}
+        <div
+          id="stream-doc"
+          ref={letterRef}
+          style={{ overflowY: 'auto', background: '#eef1f5', padding: '40px 32px 80px' }}
+        >
+          <div style={{ maxWidth: 768, margin: '0 auto' }}>
+            {downloadError && (
+              <div style={{ marginBottom: 16, borderRadius: 8, border: '1px solid #fecaca', background: '#fef2f2', padding: '10px 14px', fontSize: 13, color: '#dc2626' }}>
+                {downloadError}
+              </div>
+            )}
+
+            {mode === 'review' ? (
+              <div
+                style={{
+                  background: '#fff',
+                  borderRadius: 6,
+                  boxShadow: '0 1px 3px rgba(15,31,51,0.08), 0 12px 36px rgba(15,31,51,0.10)',
+                  padding: '60px 64px',
+                  fontFamily: "Georgia, 'Times New Roman', serif",
+                  fontSize: 15,
+                  lineHeight: 1.85,
+                  color: '#1f2733',
+                }}
+              >
+                <AnnotatedLetterComponent
+                  letter={editedLetter}
+                  items={annotationItems}
+                  activeIssue={activeIssue}
+                  hoverAnchor={hoverAnchor}
+                  onIssueClick={openIssue}
+                  onHover={setHoverAnchor}
+                />
+              </div>
+            ) : (
+              <textarea
+                value={editedLetter}
+                onChange={e => setEditedLetter(e.target.value)}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  border: '1px solid #d7dee8',
+                  borderRadius: 6,
+                  fontFamily: "Georgia, 'Times New Roman', serif",
+                  fontSize: 15,
+                  lineHeight: 1.85,
+                  color: '#1f2733',
+                  boxShadow: '0 12px 36px rgba(15,31,51,0.1)',
+                  minHeight: '70vh',
+                  resize: 'vertical',
+                  padding: '60px 64px',
+                  outline: 'none',
+                  background: '#fff',
+                }}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT — Attention Rail */}
+        <div
+          style={{
+            overflowY: 'auto',
+            background: '#fff',
+            borderLeft: '1px solid #e2e8f0',
+            padding: '22px 20px 60px',
+          }}
+        >
+          {/* Score Card */}
+          <div
+            style={{
+              border: '1px solid #e2e8f0',
+              borderRadius: 14,
+              padding: 18,
+              background: 'linear-gradient(180deg, #fbfdff, #f7fafc)',
+            }}
+          >
+            <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#94a3b8', margin: 0 }}>
+              Packet Strength
+            </p>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginTop: 6 }}>
+              <span style={{ fontSize: 38, fontWeight: 700, lineHeight: 1, color: scoreMeta.color }}>
+                {displayScore}
+              </span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: '#94a3b8' }}> / 10</span>
+            </div>
+            <div style={{ marginTop: 12, height: 8, borderRadius: 999, background: '#e2e8f0', overflow: 'hidden' }}>
+              <div
+                style={{
+                  height: '100%',
+                  borderRadius: 999,
+                  background: scoreMeta.color,
+                  width: `${animatedScore}%`,
+                  transition: 'width 0.8s cubic-bezier(0.2,0.7,0.2,1)',
+                }}
+              />
+            </div>
+            <p style={{ fontSize: 13, fontWeight: 600, color: scoreMeta.color, marginTop: 11, marginBottom: 0 }}>
+              {scoreMeta.label}
+            </p>
+          </div>
+
+          {/* Needs Attention Header */}
+          <div style={{ margin: '26px 2px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h2 style={{ fontSize: 14, fontWeight: 700, color: '#1E3A5F', margin: 0 }}>Needs attention</h2>
+            {openCount > 0 ? (
+              <span style={{ background: '#fef2f2', color: '#dc2626', borderRadius: 999, padding: '3px 9px', fontSize: 11, fontWeight: 700 }}>
+                {openCount} open
+              </span>
+            ) : (
+              <span style={{ background: '#f0fdf4', color: '#15803d', borderRadius: 999, padding: '3px 9px', fontSize: 11, fontWeight: 700 }}>
+                All clear
+              </span>
+            )}
+          </div>
+
+          {/* Stream Cards */}
+          {attentionItems.map(item => (
+            <StreamCard
+              key={item.id}
+              item={item}
+              activeIssue={activeIssue}
+              fixDraft={fixDrafts[item.id] ?? ''}
+              isSuggesting={Boolean(isSuggesting[item.factorKey as PaStrengthFactorKey])}
+              onToggle={() => activeIssue === item.id ? setActiveIssue(null) : openIssue(item.id)}
+              onHoverEnter={() => setHoverAnchor(item.anchor ?? null)}
+              onHoverLeave={() => setHoverAnchor(null)}
+              onFixChange={v => setFixDrafts(cur => ({ ...cur, [item.id]: v }))}
+              onSuggestFix={() => item.factorKey && handleSuggestFix(item.factorKey, item.label)}
+              onApplyFix={() => applyFix(item.id)}
+              onAcknowledge={() => acknowledge(item.id)}
+            />
+          ))}
+
+          {attentionItems.length === 0 && (
+            <p style={{ fontSize: 13, color: '#94a3b8', textAlign: 'center', padding: '20px 0' }}>
+              No issues found
+            </p>
+          )}
+
+          {/* Strength Factors Accordion */}
+          <button
+            type="button"
+            onClick={() => setStrengthOpen(p => !p)}
+            style={{
+              marginTop: 22,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              width: '100%',
+              background: 'none',
+              border: '1px solid #e2e8f0',
+              borderRadius: 10,
+              padding: '12px 14px',
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#475569',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            <span>All {scoreFactors.length} strength factors</span>
+            <span style={{ fontSize: 11 }}>{strengthOpen ? '▲' : '▼'}</span>
+          </button>
+
+          {strengthOpen && (
+            <div style={{ marginTop: 6, animation: 'fadeSlideIn 0.15s ease' }}>
+              {scoreFactors.map(f => {
+                const isFixed = resolved.includes(f.key);
+                const isOk = f.score >= f.maxScore;
+                const isGap = !isOk && !isFixed;
+                const iconBg = isFixed
+                  ? { bg: '#eff6ff', border: '#bfdbfe', color: '#1d4f7a' }
+                  : isOk
+                  ? { bg: '#ecfdf3', border: '#bbf7d0', color: '#16a34a' }
+                  : { bg: '#fffbeb', border: '#fde68a', color: '#d97706' };
+                const statusText = isFixed ? 'Fixed' : isOk ? 'OK' : 'Gap';
+                const statusColor = isFixed ? '#1d4f7a' : isOk ? '#16a34a' : '#d97706';
+                return (
+                  <div
+                    key={f.key}
+                    style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 8, cursor: isGap ? 'pointer' : 'default' }}
+                    onClick={() => isGap && openIssue(f.key)}
+                  >
+                    <span
+                      style={{
+                        flexShrink: 0,
+                        width: 18,
+                        height: 18,
+                        borderRadius: '50%',
+                        border: `1px solid ${iconBg.border}`,
+                        background: iconBg.bg,
+                        color: iconBg.color,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 10,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {isFixed ? '✓' : isOk ? '✓' : '!'}
+                    </span>
+                    <span style={{ flex: 1, fontSize: 12.5, fontWeight: 500, color: '#334155' }}>{f.label}</span>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: statusColor }}>{statusText}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Feedback widget */}
+          <div style={{ marginTop: 28 }}>
+            <FeedbackWidget
+              cptCode={data.cptCode}
+              payerName={data.payerName}
+              paScore={earnedScore / 10}
+              setToast={showToast}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ── TOAST ─────────────────────────────────────────────────────────── */}
+      {toast && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 68,
+            right: 20,
+            zIndex: 400,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 9,
+            background: '#fff',
+            border: '1px solid #e2e8f0',
+            borderRadius: 10,
+            padding: '11px 15px',
+            boxShadow: '0 12px 32px rgba(15,31,51,0.16)',
+            fontSize: 13,
+            fontWeight: 600,
+            color: '#334155',
+            animation: 'fadeSlideIn 0.18s ease',
+            fontFamily: "'DM Sans', system-ui, sans-serif",
+          }}
+        >
           <span
-            className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-green-100 text-[11px] text-green-700"
-            aria-hidden="true"
+            style={{
+              width: 18,
+              height: 18,
+              borderRadius: '50%',
+              background: '#ecfdf3',
+              color: '#16a34a',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 11,
+              fontWeight: 700,
+              flexShrink: 0,
+            }}
           >
             ✓
           </span>
           {toast}
         </div>
-      ) : null}
+      )}
 
-      {/* ── Sticky review header ──────────────────────────────────────────────── */}
-      <div className="sticky top-14 z-40 border-b border-[#d7dee8] bg-white shadow-[0_1px_0_rgba(15,31,51,.02)]">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-[18px] gap-y-2 px-6 py-[13px]">
-          {/* Title + chips */}
-          <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[.14em] text-[#1d4f7a]">
-              Review packet
-            </p>
-            <h1 className="text-[21px] font-semibold leading-[1.1] text-clinical-navy">
-              Letter of Medical Necessity
-            </h1>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {data.extracted.patient_name ? (
-              <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                {data.extracted.patient_name}
-              </span>
-            ) : null}
-            <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              CPT {data.cptCode}
-            </span>
-            <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              {data.payerName}
-            </span>
-            {data.isDemo ? (
-              <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
-                Demo — sample patient data
-              </span>
-            ) : null}
-          </div>
-
-          {/* Actions */}
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            {/* Review / Edit toggle */}
-            <div className="flex gap-0.5 rounded-lg bg-slate-100 p-1">
-              <button
-                type="button"
-                onClick={() => setViewMode("review")}
-                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-                  viewMode === "review"
-                    ? "bg-white text-clinical-navy shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                Review
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("edit")}
-                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-                  viewMode === "edit"
-                    ? "bg-white text-clinical-navy shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                Edit
-              </button>
-            </div>
-            <Link
-              href="/"
-              className="rounded-lg border border-[#d7dee8] px-[15px] py-[9px] text-sm font-semibold text-[#334155] transition hover:bg-slate-50"
-            >
-              New upload
-            </Link>
-            <button
-              type="button"
-              onClick={() => setChartModalOpen(true)}
-              className="rounded-lg border border-[#e2e8f0] bg-white px-[15px] py-[9px] text-sm font-semibold text-[#475569] transition hover:bg-slate-50"
-            >
-              Chart Data
-            </button>
-            <button
-              type="button"
-              onClick={handleRegenerateLetter}
-              disabled={!hasAppliedFixes || isRegenerating}
-              className={`rounded-lg border border-[#d7dee8] bg-white px-[15px] py-[9px] text-sm font-semibold text-[#334155] transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300${
-                letterIsStale && hasAppliedFixes && !isRegenerating ? " glow-pulse" : ""
-              }`}
-            >
-              {isRegenerating ? "Regenerating..." : "Regenerate letter"}
-            </button>
-            <button
-              type="button"
-              onClick={handleDownload}
-              disabled={isDownloading || Boolean(data.isDemo)}
-              title={data.isDemo ? "Download available with a real chart" : undefined}
-              className="rounded-lg bg-clinical-navy px-[18px] py-[10px] text-sm font-semibold text-white shadow-sm transition hover:bg-clinical-blue disabled:cursor-not-allowed disabled:bg-slate-300"
-            >
-              {isDownloading ? "Preparing..." : "Download PA Packet"}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Feedback strip (scrolls away) ──────────────────────────────────────── */}
-      <FeedbackWidget
-        cptCode={data.cptCode}
-        payerName={data.payerName}
-        paScore={paScore}
-        setToast={setToast}
-      />
-
-      {/* ── Two-column body ────────────────────────────────────────────────────── */}
-      <div className="mx-auto flex max-w-7xl flex-col items-start gap-6 px-6 pb-20 pt-[26px] lg:flex-row lg:gap-[30px]">
-
-        {/* LEFT: Letter */}
-        <section className="w-full min-w-0 lg:flex-1">
-          <div className="mb-3 flex items-end justify-between gap-3">
-            <div>
-              <h2 className="text-[15px] font-semibold text-clinical-navy">Editable letter draft</h2>
-              <p className="mt-[3px] text-[13px] text-[#94a3b8]">
-                {viewMode === "review"
-                  ? "Underlined text links to open issues in the panel. Switch to Edit to type directly."
-                  : "Review and revise before downloading. The export includes the required AI-assisted disclaimer."}
-              </p>
-            </div>
-            <span className="shrink-0 text-[13px] font-semibold text-[#94a3b8]">
-              CPT {data.cptCode}
-            </span>
-          </div>
-          {downloadError ? (
-            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {downloadError}
-            </div>
-          ) : null}
-          {viewMode === "edit" ? (
-            <textarea
-              value={letter}
-              onChange={(e) => setLetter(e.target.value)}
-              className="w-full resize-y rounded-lg border border-clinical-line bg-white outline-none focus:border-clinical-blue focus:ring-2 focus:ring-blue-100"
-              style={{
-                minHeight: "70vh",
-                padding: "48px 56px",
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "15px",
-                lineHeight: "1.85",
-                color: "#1f2733",
-                boxShadow: "0 1px 3px rgba(15,31,51,.08), 0 14px 40px rgba(15,31,51,.08)",
-              }}
-            />
-          ) : (
-            <AnnotatedLetter
-              letter={letter}
-              basePaStrength={basePaStrength}
-              manualFixes={manualFixes}
-              onSpanClick={(key) => setExpandedCard(key)}
-            />
-          )}
-        </section>
-
-        {/* RIGHT: Attention rail */}
-        <aside
-          ref={railRef}
-          className="w-full shrink-0 lg:sticky lg:flex lg:w-[min(384px,30vw)] lg:flex-col lg:gap-4 lg:pb-10 lg:overflow-y-auto"
-          style={{
-            top: "calc(3.5rem + 62px)",
-            maxHeight: "calc(100vh - 3.5rem - 62px)",
-            scrollbarWidth: "thin",
-            scrollbarColor: "#cbd5e1 transparent",
-          }}
-        >
-          {/* PA Strength Score card */}
-          <div className="rounded-[14px] border border-slate-200 bg-gradient-to-b from-[#fbfdff] to-[#f7fafc] p-[18px]">
-            <p className="text-[10px] font-bold uppercase tracking-[.2em] text-[#94a3b8]">
-              PA Strength Score
-            </p>
-            <div className="mt-2 flex items-baseline gap-[6px]">
-              <span className={`text-[38px] font-bold leading-none ${getScoreTextClass(paScore)}`}>
-                {paScore.toFixed(1)}
-              </span>
-              <span className="text-[15px] font-semibold text-[#94a3b8]">/ 10</span>
-            </div>
-            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-200">
-              <div
-                className={`h-full rounded-full transition-[width] duration-[800ms] cubic-bezier(.2,.7,.2,1) ${getScoreBarClass(paScore)}`}
-                style={{ width: `${animatedScorePercent}%` }}
-              />
-            </div>
-            <p className={`mt-[11px] text-[13px] font-semibold ${getScoreTextClass(paScore)}`}>
-              {getScoreDescriptor(paScore)}
-            </p>
-          </div>
-
-          {/* Hard Blocks */}
-          {(data?.extracted.validation?.hard_blocks ?? []).length > 0 ? (
-            <DenialSection
-              title="Hard blocks"
-              titleColor="#991b1b"
-              items={(data.extracted.validation.hard_blocks).map((block) => ({
-                id: `hard-block-${block.field}`,
-                block,
-                type: "hard_block" as const,
-              }))}
-              denialRiskOverrides={denialRiskOverrides}
-              onRegenerate={handleRegenerateDenialFix}
-              onDismiss={handleDismissRisk}
-              onAcknowledge={handleAcknowledgeHardBlock}
-              borderColor="border-red-600"
-              bgColor="bg-red-50"
-            />
-          ) : null}
-
-          {/* Denial Risk Flags */}
-          {(data?.extracted.validation?.soft_warnings ?? []).length > 0 ? (
-            <div className="mt-4 lg:mt-0">
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-[.1em] text-[#92400e]">
-                Denial Risk Flags
-              </p>
-              <div className="flex flex-col gap-3">
-                {data.extracted.validation.soft_warnings.map((w) => {
-                  const isAcknowledged = softWarningStates[w.field] ?? false;
-                  return (
-                    <div
-                      key={w.field}
-                      className="border-l-4 border-amber-500 bg-amber-50 rounded-r-xl py-4 px-4 flex flex-col gap-[10px]"
-                    >
-                      <div className="flex items-start gap-[9px]">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-600 w-4 h-4 flex-shrink-0 mt-0.5" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
-                        <div className="min-w-0">
-                          <p className="text-[12.5px] font-bold leading-snug text-[#92400e]">{w.label}</p>
-                          <p className="mt-[3px] text-[12px] leading-[1.5] text-[#475569]">{w.message}</p>
-                        </div>
-                      </div>
-                      <div>
-                        <button
-                          type="button"
-                          onClick={() => toggleSoftWarningAcknowledged(w.field)}
-                          className={`text-xs font-medium px-3 py-1.5 rounded-md cursor-pointer transition ${
-                            isAcknowledged
-                              ? 'bg-amber-500 text-white'
-                              : 'border border-amber-300 text-amber-700 bg-white hover:bg-amber-50'
-                          }`}
-                        >
-                          {isAcknowledged ? 'Acknowledged ✓' : 'Acknowledge risk'}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {(() => {
-                const total = data.extracted.validation.soft_warnings.length;
-                return (
-                  <>
-                    {acknowledgedCount > 0 && acknowledgedCount < total ? (
-                      <p className="mt-2 text-sm text-gray-500">{acknowledgedCount} of {total} risks acknowledged</p>
-                    ) : acknowledgedCount === total ? (
-                      <p className="mt-2 text-sm text-green-600 font-medium">✓ All {total} risks acknowledged</p>
-                    ) : null}
-                    <button
-                      type="button"
-                      disabled={acknowledgedCount === 0 || isRegenerating}
-                      onClick={handleRegenerateWithWarnings}
-                      className={`mt-3 w-full rounded-md py-2.5 text-sm font-medium transition ${
-                        acknowledgedCount > 0 && !isRegenerating
-                          ? 'bg-clinical-navy text-white hover:bg-clinical-blue'
-                          : 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-40 pointer-events-none'
-                      }`}
-                    >
-                      {isRegenerating ? 'Regenerating...' : 'Regenerate letter with fixes'}
-                    </button>
-                  </>
-                );
-              })()}
-            </div>
-          ) : null}
-
-          {/* Denial Risk Flags — Flag Resolution Queue */}
-          {flagResolutions.length > 0 ? (
-            <div className="mt-4 lg:mt-0">
-              <div className="mb-2 flex items-center justify-between border-l-4 border-l-[#EF4444] pl-3">
-                <p className="text-[10px] font-bold uppercase tracking-[.1em] text-[#991b1b]">
-                  Denial risk flags
-                </p>
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                  resolvedCount === totalFlags
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-red-100 text-red-800'
-                }`}>
-                  {resolvedCount} of {totalFlags} addressed
-                </span>
-              </div>
-              <div className="flex flex-col gap-[9px]">
-                {flagResolutions.map((r) => (
-                  <div
-                    key={r.flag}
-                    className="border border-red-100 rounded-md bg-white shadow-sm p-3 space-y-2"
-                  >
-                    {/* Flag text row */}
-                    <div className="flex items-start gap-[9px]">
-                      <span className="shrink-0 mt-[1px] text-[13px] font-bold text-red-600" aria-hidden="true">!</span>
-                      <p className="text-sm text-red-800">{r.flag}</p>
-                    </div>
-                    {/* Status toggle row */}
-                    <div className="flex gap-1.5">
-                      {(
-                        [
-                          { status: 'unresolved', label: 'Unresolved' },
-                          { status: 'resolved', label: 'Resolved' },
-                          { status: 'cannot_resolve', label: "Can't resolve" },
-                        ] as { status: FlagStatus; label: string }[]
-                      ).map(({ status, label }) => {
-                        const isActive = r.status === status
-                        const activeClass =
-                          status === 'unresolved'
-                            ? 'bg-red-50 text-red-700 border border-red-200'
-                            : status === 'resolved'
-                            ? 'bg-green-50 text-green-700 border border-green-200'
-                            : 'bg-amber-50 text-amber-700 border border-amber-200'
-                        return (
-                          <button
-                            key={status}
-                            type="button"
-                            onClick={() => updateResolution(r.flag, { status })}
-                            className={`text-xs font-medium px-2.5 py-1 rounded-md cursor-pointer ${
-                              isActive ? activeClass : 'bg-white text-slate-400 border border-slate-200'
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        )
-                      })}
-                    </div>
-                    {/* Note textarea */}
-                    {r.status !== 'unresolved' ? (
-                      <textarea
-                        rows={2}
-                        value={r.note}
-                        placeholder={
-                          r.status === 'resolved'
-                            ? "Describe the correction — e.g. 'Patient completed 12 weeks PT Jan–Mar 2024, 24 sessions per attached log'"
-                            : "Explain why — e.g. 'BMI not recorded; patient declined measurement'"
-                        }
-                        onChange={(e) => updateResolution(r.flag, { note: e.target.value })}
-                        className="w-full text-sm border border-clinical-line rounded-md p-2 resize-none focus:border-clinical-blue focus:ring-2 focus:ring-blue-100 outline-none"
-                      />
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-              {/* Regenerate button */}
-              <button
-                type="button"
-                disabled={!canRegenerate || isResolutionRegenerating}
-                onClick={handleRegenerateWithResolutions}
-                className={`mt-3 w-full rounded-md py-2.5 text-sm font-medium ${
-                  canRegenerate && !isResolutionRegenerating
-                    ? 'bg-clinical-navy text-white hover:bg-clinical-blue'
-                    : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                }`}
-              >
-                {isResolutionRegenerating ? 'Regenerating...' : 'Regenerate with resolutions'}
-              </button>
-            </div>
-          ) : null}
-
-          {/* Needs attention section */}
-          {attentionItems.length > 0 ? (
-            <div className="mt-4 lg:mt-0">
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-[14px] font-bold text-clinical-navy">Needs attention</h2>
-                {openCount > 0 ? (
-                  <span className="rounded-full bg-[#fef2f2] px-[9px] py-[3px] text-[11px] font-bold text-[#dc2626]">
-                    {openCount} open
-                  </span>
-                ) : (
-                  <span className="rounded-full bg-[#f0fdf4] px-[9px] py-[3px] text-[11px] font-bold text-[#15803d]">
-                    All clear
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-col gap-[9px]">
-                {attentionItems.map((item) => (
-                  <AttentionCard
-                    key={item.id}
-                    item={item}
-                    expanded={expandedCard === item.id}
-                    onToggle={() =>
-                      setExpandedCard(expandedCard === item.id ? null : item.id)
-                    }
-                    manualFixes={manualFixes}
-                    suggestions={suggestions}
-                    isSuggesting={isSuggesting}
-                    onFixChange={updateManualFix}
-                    onApplyFix={applyResolvedFix}
-                    onSuggestFix={handleSuggestFix}
-                    onApplySuggestion={handleApplySuggestion}
-                    onDismissSuggestion={handleDismissSuggestion}
-                  />
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {/* OK factors — single-line, no expand */}
-          {okFactors.length > 0 ? (
-            <div className="mt-4 lg:mt-0">
-              <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[.1em] text-[#94a3b8]">
-                Strong factors
-              </p>
-              <div className="flex flex-col">
-                {okFactors.map((f) => {
-                  const resolved = Boolean(manualFixes[f.key]?.resolved);
-                  return (
-                    <div
-                      key={f.key}
-                      className="flex items-center gap-[9px] rounded-lg px-3 py-[8px]"
-                    >
-                      <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border border-green-200 bg-green-50 text-green-600">
-                        <svg viewBox="0 0 16 16" className="h-[10px] w-[10px]" fill="none">
-                          <path
-                            d="M3.5 8.5l3 3 6-7"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                          />
-                        </svg>
-                      </span>
-                      <span className="flex-1 text-[12.5px] font-medium text-[#334155]">
-                        {f.label}
-                      </span>
-                      <span className="text-[10.5px] font-bold text-green-600">
-                        {resolved ? "Fixed" : "OK"}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
-        </aside>
-      </div>
-
-      {/* ── Chart Data Modal ──────────────────────────────────────────────────── */}
-      {chartModalOpen ? (
-        <ChartModal
-          data={data}
-          missingFields={missingFields}
-          onClose={() => setChartModalOpen(false)}
-        />
-      ) : null}
-    </main>
-  );
-}
-
-// ─── AnnotatedLetter ──────────────────────────────────────────────────────────
-
-function AnnotatedLetter({
-  letter,
-  basePaStrength,
-  manualFixes,
-  onSpanClick,
-}: {
-  letter: string;
-  basePaStrength: ExtractedChartData["pa_strength"] | undefined;
-  manualFixes: ManualFixes;
-  onSpanClick: (factorKey: PaStrengthFactorKey) => void;
-}) {
-  type Annotation = {
-    start: number;
-    end: number;
-    factorKey: PaStrengthFactorKey;
-    resolved: boolean;
-  };
-
-  const annotations: Annotation[] = [];
-  const lowerLetter = letter.toLowerCase();
-
-  for (const factor of paStrengthFactors) {
-    const baseScore = basePaStrength?.[factor.key]?.score ?? 0;
-    if (baseScore === 1) continue; // OK factor — no annotation
-    if (!factor.anchor) continue;
-
-    const resolved = Boolean(manualFixes[factor.key]?.resolved);
-    const lowerAnchor = factor.anchor.toLowerCase();
-    let pos = 0;
-    for (let guard = 0; guard < 30; guard++) {
-      const idx = lowerLetter.indexOf(lowerAnchor, pos);
-      if (idx === -1) break;
-      annotations.push({
-        start: idx,
-        end: idx + factor.anchor.length,
-        factorKey: factor.key,
-        resolved,
-      });
-      pos = idx + factor.anchor.length;
-    }
-  }
-
-  // Sort by position and remove overlaps
-  annotations.sort((a, b) => a.start - b.start);
-  const filtered: Annotation[] = [];
-  let lastEnd = 0;
-  for (const anno of annotations) {
-    if (anno.start >= lastEnd) {
-      filtered.push(anno);
-      lastEnd = anno.end;
-    }
-  }
-
-  // Build React nodes from runs
-  const nodes: React.ReactNode[] = [];
-  let cursor = 0;
-  for (let i = 0; i < filtered.length; i++) {
-    const anno = filtered[i];
-    if (cursor < anno.start) {
-      nodes.push(<span key={`t${i}`}>{letter.slice(cursor, anno.start)}</span>);
-    }
-    const underlineColor = anno.resolved ? "#16A34A" : "#D97706";
-    const underlineStyle = anno.resolved ? "solid" : "dashed";
-    nodes.push(
-      <span
-        key={`a${i}`}
-        style={{
-          borderBottom: `2px ${underlineStyle} ${underlineColor}`,
-          cursor: "pointer",
-          borderRadius: "2px",
-          padding: "0 1px",
-          transition: "background .12s",
-        }}
-        onClick={() => onSpanClick(anno.factorKey)}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") onSpanClick(anno.factorKey);
-        }}
-      >
-        {letter.slice(anno.start, anno.end)}
-      </span>
-    );
-    cursor = anno.end;
-  }
-  if (cursor < letter.length) {
-    nodes.push(<span key="tLast">{letter.slice(cursor)}</span>);
-  }
-
-  return (
-    <div
-      style={{
-        background: "#fff",
-        borderRadius: "8px",
-        boxShadow: "0 1px 3px rgba(15,31,51,.08), 0 14px 40px rgba(15,31,51,.08)",
-        padding: "48px 56px",
-        fontFamily: "Georgia, 'Times New Roman', serif",
-        fontSize: "15px",
-        lineHeight: "1.85",
-        color: "#1f2733",
-        whiteSpace: "pre-wrap",
-        minHeight: "70vh",
-      }}
-    >
-      {nodes}
+      <style>{`
+        @keyframes fadeSlideIn {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
 
-// ─── AttentionCard ────────────────────────────────────────────────────────────
+// ─── StreamCard ───────────────────────────────────────────────────────────────
 
-function AttentionCard({
+function StreamCard({
   item,
-  expanded,
-  onToggle,
-  manualFixes,
-  suggestions,
+  activeIssue,
+  fixDraft,
   isSuggesting,
+  onToggle,
+  onHoverEnter,
+  onHoverLeave,
   onFixChange,
-  onApplyFix,
   onSuggestFix,
-  onApplySuggestion,
-  onDismissSuggestion,
+  onApplyFix,
+  onAcknowledge,
 }: {
-  item: GapItem;
-  expanded: boolean;
+  item: AttentionItem;
+  activeIssue: string | null;
+  fixDraft: string;
+  isSuggesting: boolean;
   onToggle: () => void;
-  manualFixes: ManualFixes;
-  suggestions: Suggestions;
-  isSuggesting: SuggestionLoading;
-  onFixChange: (key: PaStrengthFactorKey, value: string) => void;
-  onApplyFix: (key: PaStrengthFactorKey, value: string, source?: ManualFix["source"]) => void;
-  onSuggestFix: (key: PaStrengthFactorKey, label: string) => void;
-  onApplySuggestion: (key: PaStrengthFactorKey) => void;
-  onDismissSuggestion: (key: PaStrengthFactorKey) => void;
+  onHoverEnter: () => void;
+  onHoverLeave: () => void;
+  onFixChange: (v: string) => void;
+  onSuggestFix: () => void;
+  onApplyFix: () => void;
+  onAcknowledge: () => void;
 }) {
-  const isDone = item.done;
+  const isOpen = activeIssue === item.id;
+  const itemColor = item.done ? '#16a34a' : item.kind === 'fix' ? '#d97706' : '#dc2626';
 
-  const statusColor = isDone ? "#16a34a" : "#d97706";
-  const borderColor = expanded ? statusColor : isDone ? "#bbf7d0" : "#fde68a";
-  const iconBg = isDone
-    ? "bg-green-50 border-green-200 text-green-600"
-    : "bg-amber-50 border-amber-200 text-amber-600";
+  const iconContent = item.done ? '✓' : item.kind === 'fix' ? '▲' : '!';
+  const iconStyle: React.CSSProperties = item.done
+    ? { background: '#ecfdf3', color: '#16a34a' }
+    : item.kind === 'fix'
+    ? { background: '#fffbeb', color: '#d97706' }
+    : { background: '#fef2f2', color: '#dc2626' };
 
-  const fixValue = manualFixes[item.factorKey]?.value ?? "";
-  const resolved = Boolean(manualFixes[item.factorKey]?.resolved);
-  const suggestion = suggestions[item.factorKey] ?? "";
-  const suggesting = Boolean(isSuggesting[item.factorKey]);
+  const kindLabel = item.done ? 'Done' : item.kind === 'fix' ? 'Fixable' : 'Risk';
 
   return (
     <div
-      data-card-id={item.id}
+      id={'rail-card-' + item.id}
+      onMouseEnter={onHoverEnter}
+      onMouseLeave={onHoverLeave}
       style={{
-        border: `1px solid ${borderColor}`,
-        borderRadius: "12px",
-        overflow: "hidden",
-        background: "#fff",
-        transition: "border-color .15s",
-        boxShadow: expanded ? "0 6px 18px rgba(15,31,51,.06)" : "none",
+        border: `1px solid ${isOpen ? itemColor : item.done ? '#bbf7d0' : '#e2e8f0'}`,
+        borderRadius: 12,
+        marginBottom: 9,
+        overflow: 'hidden',
+        transition: 'border-color 0.15s',
+        background: '#fff',
       }}
     >
-      {/* Card header */}
+      {/* Card header button */}
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-start gap-[10px] text-left"
         style={{
-          padding: "12px 13px",
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          fontFamily: "inherit",
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 11,
+          padding: '13px 14px',
+          width: '100%',
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          textAlign: 'left',
+          fontFamily: 'inherit',
         }}
       >
         <span
-          className={`mt-[1px] flex h-5 w-5 shrink-0 items-center justify-center rounded-[7px] border text-[11px] font-bold ${iconBg}`}
-          aria-hidden="true"
+          style={{
+            ...iconStyle,
+            width: 22,
+            height: 22,
+            borderRadius: 7,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 11,
+            fontWeight: 700,
+            flexShrink: 0,
+            marginTop: 1,
+          }}
         >
-          {isDone ? "✓" : "△"}
+          {iconContent}
         </span>
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="flex items-center gap-2">
-            <span className="truncate text-[13.5px] font-semibold text-clinical-navy">
-              {item.label}
-            </span>
-            <span
-              className="shrink-0 text-[9.5px] font-bold uppercase tracking-[.06em]"
-              style={{ color: statusColor }}
-            >
-              {isDone ? "Done" : "Gap"}
+        <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 13.5, fontWeight: 600, color: '#1E3A5F' }}>{item.label}</span>
+            <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: itemColor }}>
+              {kindLabel}
             </span>
           </span>
-          <span className="mt-[3px] line-clamp-2 text-[12px] leading-[1.45] text-[#64748b]">
+          <span style={{ fontSize: 12, color: '#64748b', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
             {item.note}
           </span>
         </span>
         <span
-          className="mt-[3px] shrink-0 text-[14px] text-[#cbd5e1]"
           style={{
-            transform: expanded ? "rotate(90deg)" : "none",
-            transition: "transform .15s",
+            color: '#cbd5e1',
+            fontSize: 14,
+            marginTop: 3,
+            flexShrink: 0,
+            transform: isOpen ? 'rotate(90deg)' : 'none',
+            transition: 'transform 0.15s',
           }}
-          aria-hidden="true"
         >
           ›
         </span>
       </button>
 
-      {/* Expanded body */}
-      {expanded ? (
+      {/* Expanded detail */}
+      {isOpen && (
         <div
           style={{
-            borderTop: "1px solid #eef2f7",
-            padding: "13px",
-            background: "#fbfdff",
-            display: "flex",
-            flexDirection: "column",
-            gap: "11px",
+            borderTop: '1px solid #eef2f7',
+            padding: 14,
+            background: '#fbfdff',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
           }}
         >
-          <>
-              {/* Why payers flag this */}
-              <div>
-                <p className="mb-1 text-[10px] font-bold uppercase tracking-[.08em] text-amber-600">
-                  Why payers flag this
-                </p>
-                <p className="text-[12.5px] leading-[1.6] text-[#475569]">{item.note}</p>
-              </div>
-
-              {resolved ? (
-                <div className="flex items-center gap-2 rounded-[9px] border border-green-200 bg-green-50 px-3 py-[9px]">
-                  <span className="text-[13px] font-bold text-green-600">✓</span>
-                  <span className="text-[12px] font-semibold text-[#15803d]">
-                    Fix applied — regenerate the letter to fold it in
-                  </span>
-                </div>
-              ) : (
-                <>
-                  {/* Fix textarea */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-[.08em] text-[#94a3b8]">
-                      Your fix
-                    </label>
-                    <textarea
-                      value={fixValue}
-                      placeholder={item.placeholder}
-                      onChange={(e) => onFixChange(item.factorKey, e.target.value)}
-                      className="resize-y rounded-[9px] border border-slate-200 px-[10px] py-[10px] text-[12.5px] leading-[1.55] text-[#334155] outline-none focus:border-clinical-blue focus:ring-1 focus:ring-blue-100"
-                      style={{ width: "100%", minHeight: "76px", fontFamily: "inherit" }}
-                    />
-                  </div>
-
-                  {/* Action buttons */}
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onSuggestFix(item.factorKey, item.label)}
-                      disabled={suggesting}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-semibold text-[#1d4f7a] transition hover:border-slate-300 disabled:cursor-not-allowed disabled:text-slate-400"
-                    >
-                      {suggesting ? "Suggesting..." : "✦ Suggest fix"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onApplyFix(item.factorKey, fixValue)}
-                      disabled={!fixValue.trim()}
-                      className="flex-1 rounded-lg border-none bg-clinical-navy px-3 py-2 text-[12px] font-semibold text-white transition hover:bg-clinical-blue disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
-                    >
-                      Apply fix →
-                    </button>
-                  </div>
-
-                  {/* Suggestion card */}
-                  {suggestion ? (
-                    <div className="flex flex-col gap-[9px] rounded-[10px] border border-blue-200 bg-[#eff6ff] p-3">
-                      <p className="text-[10px] font-bold uppercase tracking-[.08em] text-[#3b82f6]">
-                        Suggestion
-                      </p>
-                      <p className="text-[12.5px] leading-[1.6] text-[#1e40af]">{suggestion}</p>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => onApplySuggestion(item.factorKey)}
-                          className="rounded-lg bg-clinical-navy px-[14px] py-[7px] text-[12px] font-semibold text-white transition hover:bg-clinical-blue"
-                        >
-                          Apply fix
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onDismissSuggestion(item.factorKey)}
-                          className="rounded-lg border border-slate-200 bg-white px-[14px] py-[7px] text-[12px] font-semibold text-[#475569] transition hover:border-slate-300"
-                        >
-                          Dismiss
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-                </>
-              )}
-            </>
+          {item.kind === 'fix' ? (
+            <FixDetail
+              item={item}
+              fixDraft={fixDraft}
+              isSuggesting={isSuggesting}
+              isResolved={item.done}
+              onFixChange={onFixChange}
+              onSuggestFix={onSuggestFix}
+              onApplyFix={onApplyFix}
+            />
+          ) : (
+            <RiskDetail
+              item={item}
+              isAcknowledged={item.done}
+              onAcknowledge={onAcknowledge}
+            />
+          )}
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
 
-// ─── DenialSection (hard blocks + soft warnings) ─────────────────────────────
+// ─── FixDetail ────────────────────────────────────────────────────────────────
 
-function DenialSection({
-  title,
-  titleColor,
-  items,
-  denialRiskOverrides,
-  onRegenerate,
-  onDismiss,
+function FixDetail({
+  item,
+  fixDraft,
+  isSuggesting,
+  isResolved,
+  onFixChange,
+  onSuggestFix,
+  onApplyFix,
+}: {
+  item: AttentionItem;
+  fixDraft: string;
+  isSuggesting: boolean;
+  isResolved: boolean;
+  onFixChange: (v: string) => void;
+  onSuggestFix: () => void;
+  onApplyFix: () => void;
+}) {
+  return (
+    <>
+      <div>
+        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#b45309', margin: '0 0 4px' }}>
+          Why payers flag this
+        </p>
+        <p style={{ fontSize: 12.5, lineHeight: 1.6, color: '#475569', margin: 0 }}>{item.note}</p>
+      </div>
+
+      {isResolved ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderRadius: 9, border: '1px solid #bbf7d0', background: '#f0fdf4', padding: '9px 12px' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#16a34a' }}>✓</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#15803d' }}>Fix applied — regenerate the letter to fold it in</span>
+        </div>
+      ) : (
+        <>
+          <textarea
+            value={fixDraft}
+            onChange={e => onFixChange(e.target.value)}
+            placeholder={item.placeholder ?? 'Add the missing documentation, or paste from the chart…'}
+            style={{
+              minHeight: 84,
+              resize: 'vertical',
+              border: '1px solid #e2e8f0',
+              borderRadius: 9,
+              padding: 10,
+              fontSize: 12.5,
+              fontFamily: 'inherit',
+              width: '100%',
+              boxSizing: 'border-box',
+              outline: 'none',
+              color: '#334155',
+            }}
+          />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              onClick={onSuggestFix}
+              disabled={isSuggesting}
+              style={{
+                border: '1px solid #e2e8f0',
+                background: '#fff',
+                borderRadius: 8,
+                padding: '8px 12px',
+                fontSize: 12,
+                fontWeight: 600,
+                color: '#1d4f7a',
+                cursor: isSuggesting ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              {isSuggesting ? 'Suggesting…' : '✦ Suggest fix'}
+            </button>
+            <button
+              type="button"
+              onClick={onApplyFix}
+              disabled={!fixDraft.trim()}
+              style={{
+                flex: 1,
+                background: fixDraft.trim() ? '#1E3A5F' : '#e2e8f0',
+                color: fixDraft.trim() ? '#fff' : '#94a3b8',
+                border: 'none',
+                borderRadius: 8,
+                padding: '8px 12px',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: fixDraft.trim() ? 'pointer' : 'not-allowed',
+                fontFamily: 'inherit',
+              }}
+            >
+              Apply fix
+            </button>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+// ─── RiskDetail ───────────────────────────────────────────────────────────────
+
+function RiskDetail({
+  item,
+  isAcknowledged,
   onAcknowledge,
-  borderColor,
-  bgColor,
 }: {
-  title: string;
-  titleColor: string;
-  items: Array<{ id: string; block: ValidationBlock; type: "hard_block" | "soft_warning" }>;
-  denialRiskOverrides: Record<string, DenialOverride>;
-  onRegenerate: (id: string, fieldOrFlag: string, type: "soft_warning" | "hard_block" | "denial_flag") => Promise<void>;
-  onDismiss: (id: string) => void;
-  onAcknowledge: (field: string) => void;
-  borderColor: string;
-  bgColor: string;
+  item: AttentionItem;
+  isAcknowledged: boolean;
+  onAcknowledge: () => void;
 }) {
-  const visible = items.filter((i) => !denialRiskOverrides[i.id]?.isDismissed);
-  if (visible.length === 0) return null;
-
   return (
-    <div className="mt-4 lg:mt-0">
-      <p className="mb-2 text-[10px] font-bold uppercase tracking-[.1em]" style={{ color: titleColor }}>
-        {title}
-      </p>
-      <div className="flex flex-col gap-[9px]">
-        {visible.map(({ id, block, type }) => {
-          const isRegen = denialRiskOverrides[id]?.regenerationInProgress ?? false;
-          const isAcknowledged = denialRiskOverrides[id]?.isDismissed ?? false;
-          return (
-            <div
-              key={id}
-              className={`border-l-4 ${borderColor} ${bgColor} rounded-r-xl p-[14px] flex flex-col gap-[10px]`}
-            >
-              <div className="flex items-start gap-[9px]">
-                <span className="shrink-0 mt-[1px] text-[13px]" aria-hidden="true">
-                  {type === "hard_block" ? "⚠️" : "!"}
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[12.5px] font-bold leading-snug" style={{ color: titleColor }}>
-                    {block.label}
-                  </p>
-                  <p className="mt-[3px] text-[12px] leading-[1.5] text-[#475569]">
-                    {block.message}
-                  </p>
-                </div>
-              </div>
-              {isAcknowledged ? (
-                <span className="text-[11.5px] font-semibold text-green-700">✓ Acknowledged</span>
-              ) : type === "hard_block" ? (
-                <button
-                  type="button"
-                  onClick={() => onAcknowledge(block.field)}
-                  className="self-start rounded-lg border border-red-300 bg-white px-3 py-[7px] text-[12px] font-semibold text-[#991b1b] transition hover:bg-red-50"
-                >
-                  Acknowledge
-                </button>
-              ) : (
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onRegenerate(id, block.label, type)}
-                    disabled={isRegen}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#15803d] px-3 py-[7px] text-[12px] font-semibold text-white transition hover:bg-[#166534] disabled:cursor-not-allowed disabled:bg-slate-300"
-                  >
-                    {isRegen ? (
-                      <>
-                        <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                        </svg>
-                        Regenerating…
-                      </>
-                    ) : (
-                      "Regenerate letter addressing this"
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDismiss(id)}
-                    disabled={isRegen}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-[7px] text-[12px] font-semibold text-[#475569] transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed"
-                  >
-                    Dismiss
-                  </button>
-                </div>
-              )}
-            </div>
-          );
-        })}
+    <>
+      <div>
+        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#b91c1c', margin: '0 0 4px' }}>
+          Payer risk
+        </p>
+        <p style={{ fontSize: 12.5, lineHeight: 1.6, color: '#475569', margin: 0 }}>{item.note}</p>
       </div>
-    </div>
-  );
-}
 
-// ─── DenialFlagsSection ───────────────────────────────────────────────────────
-
-function DenialFlagsSection({
-  flags,
-  denialRiskOverrides,
-  onRegenerate,
-  onDismiss,
-}: {
-  flags: string[];
-  denialRiskOverrides: Record<string, DenialOverride>;
-  onRegenerate: (id: string, fieldOrFlag: string, type: "soft_warning" | "hard_block" | "denial_flag") => Promise<void>;
-  onDismiss: (id: string) => void;
-}) {
-  const visible = flags
-    .map((flag, i) => ({ flag, id: `risk-${i}` }))
-    .filter(({ id }) => !denialRiskOverrides[id]?.isDismissed);
-
-  if (visible.length === 0) return null;
-
-  return (
-    <div className="mt-4 lg:mt-0">
-      <p className="mb-2 text-[10px] font-bold uppercase tracking-[.1em] text-[#991b1b]">
-        Denial risk flags
-      </p>
-      <div className="flex flex-col gap-[9px]">
-        {visible.map(({ flag, id }) => {
-          const isRegen = denialRiskOverrides[id]?.regenerationInProgress ?? false;
-          return (
-            <div
-              key={id}
-              className="border-l-4 border-red-500 bg-red-50 rounded-r-xl p-[14px] flex flex-col gap-[10px]"
-            >
-              <div className="flex items-start gap-[9px]">
-                <span className="shrink-0 mt-[1px] text-[13px] font-bold text-red-600" aria-hidden="true">
-                  !
-                </span>
-                <p className="text-[12.5px] leading-[1.5] text-[#7f1d1d]">{flag}</p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => onRegenerate(id, flag, "denial_flag")}
-                  disabled={isRegen}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#15803d] px-3 py-[7px] text-[12px] font-semibold text-white transition hover:bg-[#166534] disabled:cursor-not-allowed disabled:bg-slate-300"
-                >
-                  {isRegen ? (
-                    <>
-                      <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                      </svg>
-                      Regenerating…
-                    </>
-                  ) : (
-                    "Regenerate letter addressing this"
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDismiss(id)}
-                  disabled={isRegen}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-[7px] text-[12px] font-semibold text-[#475569] transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed"
-                >
-                  Override
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ─── ChartModal ───────────────────────────────────────────────────────────────
-
-function ChartModal({
-  data,
-  missingFields,
-  onClose,
-}: {
-  data: ReviewData;
-  missingFields: string[];
-  onClose: () => void;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,.4)] p-10"
-      onClick={onClose}
-    >
-      <div
-        className="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-[0_32px_80px_rgba(15,31,51,.35)]"
-        onClick={(e) => e.stopPropagation()}
-        style={{ animation: "chartModalPop .2s ease" }}
-      >
-        {/* Modal header */}
-        <div className="flex shrink-0 items-center gap-3 border-b border-[#eef2f7] px-[22px] py-4">
-          <h2 className="text-base font-semibold text-clinical-navy">Chart Data</h2>
-          <span className="text-sm text-[#94a3b8]">Extracted from uploaded chart</span>
-          {missingFields.length > 0 ? (
-            <WarningBadge>{missingFields.length} missing</WarningBadge>
-          ) : null}
-          <button
-            type="button"
-            onClick={onClose}
-            className="ml-auto text-xl leading-none text-[#94a3b8] transition hover:text-slate-700"
-            aria-label="Close chart data"
-          >
-            ×
-          </button>
+      {item.addendum && (
+        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 9, padding: '10px 12px' }}>
+          <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', margin: '0 0 4px' }}>
+            Suggested chart addendum
+          </p>
+          <p style={{ fontSize: 12, lineHeight: 1.55, color: '#475569', fontStyle: 'italic', margin: 0 }}>
+            {item.addendum}
+          </p>
         </div>
-        {/* Modal body */}
-        <div
-          className="flex min-h-0 flex-1 flex-col gap-[15px] overflow-y-auto px-[22px] py-5"
-          style={{ scrollbarWidth: "thin", scrollbarColor: "#cbd5e1 transparent" }}
+      )}
+
+      {isAcknowledged ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderRadius: 9, border: '1px solid #bbf7d0', background: '#f0fdf4', padding: '9px 12px' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#16a34a' }}>✓</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#15803d' }}>Reviewed</span>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={onAcknowledge}
+          style={{
+            alignSelf: 'flex-start',
+            border: '1px solid #e2e8f0',
+            background: '#fff',
+            borderRadius: 8,
+            padding: '8px 14px',
+            fontSize: 12,
+            fontWeight: 600,
+            color: '#475569',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
         >
-          <DataRow label="Patient name" value={data.extracted.patient_name} copyable />
-          <DataRow label="Date of birth" value={data.extracted.date_of_birth} copyable />
-          <DataRow label="Diagnosis codes" value={data.extracted.diagnosis_codes} copyable />
-          <DataRow label="Primary complaint" value={data.extracted.primary_complaint} copyable />
-          <DataRow label="Symptom duration" value={data.extracted.symptom_duration} copyable />
-          <DataRow label="Requested procedure" value={data.extracted.requested_procedure} copyable />
-          <DataRow
-            label="Surgical approach"
-            value={data.extracted.surgical_approach_if_mentioned}
-          />
-          <DataRow
-            label="Imaging findings"
-            value={
-              data.extracted.imaging_findings
-                ? `${data.extracted.imaging_findings.modality ?? "Unknown modality"}: ${data.extracted.imaging_findings.key_findings ?? "Missing findings"}`
-                : null
-            }
-          />
-          <DataRow
-            label="Objective measurements"
-            value={
-              data.extracted.objective_measurements?.length
-                ? data.extracted.objective_measurements
-                : null
-            }
-          />
-          <DataRow
-            label="Functional limitations"
-            value={data.extracted.functional_limitations}
-            copyable
-          />
-          <Treatments treatments={data.extracted.conservative_treatments_attempted} />
-        </div>
-      </div>
-    </div>
+          Mark as reviewed
+        </button>
+      )}
+    </>
   );
 }
 
@@ -1569,409 +1084,113 @@ function FeedbackWidget({
   cptCode: string;
   payerName: string;
   paScore: number;
-  setToast: (message: string | null) => void;
+  setToast: (msg: string) => void;
 }) {
-  const [outcome, setOutcome] = useState<"approved" | "denied" | "pending" | null>(null);
-  const [denialReason, setDenialReason] = useState("");
+  const [outcome, setOutcome] = useState<'approved' | 'denied' | 'pending' | null>(null);
+  const [denialReason, setDenialReason] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(
-    selectedOutcome: "approved" | "denied" | "pending",
-    reason?: string
-  ) {
+  async function handleSubmit(selectedOutcome: 'approved' | 'denied' | 'pending', reason?: string) {
     setIsSubmitting(true);
     setError(null);
     try {
-      const response = await fetch("/api/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          cptCode,
-          payerName,
-          outcome: selectedOutcome,
-          denialReason: reason || null,
-          paScore,
-        }),
+      const res = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cptCode, payerName, outcome: selectedOutcome, denialReason: reason || null, paScore }),
       });
-      if (!response.ok) {
-        const errPayload = (await response.json()) as { error?: string };
-        throw new Error(errPayload.error ?? "Failed to submit feedback.");
+      if (!res.ok) {
+        const e = await res.json() as { error?: string };
+        throw new Error(e.error ?? 'Failed to submit feedback.');
       }
       setSubmitted(true);
-      setToast("Thanks — your feedback helps improve Greenlit MD.");
+      setToast('Thanks — your feedback helps improve Greenlit MD.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit feedback.");
+      setError(err instanceof Error ? err.message : 'Failed to submit feedback.');
     } finally {
       setIsSubmitting(false);
     }
   }
 
+  const btnBase: React.CSSProperties = {
+    border: '1px solid #e2e8f0',
+    borderRadius: 8,
+    padding: '5px 11px',
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+  };
+
   if (submitted) {
     return (
-      <div className="border-b border-[#eef1f5] bg-[#f8fafc] px-6 py-[10px]">
-        <div className="mx-auto max-w-7xl text-sm font-semibold text-slate-700">
-          Thanks — your feedback helps improve Greenlit MD.
-        </div>
-      </div>
+      <p style={{ fontSize: 13, fontWeight: 600, color: '#475569', margin: 0 }}>
+        Thanks — your feedback helps improve Greenlit MD.
+      </p>
     );
   }
 
   return (
-    <div className="border-b border-[#eef1f5] bg-[#f8fafc] px-6 py-[10px]">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-sm font-semibold text-clinical-navy">
-            Did this PA get approved?
-          </span>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={isSubmitting || (outcome !== null && outcome !== "approved")}
-              onClick={() => {
-                setOutcome("approved");
-                handleSubmit("approved");
-              }}
-              className={`rounded-md border border-clinical-line px-[11px] py-[5px] text-xs font-semibold transition-colors ${
-                outcome === "approved"
-                  ? "bg-clinical-navy text-white"
-                  : "bg-white text-[#334155] hover:bg-slate-50"
-              } disabled:cursor-not-allowed disabled:opacity-50`}
-            >
-              ✓ Approved
-            </button>
-            <button
-              type="button"
-              disabled={isSubmitting || (outcome !== null && outcome !== "denied")}
-              onClick={() => setOutcome("denied")}
-              className={`rounded-md border border-clinical-line px-[11px] py-[5px] text-xs font-semibold transition-colors ${
-                outcome === "denied"
-                  ? "bg-clinical-navy text-white"
-                  : "bg-white text-[#334155] hover:bg-slate-50"
-              } disabled:cursor-not-allowed disabled:opacity-50`}
-            >
-              ✗ Denied
-            </button>
-            <button
-              type="button"
-              disabled={isSubmitting || (outcome !== null && outcome !== "pending")}
-              onClick={() => {
-                setOutcome("pending");
-                handleSubmit("pending");
-              }}
-              className={`rounded-md border border-clinical-line px-[11px] py-[5px] text-xs font-semibold transition-colors ${
-                outcome === "pending"
-                  ? "bg-clinical-navy text-white"
-                  : "bg-white text-[#334155] hover:bg-slate-50"
-              } disabled:cursor-not-allowed disabled:opacity-50`}
-            >
-              ⏳ Pending
-            </button>
-          </div>
-        </div>
-
-        {outcome === "denied" ? (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSubmit("denied", denialReason);
+    <div>
+      <p style={{ fontSize: 12, fontWeight: 700, color: '#1E3A5F', marginBottom: 10 }}>Did this PA get approved?</p>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {(['approved', 'denied', 'pending'] as const).map(o => (
+          <button
+            key={o}
+            type="button"
+            disabled={isSubmitting}
+            onClick={() => {
+              setOutcome(o);
+              if (o !== 'denied') handleSubmit(o);
             }}
-            className="mt-2 flex flex-1 items-center gap-2 md:ml-4 md:mt-0"
+            style={{
+              ...btnBase,
+              background: outcome === o ? '#1E3A5F' : '#fff',
+              color: outcome === o ? '#fff' : '#334155',
+            }}
           >
-            <label
-              htmlFor="denial-reason-input"
-              className="whitespace-nowrap text-xs font-semibold text-clinical-navy"
-            >
-              Denial reason (optional):
-            </label>
-            <input
-              id="denial-reason-input"
-              type="text"
-              placeholder="e.g. Missing conservative treatment details"
-              value={denialReason}
-              disabled={isSubmitting}
-              onChange={(e) => setDenialReason(e.target.value)}
-              className="max-w-xs flex-1 rounded border border-clinical-line bg-white px-3 py-1 text-xs font-medium text-slate-800 outline-none focus:border-clinical-blue focus:ring-1 focus:ring-blue-100"
-            />
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="rounded bg-clinical-navy px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-clinical-blue disabled:opacity-50"
-            >
-              {isSubmitting ? "Submitting..." : "Submit"}
+            {o === 'approved' ? '✓ Approved' : o === 'denied' ? '✗ Denied' : '⏳ Pending'}
+          </button>
+        ))}
+      </div>
+      {outcome === 'denied' && !submitted && (
+        <form
+          onSubmit={e => { e.preventDefault(); handleSubmit('denied', denialReason); }}
+          style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}
+        >
+          <input
+            type="text"
+            placeholder="Denial reason (optional)"
+            value={denialReason}
+            onChange={e => setDenialReason(e.target.value)}
+            disabled={isSubmitting}
+            style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '7px 10px', fontSize: 12, fontFamily: 'inherit', outline: 'none' }}
+          />
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button type="submit" disabled={isSubmitting} style={{ ...btnBase, background: '#1E3A5F', color: '#fff', border: 'none' }}>
+              {isSubmitting ? 'Submitting…' : 'Submit'}
             </button>
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={() => {
-                setOutcome(null);
-                setError(null);
-              }}
-              className="rounded border border-clinical-line bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
-            >
+            <button type="button" onClick={() => { setOutcome(null); setError(null); }} style={btnBase}>
               Cancel
             </button>
-          </form>
-        ) : null}
-
-        {error ? (
-          <div className="flex items-center gap-2 text-xs font-semibold text-red-600">
-            <span>Error: {error}</span>
-            <button
-              type="button"
-              onClick={() => {
-                if (outcome) handleSubmit(outcome, outcome === "denied" ? denialReason : undefined);
-              }}
-              className="font-semibold text-clinical-blue underline hover:text-clinical-navy"
-            >
-              Retry
-            </button>
           </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-// ─── DataRow ──────────────────────────────────────────────────────────────────
-
-function DataRow({
-  label,
-  value,
-  copyable,
-}: {
-  label: string;
-  value: string | string[] | null;
-  copyable?: boolean;
-}) {
-  const isMissing = value === null || (Array.isArray(value) && value.length === 0);
-  const [copied, setCopied] = useState(false);
-
-  function handleCopy() {
-    const textToCopy = Array.isArray(value) ? value.join(", ") : (value ?? "");
-    navigator.clipboard.writeText(textToCopy).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    });
-  }
-
-  return (
-    <div className="border-l-2 border-clinical-navy py-1 pl-3">
-      <div className="flex items-center justify-between gap-3">
-        <dt className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#94A3B8]">
-          {label}
-        </dt>
-        <div className="flex items-center gap-1.5">
-          {!isMissing && copyable ? (
-            <button
-              type="button"
-              onClick={handleCopy}
-              aria-label={copied ? "Copied" : `Copy ${label}`}
-              className="flex h-5 w-5 items-center justify-center rounded text-slate-400 transition-colors hover:text-slate-700 focus:outline-none"
-            >
-              {copied ? (
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path
-                    d="M3.5 8.5l3 3 6-7"
-                    stroke="#16A34A"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <rect x="5" y="1" width="9" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
-                  <path
-                    d="M3 5H2a1 1 0 00-1 1v8a1 1 0 001 1h8a1 1 0 001-1v-1"
-                    stroke="currentColor"
-                    strokeWidth="1.4"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              )}
-            </button>
-          ) : null}
-          {isMissing ? <WarningBadge>Missing</WarningBadge> : null}
-        </div>
-      </div>
-      <dd className="mt-1 text-sm leading-6 text-slate-800">
-        {Array.isArray(value)
-          ? value.length
-            ? value.join("; ")
-            : "Not found"
-          : (value ?? "Not found")}
-      </dd>
-    </div>
-  );
-}
-
-// ─── Treatments ───────────────────────────────────────────────────────────────
-
-function Treatments({
-  treatments,
-}: {
-  treatments: ExtractedChartData["conservative_treatments_attempted"];
-}) {
-  return (
-    <div className="border-l-2 border-clinical-navy py-1 pl-3">
-      <div className="flex items-center justify-between gap-3">
-        <dt className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#94A3B8]">
-          Conservative treatments
-        </dt>
-        {treatments.length === 0 ? <WarningBadge>Missing</WarningBadge> : null}
-      </div>
-      {treatments.length ? (
-        <div className="mt-2 space-y-2">
-          {treatments.map((treatment, index) => (
-            <div
-              key={`${treatment.treatment}-${index}`}
-              className="rounded-[9px] bg-[#f8fafc] border border-[#eef2f7] px-3 py-[10px] text-sm leading-6"
-            >
-              {treatment.treatment ? (
-                <p className="font-bold text-slate-800">{treatment.treatment}</p>
-              ) : (
-                <p className="font-semibold italic text-slate-400">Unknown Treatment</p>
-              )}
-              <p className="text-slate-600">Duration: {treatment.duration ?? "Not found"}</p>
-              <p className="text-slate-600">Dates: {treatment.dates ?? "Not found"}</p>
-              <div className="mt-1 flex items-center gap-2 text-slate-600">
-                <span>Outcome:</span>
-                <OutcomeBadge outcome={treatment.outcome} />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <dd className="mt-1 text-sm text-slate-800">Not found</dd>
+        </form>
       )}
+      {error && <p style={{ fontSize: 12, color: '#dc2626', marginTop: 6 }}>{error}</p>}
     </div>
-  );
-}
-
-// ─── OutcomeBadge / WarningBadge ─────────────────────────────────────────────
-
-function OutcomeBadge({ outcome }: { outcome: string | null }) {
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${getOutcomeBadgeClass(outcome)}`}>
-      {outcome ?? "Not found"}
-    </span>
-  );
-}
-
-function getOutcomeBadgeClass(outcome: string | null) {
-  const n = outcome?.toLowerCase() ?? "";
-  if (n.includes("improved")) return "bg-green-100 text-green-700";
-  if (n.includes("failed")) return "bg-red-100 text-red-700";
-  if (n.includes("partial relief")) return "bg-yellow-100 text-yellow-800";
-  return "bg-slate-100 text-slate-600";
-}
-
-function WarningBadge({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-700">
-      {children}
-    </span>
   );
 }
 
 // ─── Pure helpers ─────────────────────────────────────────────────────────────
 
-function findMissingFields(extracted: ExtractedChartData) {
-  const missing: string[] = [];
-  const fields: Array<[string, string | string[] | null]> = [
-    ["patient_name", extracted.patient_name],
-    ["date_of_birth", extracted.date_of_birth],
-    ["diagnosis_codes", extracted.diagnosis_codes],
-    ["primary_complaint", extracted.primary_complaint],
-    ["symptom_duration", extracted.symptom_duration],
-    ["functional_limitations", extracted.functional_limitations],
-    ["requested_procedure", extracted.requested_procedure],
-    ["surgical_approach_if_mentioned", extracted.surgical_approach_if_mentioned],
-  ];
-  fields.forEach(([field, value]) => {
-    if (value === null || (Array.isArray(value) && value.length === 0)) missing.push(field);
-  });
-  if (!extracted.imaging_findings?.modality || !extracted.imaging_findings.key_findings) {
-    missing.push("imaging_findings");
-  }
-  if (!extracted.conservative_treatments_attempted.length) {
-    missing.push("conservative_treatments_attempted");
-  }
-  return missing;
-}
-
 function buildDownloadName(patientName: string | null, cptCode: string) {
-  const safePatient = (patientName ?? "patient")
-    .replace(/[^a-z0-9]+/gi, "-")
-    .replace(/^-|-$/g, "")
+  const safePatient = (patientName ?? 'patient')
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-|-$/g, '')
     .toLowerCase();
   return `${safePatient}-pa-packet-cpt-${cptCode}.docx`;
-}
-
-// Maps soft warning field names to the PA strength factor keys they correspond to.
-// payer_mismatch and provider_mismatch have no PA factor — excluded intentionally.
-const softWarningToFactorKey: Partial<Record<string, PaStrengthFactorKey>> = {
-  surgical_approach_if_mentioned: 'surgical_approach',
-  imaging_findings: 'imaging_findings',
-  conservative_treatments_attempted: 'conservative_treatments_named',
-  functional_limitations: 'functional_limitations',
-};
-
-function computePaStrengthScore(
-  base: ExtractedChartData["pa_strength"] | undefined,
-  manualFixes: ManualFixes,
-  softWarningStates: Record<string, boolean> = {}
-) {
-  // Build a set of factor keys boosted by acknowledged soft warnings
-  const softBoostedFactors = new Set<PaStrengthFactorKey>();
-  for (const [field, acknowledged] of Object.entries(softWarningStates)) {
-    if (acknowledged) {
-      const factorKey = softWarningToFactorKey[field];
-      if (factorKey) softBoostedFactors.add(factorKey);
-    }
-  }
-
-  let totalWeight = 0;
-  let weightedScore = 0;
-  Object.entries(paStrengthWeights).forEach(([key, weight]) => {
-    const factorKey = key as PaStrengthFactorKey;
-    const manual = manualFixes[factorKey];
-    const baseScore = base?.[factorKey]?.score ?? 0;
-    const score = manual?.resolved || softBoostedFactors.has(factorKey) ? 1 : baseScore;
-    weightedScore += score * weight;
-    totalWeight += weight;
-  });
-  if (!totalWeight) return 0;
-  return (weightedScore / totalWeight) * 10;
-}
-
-function getScoreColor(score: number) {
-  if (score >= 8) return "green";
-  if (score >= 5) return "amber";
-  return "red";
-}
-
-function getScoreTextClass(score: number) {
-  const c = getScoreColor(score);
-  if (c === "green") return "text-[#16A34A]";
-  if (c === "amber") return "text-[#D97706]";
-  return "text-[#DC2626]";
-}
-
-function getScoreBarClass(score: number) {
-  const c = getScoreColor(score);
-  if (c === "green") return "bg-[#16A34A]";
-  if (c === "amber") return "bg-[#D97706]";
-  return "bg-[#DC2626]";
-}
-
-function getScoreDescriptor(score: number) {
-  if (score >= 9) return "Strong submission — ready to submit";
-  if (score >= 7) return "Good — minor improvements recommended";
-  if (score >= 5) return "Moderate risk — address warnings before submitting";
-  return "High denial risk — significant documentation gaps";
 }
 
 function buildUpdatedPayload(data: ReviewData, manualFixes: ManualFixes) {
@@ -1985,92 +1204,61 @@ function buildUpdatedPayload(data: ReviewData, manualFixes: ManualFixes) {
       cptCode: cptOverride || data.cptCode,
       payerName: data.payerName,
       providerName: data.providerName,
-      practiceName: data.practiceName ?? "",
+      practiceName: data.practiceName ?? '',
     },
   };
 }
 
-function applyManualFixes(
-  extracted: ExtractedChartDataWithValidation,
-  manualFixes: ManualFixes
-) {
+function applyManualFixes(extracted: ExtractedChartDataWithValidation, manualFixes: ManualFixes) {
   const updated: ExtractedChartDataWithValidation = {
     ...extracted,
     diagnosis_codes: [...extracted.diagnosis_codes],
     functional_limitations: [...extracted.functional_limitations],
-    conservative_treatments_attempted: extracted.conservative_treatments_attempted.map((t) => ({
-      ...t,
-    })),
+    conservative_treatments_attempted: extracted.conservative_treatments_attempted.map(t => ({ ...t })),
     imaging_findings: extracted.imaging_findings ? { ...extracted.imaging_findings } : null,
   };
 
-  const diagnosisFix = manualFixes.diagnosis_codes?.resolved
-    ? manualFixes.diagnosis_codes.value
-    : "";
+  const diagnosisFix = manualFixes.diagnosis_codes?.resolved ? manualFixes.diagnosis_codes.value : '';
   if (diagnosisFix) updated.diagnosis_codes = splitListValues(diagnosisFix);
 
-  const treatmentsNamed = manualFixes.conservative_treatments_named?.resolved
-    ? manualFixes.conservative_treatments_named.value
-    : "";
+  const treatmentsNamed = manualFixes.conservative_treatments_named?.resolved ? manualFixes.conservative_treatments_named.value : '';
   if (treatmentsNamed) {
-    updated.conservative_treatments_attempted = splitListValues(treatmentsNamed).map((name) => ({
-      treatment: name,
-      duration: null,
-      outcome: null,
-      dates: null,
+    updated.conservative_treatments_attempted = splitListValues(treatmentsNamed).map(name => ({
+      treatment: name, duration: null, outcome: null, dates: null,
     }));
   }
 
-  const treatmentDuration = manualFixes.conservative_treatment_duration?.resolved
-    ? manualFixes.conservative_treatment_duration.value.trim()
-    : "";
+  const treatmentDuration = manualFixes.conservative_treatment_duration?.resolved ? manualFixes.conservative_treatment_duration.value.trim() : '';
   if (treatmentDuration) {
     if (updated.conservative_treatments_attempted.length === 0) {
-      updated.conservative_treatments_attempted = [
-        { treatment: "Conservative treatment", duration: treatmentDuration, outcome: null, dates: null },
-      ];
+      updated.conservative_treatments_attempted = [{ treatment: 'Conservative treatment', duration: treatmentDuration, outcome: null, dates: null }];
     } else {
-      updated.conservative_treatments_attempted = updated.conservative_treatments_attempted.map(
-        (t) => ({ ...t, duration: t.duration ?? treatmentDuration })
-      );
+      updated.conservative_treatments_attempted = updated.conservative_treatments_attempted.map(t => ({ ...t, duration: t.duration ?? treatmentDuration }));
     }
   }
 
-  const imagingFix = manualFixes.imaging_findings?.resolved
-    ? manualFixes.imaging_findings.value
-    : "";
+  const imagingFix = manualFixes.imaging_findings?.resolved ? manualFixes.imaging_findings.value : '';
   if (imagingFix) updated.imaging_findings = parseImagingInput(imagingFix);
 
-  const limitationsFix = manualFixes.functional_limitations?.resolved
-    ? manualFixes.functional_limitations.value
-    : "";
+  const limitationsFix = manualFixes.functional_limitations?.resolved ? manualFixes.functional_limitations.value : '';
   if (limitationsFix) updated.functional_limitations = splitListValues(limitationsFix);
 
-  const surgicalFix = manualFixes.surgical_approach?.resolved
-    ? manualFixes.surgical_approach.value.trim()
-    : "";
+  const surgicalFix = manualFixes.surgical_approach?.resolved ? manualFixes.surgical_approach.value.trim() : '';
   if (surgicalFix) updated.surgical_approach_if_mentioned = surgicalFix;
 
-  const symptomFix = manualFixes.symptom_duration?.resolved
-    ? manualFixes.symptom_duration.value.trim()
-    : "";
+  const symptomFix = manualFixes.symptom_duration?.resolved ? manualFixes.symptom_duration.value.trim() : '';
   if (symptomFix) updated.symptom_duration = symptomFix;
 
   return updated;
 }
 
 function splitListValues(value: string) {
-  return value
-    .split(/[,;\n]/g)
-    .map((item) => item.trim())
-    .filter(Boolean);
+  return value.split(/[,;\n]/g).map(s => s.trim()).filter(Boolean);
 }
 
 function parseImagingInput(value: string) {
-  const [modality, ...rest] = value.split(":");
-  const findings = rest.join(":").trim();
-  if (findings) {
-    return { modality: modality.trim() || null, key_findings: findings };
-  }
+  const [modality, ...rest] = value.split(':');
+  const findings = rest.join(':').trim();
+  if (findings) return { modality: modality.trim() || null, key_findings: findings };
   return { modality: null, key_findings: value.trim() || null };
 }

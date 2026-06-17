@@ -135,10 +135,38 @@ Westbrook Orthopedic Surgery Center`,
     requested_procedure: "Bilateral Total Knee Arthroplasty",
     surgical_approach_if_mentioned: "Cemented implant, bilateral",
     denial_risk_flags: [
-      "Physical therapy documented for only 4 weeks \u2014 BCBS commercial PPO typically requires 6\u201312 weeks before approving TKA",
-      "Corticosteroid injection dates not documented for right knee \u2014 unclear if injections were sequential or concurrent",
-      "Weight loss counseling outcome not recorded \u2014 payers may question whether obesity was adequately addressed pre-operatively",
-      "No MRI on file \u2014 some payers require advanced imaging to confirm end-stage OA diagnosis before approving bilateral TKA"
+      {
+        id: "flag-pt-duration",
+        label: "PT Duration Below Payer Threshold",
+        severity: "high",
+        explanation: "Physical therapy documented for only 4 weeks. BCBS commercial PPO typically requires 6\u201312 weeks of structured PT before approving TKA.",
+        recommendation: "Obtain PT records documenting additional sessions or initiate and document a full 6-week PT program before submission.",
+        anchorText: "Physical Therapy (4 weeks)"
+      },
+      {
+        id: "flag-injection-dates",
+        label: "Injection Dates Incomplete",
+        severity: "medium",
+        explanation: "Corticosteroid injection dates not documented for right knee \u2014 unclear if injections were sequential or concurrent.",
+        recommendation: "Retrieve injection procedure notes with exact dates and document each knee separately with outcome and follow-up.",
+        anchorText: "Corticosteroid Injection \u2014 Right Knee"
+      },
+      {
+        id: "flag-weight-loss-outcome",
+        label: "Weight Loss Counseling Outcome Missing",
+        severity: "low",
+        explanation: "Weight loss counseling outcome not recorded. Payers may question whether obesity was adequately addressed pre-operatively.",
+        recommendation: "Document weight loss counseling outcomes, including patient BMI trend and any achieved weight reduction.",
+        anchorText: "Weight Loss Counseling"
+      },
+      {
+        id: "flag-no-mri",
+        label: "No MRI to Confirm End-Stage OA",
+        severity: "medium",
+        explanation: "No MRI on file. Some payers require advanced imaging to confirm end-stage OA diagnosis before approving bilateral TKA.",
+        recommendation: "Order and document MRI or refer to prior MRI reports confirming cartilage loss consistent with end-stage OA.",
+        anchorText: "Radiographic Assessment"
+      }
     ],
     pa_strength: {
       diagnosis_codes: {
@@ -151,7 +179,8 @@ Westbrook Orthopedic Surgery Center`,
       },
       conservative_treatment_duration: {
         score: 0,
-        note: "PT duration only 4 weeks \u2014 below typical payer threshold of 6\u201312 weeks."
+        note: "PT duration only 4 weeks \u2014 below typical payer threshold of 6\u201312 weeks.",
+        anchorText: "Physical Therapy (4 weeks)"
       },
       imaging_findings: {
         score: 1,
@@ -312,10 +341,38 @@ Brooklyn Sports Medicine`,
     requested_procedure: "Arthroscopic Rotator Cuff Repair",
     surgical_approach_if_mentioned: "Arthroscopic technique",
     denial_risk_flags: [
-      "Arthroscopic approach documented but lacks specific portal count or double-row vs. single-row repair technique detail — UHC may request operative specifics",
-      "Symptom duration noted as 'several months' — payers typically require a precise timeline (e.g., '4 months') to assess conservative treatment adequacy",
-      "Only one subacromial injection documented — some UHC plans require two failed injections before approving rotator cuff repair",
-      "Work-related injury noted but no workers' comp authorization status documented — may require separate handling"
+      {
+        id: "flag-approach-detail",
+        label: "Repair Technique Not Specified",
+        severity: "medium",
+        explanation: "Arthroscopic approach documented but lacks specific portal count or double-row vs. single-row repair technique detail. UHC may request operative specifics.",
+        recommendation: "Document the planned repair construct (e.g., double-row suture anchor technique) and portal configuration in the operative plan.",
+        anchorText: "Arthroscopic technique"
+      },
+      {
+        id: "flag-symptom-duration",
+        label: "Symptom Duration Imprecise",
+        severity: "medium",
+        explanation: "Symptom duration noted as 'several months'. Payers typically require a precise timeline (e.g., '4 months') to assess conservative treatment adequacy.",
+        recommendation: "Document the exact onset date or duration in weeks or months from the patient's reported first symptoms.",
+        anchorText: "several months duration"
+      },
+      {
+        id: "flag-single-injection",
+        label: "Only One Injection Documented",
+        severity: "medium",
+        explanation: "Only one subacromial injection documented. Some UHC plans require two failed injections before approving rotator cuff repair.",
+        recommendation: "Retrieve any prior injection records or document that a second injection was contraindicated and explain why.",
+        anchorText: "Subacromial Corticosteroid Injection"
+      },
+      {
+        id: "flag-workers-comp",
+        label: "Workers' Comp Status Undocumented",
+        severity: "low",
+        explanation: "Work-related injury noted but no workers' comp authorization status documented. This may require separate handling or a different payer pathway.",
+        recommendation: "Clarify whether this claim is under workers' compensation or private insurance and document the authorization pathway accordingly.",
+        anchorText: "lifting injury at work"
+      }
     ],
     pa_strength: {
       diagnosis_codes: {
@@ -340,7 +397,8 @@ Brooklyn Sports Medicine`,
       },
       surgical_approach: {
         score: 0,
-        note: "Arthroscopic approach is mentioned but lacks specific portal or repair technique details."
+        note: "Arthroscopic approach is mentioned but lacks specific portal or repair technique details.",
+        anchorText: "Arthroscopic technique"
       },
       cpt_code_valid: {
         score: 1,
@@ -348,7 +406,8 @@ Brooklyn Sports Medicine`,
       },
       symptom_duration: {
         score: 0,
-        note: "Symptom duration noted as 'several months' — lacks precise measurable timeline."
+        note: "Symptom duration noted as 'several months' — lacks precise measurable timeline.",
+        anchorText: "several months duration"
       }
     },
     validation: {
@@ -450,12 +509,54 @@ Spine & Joint Institute`,
     requested_procedure: "Lumbar Interbody Fusion",
     surgical_approach_if_mentioned: "Posterior lumbar interbody fusion (PLIF) at L4-L5",
     denial_risk_flags: [
-      "No physical therapy documented — Cigna requires at least 6 weeks of structured PT before approving lumbar fusion in non-emergent cases",
-      "No chiropractic, pain management, or epidural steroid injection documented — conservative care pathway is completely absent from the record",
-      "MRI or CT not documented — X-ray findings alone are insufficient to confirm disc herniation or nerve root compression for Cigna fusion criteria",
-      "No neurological examination findings documented — motor deficit or reflex changes are typically required to support fusion authorization",
-      "Symptom duration of 6 months without conservative treatment is insufficient — payers require documented failure of treatment, not just duration",
-      "Foraminal stenosis 'suspected on clinical grounds' rather than confirmed on advanced imaging — this language will likely trigger automatic denial"
+      {
+        id: "flag-no-pt",
+        label: "No Physical Therapy Documented",
+        severity: "high",
+        explanation: "No physical therapy documented. Cigna requires at least 6 weeks of structured PT before approving lumbar fusion in non-emergent cases.",
+        recommendation: "Initiate and document a structured PT program of at least 6 weeks, then resubmit with PT records and discharge summary.",
+        anchorText: "MEDICAL NECESSITY SUMMARY"
+      },
+      {
+        id: "flag-no-conservative-care",
+        label: "Conservative Care Pathway Absent",
+        severity: "high",
+        explanation: "No chiropractic, pain management, or epidural steroid injection documented. The conservative care pathway is completely absent from the record.",
+        recommendation: "Document all prior conservative care attempts or initiate a multi-modal conservative care program before resubmission.",
+        anchorText: "MEDICAL NECESSITY SUMMARY"
+      },
+      {
+        id: "flag-no-mri",
+        label: "No MRI or CT to Confirm Compression",
+        severity: "high",
+        explanation: "MRI or CT not documented. X-ray findings alone are insufficient to confirm disc herniation or nerve root compression for Cigna fusion criteria.",
+        recommendation: "Order and obtain MRI or CT of the lumbar spine and include the radiology report with the prior auth submission.",
+        anchorText: "Imaging: Lumbar spine X-rays"
+      },
+      {
+        id: "flag-no-neuro-exam",
+        label: "Neurological Examination Not Documented",
+        severity: "high",
+        explanation: "No neurological examination findings documented. Motor deficit or reflex changes are typically required to support fusion authorization.",
+        recommendation: "Document a formal neurological examination including motor strength grading, deep tendon reflexes, and sensory testing.",
+        anchorText: "neurogenic claudication"
+      },
+      {
+        id: "flag-duration-no-treatment",
+        label: "Duration Without Treatment History",
+        severity: "high",
+        explanation: "Symptom duration of 6 months without conservative treatment is insufficient. Payers require documented failure of treatment, not just duration.",
+        recommendation: "Provide records of conservative treatment attempts or document a clinical reason why conservative care was contraindicated.",
+        anchorText: "approximately 6 months"
+      },
+      {
+        id: "flag-suspected-stenosis",
+        label: "Foraminal Stenosis Unconfirmed",
+        severity: "high",
+        explanation: "Foraminal stenosis is 'suspected on clinical grounds' rather than confirmed on advanced imaging. This language will likely trigger automatic denial.",
+        recommendation: "Replace speculative language with confirmed imaging findings. Obtain MRI to confirm or rule out foraminal stenosis before submission.",
+        anchorText: "Foraminal stenosis is suspected"
+      }
     ],
     pa_strength: {
       diagnosis_codes: {
@@ -464,15 +565,18 @@ Spine & Joint Institute`,
       },
       conservative_treatments_named: {
         score: 0,
-        note: "No conservative treatments (PT, chiropractic, injections) are documented in the record."
+        note: "No conservative treatments (PT, chiropractic, injections) are documented in the record.",
+        anchorText: "MEDICAL NECESSITY SUMMARY"
       },
       conservative_treatment_duration: {
         score: 0,
-        note: "Duration of conservative treatments is completely absent — no treatment was documented."
+        note: "Duration of conservative treatments is completely absent — no treatment was documented.",
+        anchorText: "MEDICAL NECESSITY SUMMARY"
       },
       imaging_findings: {
         score: 0,
-        note: "Only X-ray findings are present; MRI or CT required to confirm disc herniation and nerve compression for fusion authorization."
+        note: "Only X-ray findings are present; MRI or CT required to confirm disc herniation and nerve compression for fusion authorization.",
+        anchorText: "Imaging: Lumbar spine X-rays"
       },
       functional_limitations: {
         score: 1,
@@ -488,7 +592,8 @@ Spine & Joint Institute`,
       },
       symptom_duration: {
         score: 0,
-        note: "6-month symptom duration without documented conservative therapy does not satisfy Cigna criteria."
+        note: "6-month symptom duration without documented conservative therapy does not satisfy Cigna criteria.",
+        anchorText: "approximately 6 months"
       }
     },
     validation: {

@@ -13,6 +13,7 @@ export type ImagingFindings = {
 export type PaStrengthFactor = {
   score: 0 | 1;
   note: string;
+  anchorText?: string;
 };
 
 export type PaStrength = {
@@ -24,6 +25,15 @@ export type PaStrength = {
   surgical_approach: PaStrengthFactor;
   cpt_code_valid: PaStrengthFactor;
   symptom_duration: PaStrengthFactor;
+};
+
+export type DenialRiskFlag = {
+  id: string;
+  label: string;
+  severity: "high" | "medium" | "low";
+  explanation: string;
+  recommendation: string;
+  anchorText: string;
 };
 
 export type ExtractedChartData = {
@@ -38,7 +48,7 @@ export type ExtractedChartData = {
   imaging_findings: ImagingFindings | null;
   requested_procedure: string | null;
   surgical_approach_if_mentioned: string | null;
-  denial_risk_flags: string[];
+  denial_risk_flags: DenialRiskFlag[];
   pa_strength: PaStrength;
 };
 
