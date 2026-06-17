@@ -407,7 +407,7 @@ export default function LandingPage() {
               Email Us
             </a>
             <a
-              href="https://linkedin.com/company/greenlit-md/"
+              href="https://linkedin.com/company/orthren/"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 hover:text-slate-800 transition-colors"
