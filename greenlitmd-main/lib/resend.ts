@@ -52,27 +52,28 @@ const baseHtml = (body: string, email: string) => `<!DOCTYPE html>
 </head>
 <body>
 <div class="wrap">
-  <div class="badge">Greenlit MD</div>
+  <div class="badge">Orthren</div>
   ${body}
   <hr class="divider">
-  <p class="footer">You received this because you joined the Greenlit MD waitlist.<br>
+  <p class="footer">You received this because you joined the Orthren waitlist.<br>
   <a href="${unsubscribeUrl(email)}">Unsubscribe</a></p>
 </div>
 </body></html>`;
 
 export async function sendConfirmationEmail(email: string, position: number) {
   const html = baseHtml(`
-    <h1>You're on the Greenlit MD waitlist.</h1>
+    <h1>You're on the Orthren waitlist.</h1>
     <p>Thanks for signing up. You're <strong>#${position}</strong> on the list.</p>
-    <p>Greenlit MD reads a patient chart and generates a complete prior authorization packet — letter of medical necessity, PA score, and submission checklist — in under 60 seconds. No templates. No copy-paste.</p>
+    <p>Orthren reads a patient chart and generates a complete prior authorization packet — letter of medical necessity, PA score, and submission checklist — in under 60 seconds. No templates. No copy-paste.</p>
     <p>We'll let you know the moment we launch. In the meantime, <a href="https://greenlitmd.app">see how it works →</a></p>
-    <p style="color:#94a3b8;font-size:13px">— The Greenlit MD Team</p>
+    <p style="color:#94a3b8;font-size:13px">— The Orthren Team</p>
   `, email);
 
   return resend.emails.send({
-    from: "Kamari at Greenlit MD <hello@greenlitmd.app>",
+    // TODO: update sending domain to hello@orthren.app once DNS/Resend domain verification is complete
+    from: "Kamari at Orthren <hello@greenlitmd.app>",
     to: email,
-    subject: `You're #${position} on the Greenlit MD waitlist`,
+    subject: `You're #${position} on the Orthren waitlist`,
     html
   });
 }
@@ -94,7 +95,8 @@ export async function sendUpdateEmail(
   `, email);
 
   return resend.emails.send({
-    from: "Kamari at Greenlit MD <hello@greenlitmd.app>",
+    // TODO: update sending domain to hello@orthren.app once DNS/Resend domain verification is complete
+    from: "Kamari at Orthren <hello@greenlitmd.app>",
     to: email,
     subject: opts.subject,
     html
@@ -103,16 +105,17 @@ export async function sendUpdateEmail(
 
 export async function sendLaunchEmail(email: string, launchUrl: string) {
   const html = baseHtml(`
-    <h1>Greenlit MD is live.</h1>
+    <h1>Orthren is live.</h1>
     <p>Your early access is ready. Click below to get started — no setup required.</p>
-    <p><a href="${launchUrl}" style="display:inline-block;background:#1E3A5F;color:#fff;font-weight:600;font-size:14px;padding:12px 24px;border-radius:6px;text-decoration:none">Open Greenlit MD →</a></p>
+    <p><a href="${launchUrl}" style="display:inline-block;background:#1E3A5F;color:#fff;font-weight:600;font-size:14px;padding:12px 24px;border-radius:6px;text-decoration:none">Open Orthren →</a></p>
     <p style="color:#94a3b8;font-size:13px">Upload a chart, enter the CPT code and payer name, and your PA packet is ready in about 30 seconds.</p>
   `, email);
 
   return resend.emails.send({
-    from: "Kamari at Greenlit MD <hello@greenlitmd.app>",
+    // TODO: update sending domain to hello@orthren.app once DNS/Resend domain verification is complete
+    from: "Kamari at Orthren <hello@greenlitmd.app>",
     to: email,
-    subject: "Your early access to Greenlit MD is ready",
+    subject: "Your early access to Orthren is ready",
     html
   });
 }

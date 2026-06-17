@@ -111,8 +111,8 @@ export default function ReviewPage() {
   }, []);
 
   useEffect(() => {
-    document.title = "Review PA Packet — Greenlit MD";
-    return () => { document.title = "Greenlit MD"; };
+    document.title = "Review PA Packet — Orthren";
+    return () => { document.title = "Orthren"; };
   }, []);
 
   // ─── Derived data ─────────────────────────────────────────────────────────
@@ -1106,7 +1106,7 @@ function FeedbackWidget({
         throw new Error(e.error ?? 'Failed to submit feedback.');
       }
       setSubmitted(true);
-      setToast('Thanks — your feedback helps improve Greenlit MD.');
+      setToast('Thanks — your feedback helps improve Orthren.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit feedback.');
     } finally {
@@ -1127,7 +1127,7 @@ function FeedbackWidget({
   if (submitted) {
     return (
       <p style={{ fontSize: 13, fontWeight: 600, color: '#475569', margin: 0 }}>
-        Thanks — your feedback helps improve Greenlit MD.
+        Thanks — your feedback helps improve Orthren.
       </p>
     );
   }

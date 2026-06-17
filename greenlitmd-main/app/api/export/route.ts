@@ -201,7 +201,7 @@ function disclaimerFooter() {
       new Paragraph({
         alignment: AlignmentType.CENTER,
         spacing: { after: 120 },
-        children: [new TextRun({ text: "Greenlit MD", size: 18, bold: true })]
+        children: [new TextRun({ text: "Orthren", size: 18, bold: true })]
       }),
       new Paragraph({
         alignment: AlignmentType.CENTER,

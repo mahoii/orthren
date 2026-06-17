@@ -4,7 +4,7 @@ import Image from "next/image";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Greenlit MD",
+  title: "Orthren",
   description: "AI-assisted prior authorization packet builder for orthopedic practices",
   icons: {
     icon: "/icon.svg",
@@ -36,13 +36,13 @@ export default function RootLayout({
               >
                 <Image
                   src="/logo.png"
-                  alt="Greenlit MD Logo"
+                  alt="Orthren Logo"
                   width={32}
                   height={32}
                   priority
                   className="h-8 w-8 object-contain"
                 />
-                <span>Greenlit MD</span>
+                <span>Orthren</span>
                 <span className="rounded-full border border-[#CBD5E1] bg-[#F8F9FB] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
                   Beta
                 </span>

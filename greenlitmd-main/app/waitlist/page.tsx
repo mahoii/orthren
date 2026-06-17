@@ -22,7 +22,7 @@ export default function WaitlistPage() {
             href="/"
             className="text-sm font-semibold text-clinical-blue hover:text-clinical-navy transition-colors"
           >
-            &larr; Back to Greenlit MD
+            &larr; Back to Orthren
           </Link>
         </p>
       </div>

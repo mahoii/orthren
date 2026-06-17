@@ -213,7 +213,7 @@ export default function LandingPage() {
                   <>
                     The baseline orthopedic PA denial rate is{" "}
                     <strong className="text-red-700 font-bold">8–10%</strong>.
-                    Greenlit MD targets{" "}
+                    Orthren targets{" "}
                     <strong className="text-green-700 font-bold">under 1%</strong>.
                   </>
                 ),
@@ -387,12 +387,12 @@ export default function LandingPage() {
           <div className="flex items-center gap-2">
             <Image
               src="/logo.png"
-              alt="Greenlit MD"
+              alt="Orthren"
               width={20}
               height={20}
               className="h-5 w-5 object-contain opacity-80"
             />
-            <span className="font-bold text-clinical-navy">Greenlit MD</span>
+            <span className="font-bold text-clinical-navy">Orthren</span>
             <span className="text-slate-400">&copy; {new Date().getFullYear()}</span>
           </div>
 
