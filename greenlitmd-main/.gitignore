@@ -7,3 +7,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# Claude Code local-only config (machine-specific, never commit)
+CLAUDE.local.md
+.claude/settings.local.json

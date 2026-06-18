@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const token = searchParams.get("token");
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://greenlitmd.app";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://orthren.com";
 
   if (!token) {
     return NextResponse.redirect(`${appUrl}/unsubscribed`);
