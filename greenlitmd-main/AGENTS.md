@@ -3,8 +3,8 @@
 ## Stack Context (Read Before Acting)
 - **Framework:** Next.js 14 (App Router, Server Actions)
 - **Database:** Supabase (direct table inserts, server-side only — no Auth-based email)
-- **Email:** Resend via `hello@greenlitmd.app` (TODO: migrate to hello@orthren.app once DNS/Resend domain verification is complete)
-- **Deployment:** Vercel (production at `greenlitmd.app`) (TODO: migrate to orthren.app)
+- **Email:** Resend via `hello@greenlitmd.app`
+- **Deployment:** Vercel (production at `orthren.com`)
 - **Key Env Vars:** `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `RESEND_API_KEY`, `ADMIN_SECRET`, `UNSUBSCRIBE_SECRET`, `ANTHROPIC_API_KEY`
 - **Primary Domain:** Orthopedic prior authorization packet generation
 - **PDF/DOCX Parsing:** `pdf-parse` and `mammoth` (Node.js runtime required)
