@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
+import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
+import SignOutButton from "@/components/SignOutButton";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -11,11 +13,20 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  let isAuthenticated = false;
+  try {
+    const supabase = createSupabaseAuthServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    isAuthenticated = !!user;
+  } catch {
+    // cookies() unavailable in some static contexts — treat as unauthenticated
+  }
+
   return (
     <html lang="en">
       <head>
@@ -49,12 +60,16 @@ export default function RootLayout({
               </Link>
             </div>
             <div className="flex items-center">
-              <Link
-                href="/#waitlist-form"
-                className="rounded-md bg-clinical-navy px-4 py-2 text-sm font-semibold text-white transition hover:bg-clinical-blue hover:shadow-md"
-              >
-                Request Early Access
-              </Link>
+              {isAuthenticated ? (
+                <SignOutButton />
+              ) : (
+                <Link
+                  href="/#waitlist-form"
+                  className="rounded-md bg-clinical-navy px-4 py-2 text-sm font-semibold text-white transition hover:bg-clinical-blue hover:shadow-md"
+                >
+                  Request Early Access
+                </Link>
+              )}
             </div>
           </nav>
         </header>

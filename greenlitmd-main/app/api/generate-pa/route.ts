@@ -6,6 +6,7 @@ import type { ExtractedChartData, DenialRiskFlag, PaStrength, PaStrengthFactor }
 import { rateLimiter } from "@/lib/rate-limit";
 import { letterSystemPrompt } from "@/lib/letter-system-prompt";
 import { callAnthropic, callAnthropicWithRetry } from "@/lib/anthropic";
+import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,6 +60,12 @@ export async function POST(request: Request) {
         { error: "Too many requests. Please try again later." },
         { status: 429 }
       );
+    }
+
+    const supabase = createSupabaseAuthServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     if (!process.env.ANTHROPIC_API_KEY) {

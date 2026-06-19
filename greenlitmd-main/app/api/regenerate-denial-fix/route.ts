@@ -3,6 +3,7 @@ import { sanitizeLetterPlaceholders } from "@/lib/letter-placeholders";
 import type { ExtractedChartDataWithValidation } from "@/lib/types";
 import { rateLimiter } from "@/lib/rate-limit";
 import { callAnthropicWithRetry } from "@/lib/anthropic";
+import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +26,12 @@ export async function POST(request: Request) {
     const { success } = await rateLimiter.limit(ip);
     if (!success) {
       return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
+    }
+
+    const supabase = createSupabaseAuthServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     if (!process.env.ANTHROPIC_API_KEY) {
