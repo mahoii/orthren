@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const BATCH_SIZE = 50;
-const LAUNCH_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://greenlitmd.app";
+const LAUNCH_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://orthren.com";
 
 function sleep(ms: number) {
   return new Promise((res) => setTimeout(res, ms));

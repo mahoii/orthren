@@ -82,7 +82,7 @@ export default function LandingPage() {
                 <span className="h-3 w-3 rounded-full bg-green-400" />
               </div>
               <div className="mx-auto max-w-sm w-full rounded-md border border-slate-200 bg-white py-1 px-3 text-center text-xs text-slate-400 font-mono select-none">
-                greenlitmd.app/review/doe-john-27447
+                orthren.com/review/doe-john-27447
               </div>
             </div>
 
