@@ -4,14 +4,14 @@ import crypto from "crypto";
 export const resend = new Resend(process.env.RESEND_API_KEY!);
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://orthren.com";
-const secret: string = (() => {
+function getSecret(): string {
   const s = process.env.UNSUBSCRIBE_SECRET;
   if (!s) throw new Error("UNSUBSCRIBE_SECRET env var is not set");
   return s;
-})();
+}
 
 export function createUnsubscribeToken(email: string): string {
-  const hmac = crypto.createHmac("sha256", secret);
+  const hmac = crypto.createHmac("sha256", getSecret());
   hmac.update(email);
   const sig = hmac.digest("hex");
   return Buffer.from(JSON.stringify({ email, sig })).toString("base64url");
@@ -23,7 +23,7 @@ export function verifyUnsubscribeToken(token: string): string | null {
       email: string;
       sig: string;
     };
-    const hmac = crypto.createHmac("sha256", secret);
+    const hmac = crypto.createHmac("sha256", getSecret());
     hmac.update(email);
     const expected = hmac.digest("hex");
     if (!crypto.timingSafeEqual(Buffer.from(sig, "hex"), Buffer.from(expected, "hex"))) return null;
