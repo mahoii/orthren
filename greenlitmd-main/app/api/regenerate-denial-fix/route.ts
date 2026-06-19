@@ -46,7 +46,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
     }
 
-    const { validation, pa_strength, ...chartDataOnly } = body.extractedData as ExtractedChartDataWithValidation & { validation: unknown; pa_strength: unknown };
+    // Strip patient identity and scoring fields — denial-fix rewriting needs clinical evidence only.
+    const { validation, pa_strength, patient_name: _pn, date_of_birth: _dob, ...chartDataOnly } = body.extractedData as ExtractedChartDataWithValidation & { validation: unknown; pa_strength: unknown };
 
     const letter = await callAnthropicWithRetry({
       system: SYSTEM_PROMPT,

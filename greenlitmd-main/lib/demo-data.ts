@@ -597,7 +597,8 @@ Spine & Joint Institute`,
       }
     },
     validation: {
-      hard_blocks: [
+      hard_blocks: [],
+      soft_warnings: [
         {
           field: "conservative_treatments_named",
           label: "Conservative Treatment Documentation",
@@ -609,9 +610,7 @@ Spine & Joint Institute`,
           label: "Advanced Imaging Required",
           message:
             "MRI or CT of the lumbar spine is required to confirm disc herniation, nerve root compression, and degree of foraminal stenosis. X-ray alone does not meet Cigna's fusion authorization criteria."
-        }
-      ],
-      soft_warnings: [
+        },
         {
           field: "symptom_duration",
           label: "Symptom Duration vs. Treatment History",

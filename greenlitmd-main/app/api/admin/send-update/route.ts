@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { getAllSignups } from "@/lib/supabase/server";
 import { sendUpdateEmail } from "@/lib/resend";
+import crypto from "crypto";
+
+function hashEmail(email: string) {
+  return crypto.createHash("sha256").update(email).digest("hex").slice(0, 12);
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,13 +54,13 @@ export async function POST(request: Request) {
             screenshot_url: body.screenshot_url
           }).then((res) => {
             if (res.error) {
-              console.error(`Resend failed for ${email}:`, res.error);
+              console.error(`Resend failed for [${hashEmail(email)}]:`, res.error);
               failed += 1;
             } else {
               sent += 1;
             }
           }).catch((err) => {
-            console.error(`Unexpected error sending to ${email}:`, err);
+            console.error(`Unexpected error sending to [${hashEmail(email)}]:`, err);
             failed += 1;
           })
         )

@@ -352,8 +352,7 @@ async function parseJsonObject(content: string): Promise<Record<string, unknown>
   try {
     return JSON.parse(extractionText) as Record<string, unknown>;
   } catch (err) {
-    console.error("[generate-pa] parseJsonObject error. Raw content (first 600 chars):", content?.substring(0, 600));
-    console.error("[generate-pa] parseJsonObject parse failure:", err);
+    console.error("[generate-pa] parseJsonObject parse failure (content length:", content?.length ?? 0, "):", err);
     throw new Error("Failed to parse extraction response: " + (err instanceof Error ? err.message : String(err)));
   }
 }

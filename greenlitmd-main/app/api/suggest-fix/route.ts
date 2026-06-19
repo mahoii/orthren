@@ -47,10 +47,14 @@ export async function POST(request: Request) {
       );
     }
 
+    // Strip patient identity fields — the suggestion only needs clinical evidence, not demographics.
+    const { patient_name, date_of_birth, ...clinicalContext } = body.extracted;
+    void patient_name; void date_of_birth;
+
     const content = await callAnthropicWithRetry({
       system: "You are a clinical documentation assistant.",
       prompt: `Based on this patient chart context: ${JSON.stringify(
-        body.extracted
+        clinicalContext
       )}, suggest a clinically appropriate value for the missing field: ${body.factor}. Return only the suggested value as a short plain text string, no explanation.`,
       maxTokens: 200
     });

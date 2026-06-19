@@ -1,6 +1,6 @@
 ---
 name: deploy-checklist
-description: Step-by-step deploy checklist for GreenlitMD: env var verification, Vercel deploy, and smoke test. Run before every production deployment.
+description: Step-by-step deploy checklist for Orthren: env var verification, Vercel deploy, and smoke test. Run before every production deployment.
 disable-model-invocation: true
 ---
 
@@ -14,7 +14,7 @@ Confirm the following are set in Vercel project settings (Settings → Environme
 - [ ] `ANTHROPIC_API_KEY` — present, not expired
 - [ ] `SUPABASE_URL` — points to production project
 - [ ] `SUPABASE_ANON_KEY` — matches production project
-- [ ] `RESEND_API_KEY` — valid, domain `greenlitmd.app` verified in Resend dashboard
+- [ ] `RESEND_API_KEY` — valid, domain `orthren.com` verified in Resend dashboard
 - [ ] `ADMIN_SECRET` — set and matches any admin-route usage
 - [ ] `UNSUBSCRIBE_SECRET` — set
 
@@ -37,7 +37,7 @@ vercel deploy --prod
 ```
 Or push to `main` if auto-deploy is configured.
 
-### 5. Post-Deploy Smoke Test (greenlitmd.app)
+### 5. Post-Deploy Smoke Test (orthren.com)
 - [ ] Home page loads without errors
 - [ ] Upload a test chart (use one of the synthetic charts from `lib/demo-data.ts`) and confirm PA packet generates
 - [ ] Check that the LOMN letter appears in the right panel

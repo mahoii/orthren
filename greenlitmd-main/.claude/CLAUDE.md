@@ -2,14 +2,14 @@
 
 ---
 
-# GreenlitMD — Claude Code Project Context
+# Orthren — Claude Code Project Context
 
 ## Stack & Commands
 - **Framework:** Next.js 14 App Router, TypeScript, Tailwind CSS
 - **Database:** Supabase (server-side only — Server Actions / Route Handlers)
-- **Email:** Resend via `hello@greenlitmd.app` — domain verification required before Resend delivers
+- **Email:** Resend via `hello@orthren.com` — domain verification required before Resend delivers
 - **AI:** Anthropic API (`claude-sonnet-4-6`) via `lib/anthropic.ts`
-- **Deployment:** Vercel → `greenlitmd.app` (production) and `orthren.com`
+- **Deployment:** Vercel → `orthren.com` (production) and `greenlitmd.app`
 - **Commands:** `npm run dev` · `npm run build` · `npm run typecheck`
 - **Env vars required:** `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `RESEND_API_KEY`, `ADMIN_SECRET`, `UNSUBSCRIBE_SECRET`, `ANTHROPIC_API_KEY`
 
@@ -30,7 +30,7 @@
 
 ## Known Gotchas
 - **CSRF / origin validation:** `next.config.mjs` `serverActions.allowedOrigins` must include production domain + `*.vercel.app` for preview branches. Adding a new domain requires updating this list.
-- **Resend delivery:** Emails only deliver from `hello@greenlitmd.app` once the domain is verified in the Resend dashboard. Any new sending domain requires DNS verification before use.
+- **Resend delivery:** Emails only deliver from `hello@orthren.com` once the domain is verified in the Resend dashboard. Any new sending domain requires DNS verification before use.
 - **Edge Runtime incompatibility:** Never set `export const runtime = 'edge'` on any route that imports pdf-parse or mammoth — they require the Node.js serverless runtime.
 - **Sandbox isolation:** `/sandbox` and its handlers must only read from the static Delgado / Chen / Vance profiles in `lib/demo-data.ts`. Zero live Anthropic calls from sandbox, ever.
 

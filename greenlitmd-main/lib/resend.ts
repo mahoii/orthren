@@ -4,7 +4,11 @@ import crypto from "crypto";
 export const resend = new Resend(process.env.RESEND_API_KEY!);
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://orthren.com";
-const secret = process.env.UNSUBSCRIBE_SECRET ?? "fallback-secret";
+const secret: string = (() => {
+  const s = process.env.UNSUBSCRIBE_SECRET;
+  if (!s) throw new Error("UNSUBSCRIBE_SECRET env var is not set");
+  return s;
+})();
 
 export function createUnsubscribeToken(email: string): string {
   const hmac = crypto.createHmac("sha256", secret);
