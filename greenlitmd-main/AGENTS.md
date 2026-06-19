@@ -3,7 +3,7 @@
 ## Stack Context (Read Before Acting)
 - **Framework:** Next.js 14 (App Router, Server Actions)
 - **Database:** Supabase (direct table inserts, server-side only — no Auth-based email)
-- **Email:** Resend via `hello@greenlitmd.app`
+- **Email:** Resend via `hello@orthren.com`
 - **Deployment:** Vercel (production at `orthren.com`)
 - **Key Env Vars:** `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `RESEND_API_KEY`, `ADMIN_SECRET`, `UNSUBSCRIBE_SECRET`, `ANTHROPIC_API_KEY`
 - **Primary Domain:** Orthopedic prior authorization packet generation
