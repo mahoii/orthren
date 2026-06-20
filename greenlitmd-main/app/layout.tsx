@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   title: "Orthren",
   description: "AI-assisted prior authorization packet builder for orthopedic practices",
   icons: {
-    icon: "/orthren-icon.svg",
+    icon: "/favicon-svg.svg",
   },
 };
 
@@ -30,7 +30,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="icon" type="image/svg+xml" href="/orthren-icon.svg" />
+        <link rel="icon" type="image/svg+xml" href="/favicon-svg.svg" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link

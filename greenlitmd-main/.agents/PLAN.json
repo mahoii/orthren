@@ -1,39 +1,38 @@
 {
-  "goal": "Fix waitlist signup by updating Resend sender email and aligning Supabase schema.",
+  "goal": "Replace the active green checkmark favicon (app/icon.svg) and references in layout with the Orthren logo from app/favicon-svg.svg.",
   "thinking_level_used": "medium",
   "steps": [
     {
       "id": 1,
-      "action": "Update verified email sender in lib/resend.ts from hello@greenlitmd.app to hello@contact.greenlitmd.app.",
-      "target_file": "lib/resend.ts",
+      "action": "Overwrite app/icon.svg with the SVG content of app/favicon-svg.svg",
+      "target_file": "app/icon.svg",
       "depends_on": [],
-      "success_criteria": "The file contains hello@contact.greenlitmd.app as the sender address.",
+      "success_criteria": "app/icon.svg exists and its contents are identical to app/favicon-svg.svg",
       "risk": "low",
-      "notes": "Must match the verified Resend domain from AGENTS.md."
+      "notes": null
     },
     {
       "id": 2,
-      "action": "Update supabase_setup.sql schema definition to include name and unsubscribed columns.",
-      "target_file": "supabase_setup.sql",
+      "action": "Copy app/favicon-svg.svg to public/favicon-svg.svg so it is served statically as a public asset",
+      "target_file": "public/favicon-svg.svg",
       "depends_on": [],
-      "success_criteria": "The file supabase_setup.sql contains definition for name text and unsubscribed boolean DEFAULT false.",
+      "success_criteria": "public/favicon-svg.svg exists and its contents match app/favicon-svg.svg",
       "risk": "low",
-      "notes": "User confirmation is required for SQL changes as per AGENTS.md rules."
+      "notes": null
     },
     {
       "id": 3,
-      "action": "Inform the user to unpause their Supabase database at https://zvarxrjfjxghclarvoux.supabase.co and run the SQL migration for waitlist_signups.",
-      "target_file": null,
+      "action": "Update app/layout.tsx to reference /favicon-svg.svg instead of /orthren-icon.svg",
+      "target_file": "app/layout.tsx",
       "depends_on": [2],
-      "success_criteria": "User unpauses the database and runs the SQL commands to add name and unsubscribed columns.",
-      "risk": "medium",
-      "notes": "External dependency on user database restoration."
+      "success_criteria": "app/layout.tsx metadata.icons.icon and head link tag refer to '/favicon-svg.svg'",
+      "risk": "low",
+      "notes": null
     }
   ],
   "constraints": [
-    "Do not modify Supabase database schema on the live database directly without human confirmation.",
-    "Do not hardcode keys or secrets.",
-    "Use server-side Supabase client actions only."
+    "Do not break Next.js layout metadata structure",
+    "Keep the new SVG contents identical to app/favicon-svg.svg"
   ],
-  "rollback": "Revert changes in lib/resend.ts and supabase_setup.sql using git checkout."
+  "rollback": "git checkout app/icon.svg app/layout.tsx && rm -f public/favicon-svg.svg"
 }
