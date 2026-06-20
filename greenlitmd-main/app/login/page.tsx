@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
+import Logo from "@/components/Logo";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
@@ -35,7 +35,7 @@ export default function LoginPage() {
     <main className="flex min-h-[calc(100vh-56px)] items-center justify-center bg-[#F8F9FB] px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <Image src="/logo.png" alt="Orthren" width={48} height={48} className="h-12 w-12 object-contain" />
+          <Logo size="lg" showWordmark={false} />
           <h1 className="text-2xl font-bold text-[#0F2A4A]">Sign in to Orthren</h1>
           <p className="text-sm text-slate-500">We&apos;ll send a magic link to your email.</p>
         </div>

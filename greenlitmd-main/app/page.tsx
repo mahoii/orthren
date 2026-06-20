@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import Logo from "@/components/Logo";
 import WaitlistForm from "@/components/WaitlistForm";
 import ScrollButton from "@/components/ScrollButton";
 
@@ -385,14 +385,7 @@ export default function LandingPage() {
       <footer className="border-t border-slate-200 bg-white px-6 py-10 text-xs text-slate-500">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 sm:flex-row">
           <div className="flex items-center gap-2">
-            <Image
-              src="/logo.png"
-              alt="Orthren"
-              width={20}
-              height={20}
-              className="h-5 w-5 object-contain opacity-80"
-            />
-            <span className="font-bold text-clinical-navy">Orthren</span>
+            <Logo size="sm" />
             <span className="text-slate-400">&copy; {new Date().getFullYear()}</span>
           </div>
 

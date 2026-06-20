@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import SignOutButton from "@/components/SignOutButton";
+import Logo from "@/components/Logo";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Orthren",
   description: "AI-assisted prior authorization packet builder for orthopedic practices",
   icons: {
-    icon: "/icon.svg",
+    icon: "/orthren-icon.svg",
   },
 };
 
@@ -30,6 +30,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <head>
+        <link rel="icon" type="image/svg+xml" href="/orthren-icon.svg" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
@@ -43,17 +44,9 @@ export default async function RootLayout({
             <div className="flex flex-1 items-center gap-2">
               <Link
                 href="/"
-                className="flex items-center gap-2 text-base font-bold text-clinical-navy hover:text-clinical-blue transition-colors"
+                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
               >
-                <Image
-                  src="/logo.png"
-                  alt="Orthren Logo"
-                  width={32}
-                  height={32}
-                  priority
-                  className="h-8 w-8 object-contain"
-                />
-                <span>Orthren</span>
+                <Logo size="md" />
                 <span className="rounded-full border border-[#CBD5E1] bg-[#F8F9FB] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
                   Beta
                 </span>
