@@ -37,12 +37,14 @@ function LoginForm() {
     setLoading(true);
     setError(null);
 
+    const redirectTo = process.env.NEXT_PUBLIC_SITE_URL
+      ? `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback`
+      : `${window.location.origin}/api/auth/callback`;
+
     const supabase = createSupabaseBrowserClient();
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/api/auth/callback`,
-      },
+      options: { emailRedirectTo: redirectTo },
     });
 
     if (error) {
