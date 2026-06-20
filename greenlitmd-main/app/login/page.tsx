@@ -1,10 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Logo from "@/components/Logo";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
+  const authError = searchParams.get("error") === "auth_failed";
+  const [dismissed, setDismissed] = useState(false);
+
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +39,18 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-[calc(100vh-56px)] items-center justify-center bg-[#F8F9FB] px-4">
       <div className="w-full max-w-sm">
+        {authError && !dismissed && (
+          <div className="mb-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <span className="flex-1">Login link expired or invalid. Request a new one.</span>
+            <button
+              onClick={() => setDismissed(true)}
+              className="shrink-0 font-medium hover:text-red-900"
+              aria-label="Dismiss"
+            >
+              &#x2715;
+            </button>
+          </div>
+        )}
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
           <Logo size="lg" showWordmark={false} />
           <h1 className="text-2xl font-bold text-[#0F2A4A]">Sign in to Orthren</h1>
