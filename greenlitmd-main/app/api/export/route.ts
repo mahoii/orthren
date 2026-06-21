@@ -160,7 +160,7 @@ function checklistPage(extracted: ExtractedChartData) {
     },
     {
       label: "PT/conservative care notes attached",
-      missing: extracted.conservative_treatments_attempted.length === 0
+      missing: (extracted.conservative_treatments_attempted ?? []).length === 0
     },
     { label: "Operative report attached (if applicable)", missing: false }
   ];
@@ -177,7 +177,7 @@ function checklistPage(extracted: ExtractedChartData) {
           spacing: { after: 240 },
           children: [
             new TextRun({
-              text: `${item.missing ? "⚠ ACTION REQUIRED" : "Pending"}: ${item.label}`,
+              text: `${item.missing ? "Pending" : "✓ Included"}: ${item.label}`,
               size: 24,
               bold: item.missing,
               color: item.missing ? "CC0000" : "000000"
