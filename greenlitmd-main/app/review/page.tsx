@@ -1,7 +1,7 @@
 "use client";
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import AnnotatedLetterComponent, { type AnnotationItem } from "@/components/AnnotatedLetter";
 import type { DenialRiskFlag, ExtractedChartData, ExtractedChartDataWithValidation, GeneratePaResponse } from "@/lib/types";
@@ -192,7 +192,7 @@ export default function ReviewPage() {
     setMode(newMode);
   };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (letterRef.current) {
       letterRef.current.scrollTop = savedScrollRef.current;
     }
