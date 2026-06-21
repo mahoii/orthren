@@ -95,6 +95,7 @@ export default function ReviewPage() {
   const [animatedScore, setAnimatedScore] = useState(0);
 
   const letterRef = useRef<HTMLDivElement>(null);
+  const savedScrollRef = useRef<number>(0);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasAnimated = useRef(false);
 
@@ -183,6 +184,19 @@ export default function ReviewPage() {
     if (v >= 5) return { color: '#d97706', label: 'Moderate — address gaps before submitting' };
     return { color: '#dc2626', label: 'High denial risk — major gaps' };
   }, [earnedScore, openCount]);
+
+  const handleModeToggle = (newMode: 'review' | 'edit') => {
+    if (letterRef.current) {
+      savedScrollRef.current = letterRef.current.scrollTop;
+    }
+    setMode(newMode);
+  };
+
+  useEffect(() => {
+    if (letterRef.current) {
+      letterRef.current.scrollTop = savedScrollRef.current;
+    }
+  }, [mode]);
 
   // Animate score bar on load
   useEffect(() => {
@@ -423,7 +437,7 @@ export default function ReviewPage() {
               <button
                 key={m}
                 type="button"
-                onClick={() => setMode(m)}
+                onClick={() => handleModeToggle(m)}
                 style={{
                   padding: '6px 12px',
                   fontSize: 12.5,
