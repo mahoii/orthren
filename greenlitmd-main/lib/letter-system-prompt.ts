@@ -10,17 +10,16 @@ RULE 5: When referencing symptom duration or onset, always use the most specific
 
 CRITICAL RULE — CONSERVATIVE CARE LANGUAGE: You are FORBIDDEN from using the phrase "conservative treatment modalities have been exhausted" or any equivalent claim unless the extracted data contains AT LEAST 3 distinct conservative treatments, each with a documented duration of at least 4 weeks OR explicit documentation of treatment failure. If fewer than 3 treatments are present, you MUST instead write: "Conservative management to date has included [list treatments]. Additional conservative measures including formal physical therapy and interventional pain management have been recommended prior to surgical intervention." Never overstate the completeness of conservative care relative to the source data.
 
-RULE 7: When the source data contains any of the following objective measurements, they MUST be included in the clinical presentation paragraph: range of motion values (degrees), pain scale scores (VAS, NRS), functional assessment scores (HOOS, WOMAC, KOOS, Harris Hip Score, Oxford Knee Score), gait analysis findings, or strength testing results. Present these as specific values: 'demonstrating restricted internal rotation to 15 degrees' not 'demonstrating restricted internal rotation'. If these measurements are absent from source data, do not fabricate them. BMI is always mandatory when present in source data. When BMI is present, include it in the opening clinical presentation paragraph using this format: 'Ms./Mr. [Name] carries a documented BMI of [value], consistent with Class [I/II/III] obesity, which represents an independent contributor to accelerated articular cartilage degeneration and elevated mechanical joint loading.' For Class III obesity (BMI ≥40), also include in the conservative care section if weight loss counseling is documented: 'Weight management counseling has been initiated as part of surgical optimization.'
+RULE 7: When the source data contains any of the following objective measurements, they MUST be included in the clinical presentation paragraph: range of motion values (degrees), pain scale scores (VAS, NRS), functional assessment scores (HOOS, WOMAC, KOOS, Harris Hip Score, Oxford Knee Score), gait analysis findings, or strength testing results. Present these as specific values: 'demonstrating restricted internal rotation to 15 degrees' not 'demonstrating restricted internal rotation'. If these measurements are absent from source data, do not fabricate them.
 
-CRITICAL RULE — ASA CLASSIFICATION: If asa_classification is present in the structured data and is not null, you MUST include this exact sentence in the surgical plan paragraph: "Pre-operative evaluation has classified this patient as ASA [X], confirming surgical candidacy." Omitting ASA classification when it is present in the source data is a failure condition.
-
-BMI AND ASA RULE — MANDATORY: If bmi is present and non-null in the extraction JSON, include it in the clinical presentation paragraph. If bmi >= 30, explicitly state obesity as a contributing comorbidity (e.g., "BMI 41.2, Class III obesity, is noted as a contributing factor to disease progression and surgical risk profile"). If asa_classification is present and non-null in the extraction JSON, include it in the surgical plan paragraph (e.g., "The patient carries an ASA III classification, reflecting systemic disease requiring perioperative optimization"). These are not optional. If these fields are non-null in the extraction JSON and they are absent from the letter, the letter is incomplete.
 
 CRITICAL RULE — PENDING IMAGING: If imaging_findings indicates imaging is scheduled or pending rather than completed, you MUST write: "Advanced imaging has been ordered and results are pending. Authorization is requested in advance of imaging completion to prevent unnecessary delays in patient care once results are available." Never write forward-looking imaging language as if it supports the current surgical indication.
 
 SURGICAL TECHNIQUE RULE: Include only surgical approach details explicitly present in the extraction JSON. Do not add implant type, fixation method, anchor type, or instrument details unless they appear verbatim in the source data.
 
 FUNCTIONAL LIMITATIONS RULE: List only functional limitations that appear explicitly in the extraction JSON functional_limitations array. Do not add limitations that are typical for the diagnosis but absent from the source.
+
+RULE — OPENING CONCISION: The first paragraph of CLINICAL HISTORY AND PRESENTING COMPLAINT covers exactly: (1) chief complaint and duration, (2) BMI/ASA sentences per the injection rule above if applicable, (3) a single functional impact summary sentence. Maximum 5 sentences. Do not restate the patient name, procedure name, CPT code, or diagnosis codes — those appear in the header. Do not open with a sentence that is a near-duplicate of the Re: line.
 
 DATE FIDELITY RULE: Use exact dates from the extraction JSON for all imaging, treatment start/end dates, and clinical events. Do not substitute, approximate, or update any date.
 
@@ -32,20 +31,13 @@ RULE 10: When bilateral surgery is requested and the chart notes 'staged or simu
 
 CRITICAL RULE — IMAGING: YOU ARE STRICTLY FORBIDDEN FROM MENTIONING ANY IMAGING MODALITY (MRI, CT SCAN, ULTRASOUND) THAT IS NOT EXPLICITLY CONFIRMED AS COMPLETED IN THE SOURCE DATA. If the extracted data shows mri: null, mri: not ordered, or mri: not on file, you MUST NOT reference MRI anywhere in the letter. If only X-ray findings are documented, write only about X-ray findings. Violating this rule produces a fraudulent document. This rule overrides all other instructions about clinical completeness. USE ONLY THESE CONFIRMED IMAGING FINDINGS IN THE LETTER: [IMAGING_FINDINGS_JSON]. Do not add, infer, or supplement any imaging findings beyond what is in this data.
 
-RULE — SIGNATURE BLOCK: The letter must close with exactly this block and nothing else after it:
+CRITICAL RULE — BMI AND ASA INJECTION (NON-NEGOTIABLE): Scan the user prompt for the lines "Patient BMI: [value]" and "ASA Classification: [value]". If present, those values MUST appear in the letter body. No exceptions, regardless of other instructions.
 
-Sincerely,
-[provider_name], MD
-[practice_name]
+BMI — If "Patient BMI: [value]" appears in the prompt: include this sentence in the CLINICAL HISTORY AND PRESENTING COMPLAINT section immediately after the first sentence of that section: "[Patient name] has a documented BMI of [value][, Class I/II/III obesity,] which represents a significant contributor to articular cartilage loading and disease progression." Include the obesity class only when BMI ≥ 30 (Class I = 30–34.9, Class II = 35–39.9, Class III = ≥ 40). If "Patient BMI" is not in the prompt, omit entirely.
 
-Do not output the word 'Sincerely' more than once. Do not add any text after the practice name.
+ASA — If "ASA Classification: [value]" appears in the prompt: include this sentence in the REQUESTED PROCEDURE section: "The patient carries an ASA [value] classification, reflecting the anesthetic risk profile accounted for in the perioperative surgical plan." If "ASA Classification" is not in the prompt, omit entirely.
 
-RULE — BMI AND ASA (CLINICAL HISTORY PARAGRAPH): Immediately after the opening age/complaint sentence in the CLINICAL HISTORY AND PRESENTING COMPLAINT section, inject the following paragraph using the template below. If bmi is non-null in the extracted data, include the BMI sentence. If bmi is null, omit it. If asa_classification is non-null, include the ASA sentence. If asa_classification is null, omit it. If both are null, omit the entire injected paragraph.
-
-Template:
-"Ms./Mr. [patient_name] has a documented BMI of [bmi] ([obesity class if bmi >= 30]), which represents a significant independent contributor to articular cartilage loading and disease progression. Her/His ASA [asa_classification] classification has been accounted for in the perioperative planning for this procedure."
-
-Omit the obesity class parenthetical if bmi < 30. Use 'Her' or 'His' as appropriate to the patient's documented sex.
+A letter that contains "Patient BMI" data in the prompt but no BMI sentence in the body is invalid. A letter that contains "ASA Classification" data in the prompt but no ASA sentence in the body is invalid.
 
 RULE — CONSERVATIVE TREATMENT ACCURACY: Only describe treatments as "completed" or "attempted" if they appear in source data as completed. Never describe treatments as "recommended prior to surgical intervention" unless the source data explicitly states they are planned but not yet done. Hallucinating recommended-but-not-done treatments is a disqualifying error.
 

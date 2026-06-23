@@ -327,8 +327,9 @@ ${asaClassification ? "ASA Classification: " + asaClassification : ""}${objectiv
 
   // Fix 4: Remove duplicate signature blocks
   letter = removeDuplicateSignatureBlocks(letter);
+  letter = injectBmiAsa(letter, extracted);
 
-  // Fix 5: Remove "not documented" language and sentences containing it
+  // Remove "not documented" language and sentences containing it
   letter = removeNotDocumentedLanguage(letter);
 
   letter = reidentify(letter, phiMap);
@@ -343,19 +344,45 @@ ${asaClassification ? "ASA Classification: " + asaClassification : ""}${objectiv
   });
 }
 
-// Fix 4: Remove duplicate signature blocks
-function removeDuplicateSignatureBlocks(letter: string) {
-  const signaturePattern = /Sincerely,[\s\S]*?MD[\s\S]*?(?=Sincerely,|$)/gi;
-  const matches = letter.match(signaturePattern);
+// Programmatic safety net: inject BMI/ASA sentences if the model omitted them
+function injectBmiAsa(letter: string, extracted: ExtractedChartData): string {
+  const bmi = (extracted as any).bmi as number | null | undefined;
+  const asa = (extracted as any).asa_classification as string | null | undefined;
 
-  if (matches && matches.length > 1) {
-    // Remove all signature blocks first
-    letter = letter.replace(signaturePattern, "");
-    // Add back only the last one
-    letter = letter + "\n" + matches[matches.length - 1];
+  if (bmi != null && !/\bBMI\b/i.test(letter)) {
+    const obesityClass =
+      bmi >= 40 ? "Class III obesity, " :
+      bmi >= 35 ? "Class II obesity, " :
+      bmi >= 30 ? "Class I obesity, " : "";
+    const sentence = `The patient has a documented BMI of ${bmi}, ${obesityClass}which represents a significant contributor to articular cartilage loading and disease progression.`;
+    letter = letter.replace(
+      /(CLINICAL HISTORY AND PRESENTING COMPLAINT\s*\n+[^.!?]+[.!?])/i,
+      `$1 ${sentence}`
+    );
+  }
+
+  if (asa != null && !/\bASA\b/i.test(letter)) {
+    const sentence = `The patient carries an ASA ${asa} classification, reflecting the anesthetic risk profile accounted for in the perioperative surgical plan.`;
+    letter = letter.replace(
+      /(REQUESTED PROCEDURE\s*\n+)/i,
+      `$1${sentence} `
+    );
   }
 
   return letter;
+}
+
+// Remove duplicate signature blocks — keep only the last "Sincerely," onwards
+function removeDuplicateSignatureBlocks(letter: string) {
+  const occurrences: number[] = [];
+  const re = /Sincerely,/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(letter)) !== null) occurrences.push(m.index);
+  if (occurrences.length <= 1) return letter;
+
+  const firstIdx = occurrences[0];
+  const lastIdx = occurrences[occurrences.length - 1];
+  return letter.slice(0, firstIdx).trimEnd() + "\n\n" + letter.slice(lastIdx);
 }
 
 // Fix 5: Remove "not documented" language and sentences containing it
