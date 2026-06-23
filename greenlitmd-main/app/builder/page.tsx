@@ -8,41 +8,64 @@ import { CLEAN_TKA, MESSY_ROTATOR_CUFF, INCOMPLETE_LUMBAR_FUSION } from "@/lib/d
 
 type ProfileKey = "CLEAN_TKA" | "MESSY_ROTATOR_CUFF" | "INCOMPLETE_LUMBAR_FUSION";
 
-const profileMap: Record<
-  ProfileKey,
-  {
-    data: typeof CLEAN_TKA;
-    cpt: string;
-    payer: string;
-    provider: string;
-    practice: string;
-    fileName: string;
-  }
-> = {
+type ProfileMeta = {
+  label: string;
+  sublabel: string;
+  data: typeof CLEAN_TKA;
+  cpt: string;
+  payer: string;
+  provider: string;
+  practice: string;
+  fileName: string;
+  scoreLabel: string;
+  scoreColor: "green" | "amber" | "red";
+};
+
+const PROFILES: Record<ProfileKey, ProfileMeta> = {
   CLEAN_TKA: {
+    label: "Clean TKA Chart",
+    sublabel: "High score — ready to submit",
     data: CLEAN_TKA,
     cpt: "27447",
     payer: "BlueCross BlueShield",
     provider: "Dr. R. Chambers, MD",
     practice: "Westbrook Orthopedic Surgery Center",
-    fileName: "Maria_Delgado_Chart.pdf"
+    fileName: "Maria_Delgado_Chart.pdf",
+    scoreLabel: "≈8.0/10",
+    scoreColor: "green",
   },
   MESSY_ROTATOR_CUFF: {
+    label: "Messy Rotator Cuff",
+    sublabel: "Intermediate — minor gaps",
     data: MESSY_ROTATOR_CUFF,
     cpt: "29827",
     payer: "UnitedHealthcare",
     provider: "Dr. Alex Mercer, MD",
     practice: "Brooklyn Sports Medicine",
-    fileName: "robert_chen_dictation.docx"
+    fileName: "robert_chen_dictation.docx",
+    scoreLabel: "≈7.0/10",
+    scoreColor: "amber",
   },
   INCOMPLETE_LUMBAR_FUSION: {
+    label: "Incomplete Lumbar Fusion",
+    sublabel: "High denial risk — major gaps",
     data: INCOMPLETE_LUMBAR_FUSION,
     cpt: "22630",
     payer: "Cigna",
     provider: "Dr. Sarah Jenkins, MD",
     practice: "Spine & Joint Institute",
-    fileName: "eleanor_vance_chart.txt"
-  }
+    fileName: "eleanor_vance_chart.txt",
+    scoreLabel: "≈4.5/10",
+    scoreColor: "red",
+  },
+};
+
+const PROFILE_KEYS: ProfileKey[] = ["CLEAN_TKA", "MESSY_ROTATOR_CUFF", "INCOMPLETE_LUMBAR_FUSION"];
+
+const scorePillBg: Record<ProfileMeta["scoreColor"], string> = {
+  green: "bg-green-50 text-green-700 border-green-200",
+  amber: "bg-amber-50 text-amber-700 border-amber-200",
+  red: "bg-red-50 text-red-700 border-red-200",
 };
 
 const progressSteps = [
@@ -140,7 +163,7 @@ export default function UploadPage() {
     setIsDemoMode(true);
     setFile(null);
 
-    const profile = profileMap[key];
+    const profile = PROFILES[key];
 
     // Auto-fill form fields from the profile metadata
     setCptCode(profile.cpt);
@@ -216,7 +239,7 @@ export default function UploadPage() {
 
     // If a Test Case is active, simulate 1.5s and save its specific JSON profile
     if (activeTestCase) {
-      const profile = profileMap[activeTestCase];
+      const profile = PROFILES[activeTestCase];
       const stepInterval = Math.floor(1500 / progressSteps.length);
       const progressTimer = window.setInterval(() => {
         setActiveStep((current) => Math.min(current + 1, progressSteps.length - 1));
@@ -293,14 +316,35 @@ export default function UploadPage() {
   return (
     <main className="min-h-[calc(100vh-3.5rem)] bg-[#F8F9FB]">
       <section className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-5xl flex-col justify-center px-6 py-10">
+
+        {/* ── Header — conditional on sandbox mode ───────────────────────── */}
         <div className="mb-8">
-          <p className="text-sm font-semibold uppercase tracking-wide text-clinical-blue">Orthopedic PA Builder</p>
-          <h1 className="mt-3 text-3xl font-semibold text-clinical-navy md:text-4xl">
-            Orthopedic PA denials cost your practice $15K–$50K. Generate payer-ready packets in 60 seconds with Orthren.
-          </h1>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
-            Upload the chart, enter the request details, and review the AI-assisted draft before exporting the final packet.
-          </p>
+          {activeTestCase !== null ? (
+            <>
+              <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3.5 py-1 text-xs font-semibold tracking-wide text-amber-700 shadow-sm mb-4">
+                <span className="flex h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true" />
+                Interactive Sandbox — No real data processed
+              </div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-clinical-blue">SANDBOX DEMO</p>
+              <h1 className="mt-3 text-3xl font-semibold text-clinical-navy md:text-4xl">
+                See a payer-ready PA packet built in real time.
+              </h1>
+              <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
+                Choose a synthetic patient profile below and click &ldquo;Generate PA Packet&rdquo; to watch
+                the full pipeline run — zero real data, zero API calls.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-semibold uppercase tracking-wide text-clinical-blue">Orthopedic PA Builder</p>
+              <h1 className="mt-3 text-3xl font-semibold text-clinical-navy md:text-4xl">
+                Orthopedic PA denials cost your practice $15K–$50K. Generate payer-ready packets in 60 seconds with Orthren.
+              </h1>
+              <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
+                Upload the chart, enter the request details, and review the AI-assisted draft before exporting the final packet.
+              </p>
+            </>
+          )}
           <div className="mt-8 flex items-center gap-4">
             <Link
               href="/"
@@ -311,137 +355,197 @@ export default function UploadPage() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="grid gap-7 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="flex flex-col gap-3">
-          <label
-            onDragOver={(event) => {
-              event.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleDrop}
-            className={`flex min-h-80 cursor-pointer flex-col items-center justify-center rounded-lg border px-8 text-center transition duration-200 hover:shadow-[0_16px_40px_rgba(30,58,95,0.10)] ${
-              isDragging ? "border-clinical-navy bg-blue-50 shadow-[0_16px_40px_rgba(30,58,95,0.10)]" : "border-[#CBD5E1] bg-white"
-            }`}
-          >
-            <input
-              className="sr-only"
-              type="file"
-              accept="application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.txt,text/plain"
-              onChange={handleFileChange}
-            />
-            <span className="rounded-full bg-clinical-navy px-4 py-2 text-sm font-semibold text-white shadow-sm">
-              Chart upload
-            </span>
-            <span className="mt-5 text-xl font-semibold text-clinical-navy">
-              {file
-                ? file.name
-                : activeTestCase
-                ? profileMap[activeTestCase].fileName
-                : isDemoMode
-                ? "Maria_Delgado_Chart.pdf"
-                : "Drag and drop the patient chart here"}
-            </span>
-            <span className="mt-3 text-sm text-slate-500">
-              {file && !isDemoMode && !activeTestCase
-                ? "Chart loaded — ready to generate"
-                : activeTestCase
-                ? "Test case loaded — ready to generate"
-                : isDemoMode
-                ? "Sample chart loaded — ready to generate"
-                : "or click to browse - PDF, DOCX, or TXT supported"}
-            </span>
-            {file && !isDemoMode ? <span className="mt-4 text-sm text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</span> : null}
-            {(isDemoMode || activeTestCase) && !file ? (
-              <span className="mt-4 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
-                Demo — sample patient data
-              </span>
-            ) : null}
-          </label>
-
-          <div className="rounded-lg border border-clinical-line bg-white px-5 py-4">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-clinical-navy">
-              Interactive Demo Test Cases (1.5s Mock Generation):
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {([
-                { label: "Clean TKA", key: "CLEAN_TKA" as const },
-                { label: "Messy OCR (Rotator Cuff)", key: "MESSY_ROTATOR_CUFF" as const },
-                { label: "Incomplete Lumbar Fusion", key: "INCOMPLETE_LUMBAR_FUSION" as const }
-              ]).map(({ label, key }) => (
+        {/* ── Profile selector — always visible ──────────────────────────── */}
+        <div className="mb-7 rounded-lg border border-clinical-line bg-white p-5 shadow-sm">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-clinical-navy">
+            SELECT A PATIENT PROFILE TO TEST:
+          </p>
+          <div className="flex flex-wrap gap-3" role="group" aria-label="Patient profile selector">
+            {PROFILE_KEYS.map((key) => {
+              const p = PROFILES[key];
+              const isActive = activeTestCase === key;
+              return (
                 <button
                   key={key}
                   type="button"
                   id={`test-case-${key.toLowerCase().replace(/_/g, "-")}`}
                   disabled={isLoading}
                   onClick={() => triggerTestCase(key)}
-                  className={`rounded-full border px-4 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                    activeTestCase === key
-                      ? "border-clinical-navy bg-clinical-navy text-white"
-                      : "border-clinical-line bg-white text-slate-700 hover:bg-slate-50"
+                  aria-pressed={isActive}
+                  className={`flex flex-col items-start gap-0.5 rounded-lg border px-4 py-3 text-left transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
+                    isActive
+                      ? "border-clinical-navy bg-clinical-navy text-white shadow-md"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
                   }`}
                 >
-                  {label}
+                  <span className="text-sm font-semibold">{p.label}</span>
+                  <span className={`text-xs ${isActive ? "text-blue-200" : "text-slate-500"}`}>
+                    {p.sublabel}
+                  </span>
+                  <span
+                    className={`mt-1.5 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+                      isActive
+                        ? "border-white/30 bg-white/10 text-white"
+                        : `border ${scorePillBg[p.scoreColor]}`
+                    }`}
+                  >
+                    {p.scoreLabel}
+                  </span>
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="grid gap-7 lg:grid-cols-[1.1fr_0.9fr]">
+
+          {/* ── Left panel — conditional on sandbox mode ────────────────── */}
+          <div className="flex flex-col gap-3">
+            {activeTestCase !== null ? (
+              <>
+                {/* Static chart card */}
+                <div className="flex min-h-80 flex-col items-center justify-center rounded-lg border border-[#CBD5E1] bg-white px-8 text-center transition-all">
+                  <span
+                    className="flex h-14 w-14 items-center justify-center rounded-xl bg-clinical-navy/5 mb-4"
+                    aria-hidden="true"
+                  >
+                    <svg
+                      className="h-7 w-7 text-clinical-navy"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={1.5}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
+                      />
+                    </svg>
+                  </span>
+                  <span className="rounded-full bg-clinical-navy px-4 py-2 text-sm font-semibold text-white shadow-sm mb-4">
+                    Sample chart loaded
+                  </span>
+                  <span className="text-xl font-semibold text-clinical-navy">
+                    {PROFILES[activeTestCase].fileName}
+                  </span>
+                  <span className="mt-2 text-sm text-slate-500">Sample Chart Loaded Automatically</span>
+                  <span className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+                    <span className="h-1.5 w-1.5 rounded-full bg-green-500" aria-hidden="true" />
+                    Ready to generate
+                  </span>
+                </div>
+
+                {/* Sandbox mode banner */}
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 mb-1">
+                    SANDBOX MODE
+                  </p>
+                  <p className="text-xs text-amber-800 leading-relaxed">
+                    All fields are pre-configured with synthetic patient data matching the selected
+                    profile. No real charts, patient records, or API calls are used.
+                  </p>
+                </div>
+              </>
+            ) : (
+              /* Drag-and-drop file upload zone */
+              <label
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+                className={`flex min-h-80 cursor-pointer flex-col items-center justify-center rounded-lg border px-8 text-center transition duration-200 hover:shadow-[0_16px_40px_rgba(30,58,95,0.10)] ${
+                  isDragging ? "border-clinical-navy bg-blue-50 shadow-[0_16px_40px_rgba(30,58,95,0.10)]" : "border-[#CBD5E1] bg-white"
+                }`}
+              >
+                <input
+                  className="sr-only"
+                  type="file"
+                  accept="application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.txt,text/plain"
+                  onChange={handleFileChange}
+                />
+                <span className="rounded-full bg-clinical-navy px-4 py-2 text-sm font-semibold text-white shadow-sm">
+                  Chart upload
+                </span>
+                <span className="mt-5 text-xl font-semibold text-clinical-navy">
+                  {file ? file.name : "Drag and drop the patient chart here"}
+                </span>
+                <span className="mt-3 text-sm text-slate-500">
+                  {file ? "Chart loaded — ready to generate" : "or click to browse - PDF, DOCX, or TXT supported"}
+                </span>
+                {file ? <span className="mt-4 text-sm text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</span> : null}
+              </label>
+            )}
           </div>
 
+          {/* ── Right panel — conditional on sandbox mode ───────────────── */}
           <div className="rounded-lg border border-clinical-line bg-white p-6 shadow-sm">
             <div className="space-y-5">
-              <Field
-                label="Procedure CPT code"
-                value={cptCode}
-                onChange={setCptCode}
-                placeholder="e.g. 29827"
-                disabled={isLoading}
-              >
-                {cptWarning ? (
-                  <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-                    <p>
-                      CPT code {cptWarning.enteredCode} was not recognized as a common orthopedic surgical code. Please
-                      verify before continuing.
-                    </p>
-                    {cptWarning.closestMatch ? (
-                      <p className="mt-1 flex items-center gap-3 font-medium">
-                        <span>
-                          Closest match: CPT {cptWarning.closestMatch.code} - {cptWarning.closestMatch.description}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setCptCode(cptWarning.closestMatch!.code)}
-                          className="ml-auto inline-flex items-center rounded-md bg-clinical-navy px-2 py-1 text-xs font-semibold text-white hover:bg-clinical-blue"
-                        >
-                          Use
-                        </button>
-                      </p>
+              {activeTestCase !== null ? (
+                <>
+                  <ReadOnlyField label="Procedure CPT code" value={cptCode} />
+                  <ReadOnlyField label="Insurance payer name" value={payerName} />
+                  <ReadOnlyField label="Requesting provider name" value={providerName} />
+                  <ReadOnlyField label="Practice name" value={practiceName} optional />
+                </>
+              ) : (
+                <>
+                  <Field
+                    label="Procedure CPT code"
+                    value={cptCode}
+                    onChange={setCptCode}
+                    placeholder="e.g. 29827"
+                    disabled={isLoading}
+                  >
+                    {cptWarning ? (
+                      <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+                        <p>
+                          CPT code {cptWarning.enteredCode} was not recognized as a common orthopedic surgical code. Please
+                          verify before continuing.
+                        </p>
+                        {cptWarning.closestMatch ? (
+                          <p className="mt-1 flex items-center gap-3 font-medium">
+                            <span>
+                              Closest match: CPT {cptWarning.closestMatch.code} - {cptWarning.closestMatch.description}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setCptCode(cptWarning.closestMatch!.code)}
+                              className="ml-auto inline-flex items-center rounded-md bg-clinical-navy px-2 py-1 text-xs font-semibold text-white hover:bg-clinical-blue"
+                            >
+                              Use
+                            </button>
+                          </p>
+                        ) : null}
+                      </div>
                     ) : null}
-                  </div>
-                ) : null}
-              </Field>
-              <Field
-                label="Insurance payer name"
-                value={payerName}
-                onChange={setPayerName}
-                placeholder="e.g. Aetna"
-                disabled={isLoading}
-              />
-              <Field
-                label="Requesting provider name"
-                value={providerName}
-                onChange={setProviderName}
-                placeholder="e.g. Jane Smith, MD"
-                disabled={isLoading}
-              />
-              <Field
-                label="Practice name"
-                value={practiceName}
-                onChange={setPracticeName}
-                placeholder="e.g. NYU Langone Orthopedics"
-                disabled={isLoading}
-                optional
-              />
+                  </Field>
+                  <Field
+                    label="Insurance payer name"
+                    value={payerName}
+                    onChange={setPayerName}
+                    placeholder="e.g. Aetna"
+                    disabled={isLoading}
+                  />
+                  <Field
+                    label="Requesting provider name"
+                    value={providerName}
+                    onChange={setProviderName}
+                    placeholder="e.g. Jane Smith, MD"
+                    disabled={isLoading}
+                  />
+                  <Field
+                    label="Practice name"
+                    value={practiceName}
+                    onChange={setPracticeName}
+                    placeholder="e.g. NYU Langone Orthopedics"
+                    disabled={isLoading}
+                    optional
+                  />
+                </>
+              )}
             </div>
 
             {error ? (
@@ -459,7 +563,9 @@ export default function UploadPage() {
                   <p className="text-sm font-semibold text-clinical-navy">Generating packet</p>
                 </div>
                 <p className="text-xs text-slate-500 mb-4">
-                  AI analysis takes 20–40 seconds. Your packet is being built.
+                  {activeTestCase !== null
+                    ? "Simulated analysis running. Your packet will be ready shortly."
+                    : "AI analysis takes 20–40 seconds. Your packet is being built."}
                 </p>
                 <div className="space-y-3">
                   {progressSteps.map((step, index) => (
@@ -540,6 +646,36 @@ function Field({ label, value, onChange, placeholder, disabled, children, option
       />
       {children}
     </label>
+  );
+}
+
+type ReadOnlyFieldProps = {
+  label: string;
+  value: string;
+  optional?: boolean;
+};
+
+function ReadOnlyField({ label, value, optional }: ReadOnlyFieldProps) {
+  return (
+    <div>
+      <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+        {label}
+        {optional ? (
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+            Optional
+          </span>
+        ) : null}
+        <span className="ml-auto rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-clinical-blue">
+          Sandbox
+        </span>
+      </span>
+      <input
+        readOnly
+        value={value}
+        tabIndex={-1}
+        className="mt-2 w-full cursor-not-allowed rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-medium text-slate-500 outline-none"
+      />
+    </div>
   );
 }
 

@@ -37,9 +37,15 @@ function LoginForm() {
     setLoading(true);
     setError(null);
 
-    const redirectTo = process.env.NEXT_PUBLIC_SITE_URL
+    const base = process.env.NEXT_PUBLIC_SITE_URL
       ? `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback`
       : `${window.location.origin}/api/auth/callback`;
+    const callbackUrl = new URL(base);
+    const redirectParam = new URLSearchParams(window.location.search).get("redirect");
+    if (redirectParam && redirectParam.startsWith("/")) {
+      callbackUrl.searchParams.set("redirect", redirectParam);
+    }
+    const redirectTo = callbackUrl.toString();
 
     const supabase = createSupabaseBrowserClient();
     const { error } = await supabase.auth.signInWithOtp({
