@@ -32,15 +32,24 @@ RULE 10: When bilateral surgery is requested and the chart notes 'staged or simu
 
 CRITICAL RULE — IMAGING: YOU ARE STRICTLY FORBIDDEN FROM MENTIONING ANY IMAGING MODALITY (MRI, CT SCAN, ULTRASOUND) THAT IS NOT EXPLICITLY CONFIRMED AS COMPLETED IN THE SOURCE DATA. If the extracted data shows mri: null, mri: not ordered, or mri: not on file, you MUST NOT reference MRI anywhere in the letter. If only X-ray findings are documented, write only about X-ray findings. Violating this rule produces a fraudulent document. This rule overrides all other instructions about clinical completeness. USE ONLY THESE CONFIRMED IMAGING FINDINGS IN THE LETTER: [IMAGING_FINDINGS_JSON]. Do not add, infer, or supplement any imaging findings beyond what is in this data.
 
-RULE — SIGNATURE BLOCK: The letter must end with exactly ONE signature block. Format: "Sincerely,\n[Provider Name], MD\n[Practice Name]". Never output "Sincerely" twice. Never output both "R. Chambers" and "Dr. R. Chambers". If you detect a duplicate signature block, remove the first instance.
+RULE — SIGNATURE BLOCK: The letter must close with exactly this block and nothing else after it:
 
-RULE — BMI: If extracted BMI is >= 30, you MUST include a sentence in the clinical presentation paragraph identifying obesity (with exact BMI and class if Class II/III) as a contributing factor to disease progression and surgical candidacy.
+Sincerely,
+[provider_name], MD
+[practice_name]
 
-RULE — ASA: If ASA classification is present in extracted data, you MUST include it in the surgical plan paragraph. Format: "The patient carries an ASA [X] classification, reflecting [brief clinical rationale]."
+Do not output the word 'Sincerely' more than once. Do not add any text after the practice name.
+
+RULE — BMI AND ASA (CLINICAL HISTORY PARAGRAPH): Immediately after the opening age/complaint sentence in the CLINICAL HISTORY AND PRESENTING COMPLAINT section, inject the following paragraph using the template below. If bmi is non-null in the extracted data, include the BMI sentence. If bmi is null, omit it. If asa_classification is non-null, include the ASA sentence. If asa_classification is null, omit it. If both are null, omit the entire injected paragraph.
+
+Template:
+"Ms./Mr. [patient_name] has a documented BMI of [bmi] ([obesity class if bmi >= 30]), which represents a significant independent contributor to articular cartilage loading and disease progression. Her/His ASA [asa_classification] classification has been accounted for in the perioperative planning for this procedure."
+
+Omit the obesity class parenthetical if bmi < 30. Use 'Her' or 'His' as appropriate to the patient's documented sex.
 
 RULE — CONSERVATIVE TREATMENT ACCURACY: Only describe treatments as "completed" or "attempted" if they appear in source data as completed. Never describe treatments as "recommended prior to surgical intervention" unless the source data explicitly states they are planned but not yet done. Hallucinating recommended-but-not-done treatments is a disqualifying error.
 
-RULE — SURGICAL APPROACH: Always include the exact surgical approach and implant type as extracted (e.g., "cemented implant, bilateral"). Do not replace with vague language about surgeon discretion.
+RULE — SURGICAL APPROACH: In the REQUESTED PROCEDURE section, state the surgical approach and implant type exactly as extracted. Do not use phrases like 'to be determined by the operating surgeon' or 'based on intraoperative findings.' If surgical_approach in extracted data is 'cemented implant, bilateral', write exactly: 'Surgical Approach: Cemented implant, bilateral.'
 
 RULE — STRUCTURE: Use the following section headers exactly:
 CLINICAL HISTORY AND PRESENTING COMPLAINT
@@ -80,4 +89,4 @@ For the Member ID header line: insert the member ID if present in source data; o
 
 CRITICAL RULE — MISSING INFORMATION: If source data is insufficient for a specific field, either omit that detail entirely from the narrative or note it once at the end of the relevant paragraph using this exact phrase: "Chart review is recommended to confirm this detail prior to submission." Never use this phrase more than once per letter. Never use square brackets.
 
-Never use the phrase 'not documented', 'not well-documented', 'not recorded', 'not on file', 'are not recorded', 'is not recorded', 'duration and outcome are not', or 'exact duration and follow-up are not' in the generated letter. If information is missing for a specific treatment or finding, either omit that detail entirely from the narrative or use clinical language such as 'clinical response was noted' or 'treatment was discontinued.' The letter must read as a polished clinical document, not a data extraction report. SIGNATURE RULE: Output exactly one signature block at the end of the letter. Format: "Sincerely," on one line, then "[Provider Name], MD" on the next line, then "[Practice Name]" on the next line only if a non-empty practice name was provided. Never output two signature blocks. Never prefix the name with "Dr." in the signature — the MD suffix is sufficient. If you find yourself writing a second signature block, delete it. Never write 'Orthopedic Practice' unless that was explicitly provided as the practice name. Write in formal clinical language. Do not use bullet points. CRITICAL: Never invent, assume, or fabricate a practice name, clinic name, or institution name.`;
+Never use the phrase 'not documented', 'not well-documented', 'not recorded', 'not on file', 'are not recorded', 'is not recorded', 'duration and outcome are not', or 'exact duration and follow-up are not' in the generated letter. If information is missing for a specific treatment or finding, either omit that detail entirely from the narrative or use clinical language such as 'clinical response was noted' or 'treatment was discontinued.' The letter must read as a polished clinical document, not a data extraction report. SIGNATURE RULE: The letter must close with exactly this block and nothing else after it: "Sincerely," on one line, then "[provider_name], MD" on the next line, then "[practice_name]" on the next line. Do not output the word 'Sincerely' more than once. Do not add any text after the practice name. Never prefix the name with "Dr." in the signature — the MD suffix is sufficient. Never write 'Orthopedic Practice' unless that was explicitly provided as the practice name. Write in formal clinical language. Do not use bullet points. CRITICAL: Never invent, assume, or fabricate a practice name, clinic name, or institution name.`;
