@@ -304,6 +304,23 @@ export default function ReviewPage() {
       if (!res.ok) throw new Error(json.error ?? 'Unable to regenerate the letter.');
       if (json.letter) {
         setEditedLetter(json.letter);
+        // Persist resolved factors into pa_strength so the score doesn't
+        // regress when we clear the resolved[] array below.
+        if (resolved.length > 0) {
+          setData(prev => {
+            if (!prev) return prev;
+            const updatedPaStrength = { ...prev.extracted.pa_strength } as Record<string, { score: number; note: string; anchorText?: string }>;
+            for (const key of resolved) {
+              if (updatedPaStrength[key]) {
+                updatedPaStrength[key] = { ...updatedPaStrength[key], score: 1 };
+              }
+            }
+            return {
+              ...prev,
+              extracted: { ...prev.extracted, pa_strength: updatedPaStrength as typeof prev.extracted.pa_strength },
+            };
+          });
+        }
         setResolved([]);
         setActiveIssue(null);
         showToast('Letter regenerated with your updates');
