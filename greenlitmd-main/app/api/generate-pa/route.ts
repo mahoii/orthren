@@ -137,6 +137,7 @@ export async function POST(request: Request) {
     const requestDetails = { cptCode, payerName, providerName, practiceName };
     const { redacted: redactedChart, map: phiMap } = deidentify(chartText);
     const extracted = await extractChartData(redactedChart, chartText, requestDetails, phiMap);
+    console.log('EXTRACTION OUTPUT:', JSON.stringify(extracted, null, 2));
 
     if (process.env.NODE_ENV === "development") {
       console.log("[EXTRACTION JSON]", JSON.stringify(extracted, null, 2));
