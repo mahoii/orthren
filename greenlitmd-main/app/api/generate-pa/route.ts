@@ -8,6 +8,7 @@ import { letterSystemPrompt } from "@/lib/letter-system-prompt";
 import { callAnthropicWithRetry } from "@/lib/anthropic";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import { deidentify, reidentify } from "@/lib/deidentify";
+import { validateExtraction } from "@/lib/extractionValidator";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,33 +25,60 @@ type RequestDetails = {
 };
 
 const extractionSystemPrompt =
-  `You are a medical records analyst specializing in orthopedic prior authorization. Extract the following from the provided patient chart text and return ONLY valid JSON. Include these chart data keys: patient_name, date_of_birth, diagnosis_codes (array), primary_complaint, symptom_duration, functional_limitations (array of specific limitations mentioned), objective_measurements (array), conservative_treatments_attempted (array), imaging_findings (object with modality and key findings), requested_procedure, surgical_approach_if_mentioned, denial_risk_flags (array of structured objects — see schema below). If information is not found, use null for strings and empty arrays for arrays, except conservative_treatments_attempted must follow the instruction below. After extracting all fields, also return a 'validation' object with hard_blocks and soft_warnings arrays. For hard_blocks, include any of these fields that are missing or null: patient_name, diagnosis_codes (if empty), requested_procedure. For soft_warnings, include any of these fields that are missing or null: surgical_approach_if_mentioned, imaging_findings, conservative_treatments_attempted (if empty), functional_limitations (if empty). Each block/warning object must have: {field, label, message}. Return the complete JSON including chart data and validation object.
+  `You are a medical records analyst. Extract data from the provided patient chart and return ONLY valid JSON with the exact keys listed below.
 
-For objective_measurements, extract ALL quantified clinical measurements documented in the chart. This includes: range of motion values (e.g. "Knee flexion limited to 85 degrees"), pain scale scores (e.g. "Pain rated 8/10 at rest"), functional outcome scores (e.g. "KOOS score 32/100", "Oxford Knee Score 18/48", "VAS 7.5"), strength measurements, walking distance or tolerance, and any other numeric clinical findings. Return each as a plain English string (e.g. "ROM: knee flexion 85Â°, extension deficit 10Â°"). Return an empty array if no quantified measurements are documented.
+MANDATORY EXTRACTION RULES — violating any of these is a critical error:
 
-Extract ALL conservative treatments attempted by the patient before surgery. For each treatment found, you MUST provide the treatment_name â€” never return null or unknown for this field. Search the chart for any mention of: physical therapy (PT), occupational therapy (OT), NSAIDs (ibuprofen, naproxen, celecoxib, meloxicam), corticosteroid injections (cortisone, kenalog, depomedrol), hyaluronic acid injections (synvisc, hyalgan, euflexxa), bracing or orthotics, activity modification, weight loss programs, chiropractic care, acupuncture, topical medications, opioid or non-opioid analgesics, or any other conservative intervention mentioned.
+DATES: Extract dates exactly as written in the source. If the source says "03/01/2025", output "03/01/2025". Never infer the year. Never substitute the current date. If a date is genuinely absent, output null.
+
+DURATIONS: Each treatment has its own independent duration field. Do NOT carry over durations from one treatment to another. Extract the exact language used ("4 months", "6 weeks", "3 days"). If no duration is stated, output null.
+
+OUTCOMES/RELIEF DURATION: Extract only what the source explicitly states. If source says "2 weeks of relief", output "2 weeks". Do not round up or infer.
+
+SYMPTOM DURATION: Extract the exact stated duration ("8 months", "since Thanksgiving"). Never approximate. If source says "8 months", do not output "approximately 6 months".
+
+FUNCTIONAL LIMITATIONS: List only limitations explicitly stated in the source. Do not infer limitations from the diagnosis. Do not add limitations that are typical for the condition but not stated.
+
+IMAGING: Only extract imaging explicitly documented as completed with a result. If MRI is "pending" or "scheduled", set mri completed to false and mri to null fields. Use the exact date stated in the source for imaging date.
+
+SURGICAL TECHNIQUE: Extract only what is explicitly stated (e.g., "arthroscopic", "anterior approach"). Do not add implant types, fixation methods, or approach details not present in the source.
+
+CONSERVATIVE TREATMENTS: Each entry in conservative_treatments_attempted must have its own independent duration, dates, and outcome. Never copy a value from one treatment row to another.
+
+NULL POLICY: If a field is not explicitly present in the source, output null. Never fabricate a value because it seems medically reasonable.
+
+Include these chart data keys: patient_name, date_of_birth, diagnosis_codes (array), primary_complaint, symptom_duration (exact verbatim from source), functional_limitations (array — source-only, no inferences), objective_measurements (array), conservative_treatments_attempted (array — see schema below), imaging_findings (object — see schema below), requested_procedure, surgical_approach_if_mentioned (verbatim from source only), bmi, asa_classification, payer_name, denial_risk_flags (array of structured objects — see schema below). If information is not found, use null for strings and empty arrays for arrays, except conservative_treatments_attempted must follow the instruction below. After extracting all fields, also return a 'validation' object with hard_blocks and soft_warnings arrays. For hard_blocks, include any of these fields that are missing or null: patient_name, diagnosis_codes (if empty), requested_procedure. For soft_warnings, include any of these fields that are missing or null: surgical_approach_if_mentioned, imaging_findings, conservative_treatments_attempted (if empty), functional_limitations (if empty). Each block/warning object must have: {field, label, message}. Return the complete JSON including chart data and validation object.
+
+For objective_measurements, extract ALL quantified clinical measurements documented in the chart. This includes: range of motion values (e.g. "Knee flexion limited to 85 degrees"), pain scale scores (e.g. "Pain rated 8/10 at rest"), functional outcome scores (e.g. "KOOS score 32/100", "Oxford Knee Score 18/48", "VAS 7.5"), strength measurements, walking distance or tolerance, and any other numeric clinical findings. Return each as a plain English string. Return an empty array if no quantified measurements are documented.
+
+Extract ALL conservative treatments attempted by the patient before surgery. For each treatment found, you MUST provide the treatment_name — never return null or unknown for this field. Search the chart for any mention of: physical therapy (PT), occupational therapy (OT), NSAIDs (ibuprofen, naproxen, celecoxib, meloxicam), corticosteroid injections (cortisone, kenalog, depomedrol), hyaluronic acid injections (synvisc, hyalgan, euflexxa), bracing or orthotics, activity modification, weight loss programs, chiropractic care, acupuncture, topical medications, opioid or non-opioid analgesics, or any other conservative intervention mentioned.
 For each treatment found return an object with exactly these fields:
 
-treatment_name: the specific name of the treatment (e.g. Physical Therapy, Ibuprofen/NSAID, Corticosteroid Injection â€” Kenalog, Hyaluronic Acid Injection â€” Synvisc). Never return null. If ambiguous, make the most reasonable clinical inference from context.
-duration: how long the treatment was attempted (e.g. 6 months, 8 weeks). If explicit duration is not stated BUT dates are provided, calculate the duration based on the dates (e.g., if injections are dated January 2024 and May 2024, write "5 months between injections" or "ongoing from January to May 2024"). Return null only if neither duration nor dates are mentioned.
+treatment_name: the specific name of the treatment (e.g. Physical Therapy, Ibuprofen/NSAID, Corticosteroid Injection — Kenalog, Hyaluronic Acid Injection — Synvisc). Never return null. If ambiguous, make the most reasonable clinical inference from context.
+duration: how long the treatment was attempted (e.g. 6 months, 8 weeks). Extract exact language from source. If explicit duration is not stated BUT dates are provided, calculate the duration based on the dates. Return null only if neither duration nor dates are mentioned.
 outcome: what happened (e.g. failed, minimal improvement, GI intolerance developed, temporary relief only, no improvement). Use the exact language from the chart where possible.
 dates: any specific dates mentioned for this treatment. Return null if not found.
+relief_duration: if the treatment provided any period of relief, extract exactly how long as stated in the source (e.g. "2 weeks", "3 days"). Return null if not stated.
 
-Return a minimum of 1 treatment object. If no treatments are found at all, return a single object with treatment_name: Conservative treatment history not documented, duration: null, outcome: null, dates: null.
+Return a minimum of 1 treatment object. If no treatments are found at all, return a single object with treatment_name: Conservative treatment history not documented, duration: null, outcome: null, dates: null, relief_duration: null.
+
+For imaging_findings, return an object with this exact structure:
+{ "xray": { "completed": boolean, "date": string|null, "findings": string|null }, "mri": { "completed": boolean, "date": string|null, "findings": string|null } }
+Set completed to true only if the imaging is explicitly documented as completed with results present in the source. Set completed to false if imaging is pending, scheduled, not ordered, or not mentioned. Use the exact date stated in the source; do not infer or approximate the year.
 
 For denial_risk_flags, return an array of structured objects. Each object must follow this exact schema:
-{ “id”: “flag-1”, “label”: “Short title (5-8 words)”, “severity”: “high|medium|low”, “explanation”: “Why payers flag this — 1-2 sentences citing documentation standards.”, “recommendation”: “Suggested chart addendum the physician should add — 1-2 sentences.”, “anchorText”: “Exact verbatim phrase (10-50 chars) from the generated letter that this flag relates to, or the first relevant phrase in the letter.” }
-Provide SPECIFIC, ACTIONABLE flags based on actual gaps in the documentation. Examples of GOOD flags: treatment duration under payer threshold, no imaging to confirm diagnosis, incomplete conservative care dates, single treatment attempt with no follow-up. Examples of BAD flags (too generic, avoid): “insufficient documentation of medical necessity”, “missing pre-operative medical evaluation”. Focus on: specific treatment durations, missing imaging modalities, unclear timelines, single attempts at treatment with no follow-up.
+{ "id": "flag-1", "label": "Short title (5-8 words)", "severity": "high|medium|low", "explanation": "Why payers flag this — 1-2 sentences citing documentation standards.", "recommendation": "Suggested chart addendum the physician should add — 1-2 sentences.", "anchorText": "Exact verbatim phrase (10-50 chars) from the generated letter that this flag relates to, or the first relevant phrase in the letter." }
+Provide SPECIFIC, ACTIONABLE flags based on actual gaps in the documentation. Examples of GOOD flags: treatment duration under payer threshold, no imaging to confirm diagnosis, incomplete conservative care dates, single treatment attempt with no follow-up. Examples of BAD flags (too generic, avoid): "insufficient documentation of medical necessity", "missing pre-operative medical evaluation". Focus on: specific treatment durations, missing imaging modalities, unclear timelines, single attempts at treatment with no follow-up.
 
-CONSERVATIVE CARE COMPLETENESS CHECK: After extracting all treatments, evaluate whether the documented conservative care meets minimum payer standards. If fewer than 3 distinct treatment modalities are documented OR if any treatment has no documented duration OR if no physical therapy is documented for a surgical procedure request, add a denial_risk_flag object: { “id”: “flag-conservative-care”, “label”: “Insufficient Conservative Care”, “severity”: “high”, “explanation”: “Only [N] treatment(s) documented. Payers for CPT [code] typically require documented failure of physical therapy (minimum 6 weeks), NSAIDs, and at least one injection before approving surgical intervention.”, “recommendation”: “Obtain records documenting additional conservative treatments or initiate and document further conservative care before submission.”, “anchorText”: “CONSERVATIVE TREATMENT” }. This flag is mandatory when conservative_treatments_attempted contains fewer than 3 entries with complete duration data.
+CONSERVATIVE CARE COMPLETENESS CHECK: After extracting all treatments, evaluate whether the documented conservative care meets minimum payer standards. If fewer than 3 distinct treatment modalities are documented OR if any treatment has no documented duration OR if no physical therapy is documented for a surgical procedure request, add a denial_risk_flag object: { "id": "flag-conservative-care", "label": "Insufficient Conservative Care", "severity": "high", "explanation": "Only [N] treatment(s) documented. Payers for CPT [code] typically require documented failure of physical therapy (minimum 6 weeks), NSAIDs, and at least one injection before approving surgical intervention.", "recommendation": "Obtain records documenting additional conservative treatments or initiate and document further conservative care before submission.", "anchorText": "CONSERVATIVE TREATMENT" }. This flag is mandatory when conservative_treatments_attempted contains fewer than 3 entries with complete duration data.
 
-PENDING IMAGING FLAG: If imaging_findings contains language indicating imaging is scheduled, pending, or not yet completed, add a denial_risk_flag object: { “id”: “flag-pending-imaging”, “label”: “Imaging Not Yet Complete”, “severity”: “high”, “explanation”: “Payers require completed imaging results before authorizing surgical procedures.”, “recommendation”: “Do not submit until imaging results are available and documented.”, “anchorText”: “Radiographic” }.
+PENDING IMAGING FLAG: If imaging_findings contains imaging that is scheduled, pending, or not yet completed, add a denial_risk_flag object: { "id": "flag-pending-imaging", "label": "Imaging Not Yet Complete", "severity": "high", "explanation": "Payers require completed imaging results before authorizing surgical procedures.", "recommendation": "Do not submit until imaging results are available and documented.", "anchorText": "Radiographic" }.
 
 After extracting all fields, evaluate the chart against these 8 factors and return a score object called pa_strength inside the JSON. For each factor, return a score of 0 or 1 (0 = missing or insufficient, 1 = present and adequate), a one-sentence plain English note explaining the score, and for factors with score=0, an anchorText field (10-50 char verbatim phrase from the letter indicating where the gap is, or the most relevant section heading). The pa_strength object must include: diagnosis_codes, conservative_treatments_named, conservative_treatment_duration, imaging_findings, functional_limitations, surgical_approach, cpt_code_valid, and symptom_duration. Each must be an object with score (0 or 1), note (string), and optionally anchorText (string, only when score=0).
 
 Weight the overall score on the frontend as: diagnosis_codes 10%, conservative_treatments_named 20%, conservative_treatment_duration 10%, imaging_findings 15%, functional_limitations 15%, surgical_approach 10%, cpt_code_valid 10%, symptom_duration 10%.
 
-Return ONLY valid JSON. Do not wrap in code fences or backticks. Start with { and end with }.`;
+Return ONLY valid JSON. No markdown. No backticks. No preamble. No explanation. Start with { and end with }.`;
 
 export async function POST(request: Request) {
   try {
@@ -108,9 +136,21 @@ export async function POST(request: Request) {
     const requestDetails = { cptCode, payerName, providerName, practiceName };
     const { redacted: redactedChart, map: phiMap } = deidentify(chartText);
     const extracted = await extractChartData(redactedChart, chartText, requestDetails, phiMap);
-    const letter = await generateLetter(extracted, requestDetails, phiMap);
 
-    return NextResponse.json({ extracted, letter });
+    if (process.env.NODE_ENV === "development") {
+      console.log("[EXTRACTION JSON]", JSON.stringify(extracted, null, 2));
+    }
+
+    const discrepancies = await validateExtraction(chartText, extracted as Record<string, unknown>);
+    const extractedWithWarnings = extracted as typeof extracted & { extraction_warnings?: string[] };
+    if (discrepancies.length > 0) {
+      discrepancies.forEach((d) => console.error("[EXTRACTION QA]", d));
+      extractedWithWarnings.extraction_warnings = discrepancies;
+    }
+
+    const letter = await generateLetter(extractedWithWarnings, requestDetails, phiMap);
+
+    return NextResponse.json({ extracted: extractedWithWarnings, letter });
   } catch (error) {
     console.error("[generate-pa] POST handler error:", error);
     return NextResponse.json(
@@ -189,7 +229,7 @@ async function extractChartText(chart: File) {
   } else if (isDocx) {
     text = await extractDocxText(chart);
   } else {
-    // Standard plain-text file â€” read directly
+    // Standard plain-text file â€" read directly
     text = await chart.text();
   }
 
@@ -206,7 +246,7 @@ async function extractChartData(
   requestDetails: RequestDetails,
   phiMap: Record<string, string>
 ): Promise<ExtractedChartData & { validation: any }> {
-  // â”€â”€ Section C: Catastrophic try/catch wraps the entire parsing phase â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Section C: Catastrophic try/catch wraps the entire parsing phase â"€â"€â"€â"€â"€â"€
   try {
     const content = await callAnthropicWithRetry({
       system: extractionSystemPrompt,
@@ -346,7 +386,7 @@ function removeNotDocumentedLanguage(letter: string) {
   return letter;
 }
 
-// â”€â”€ Section A: Defensive regex boundary parser â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€ Section A: Defensive regex boundary parser â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 async function parseJsonObject(content: string): Promise<Record<string, unknown>> {
   // Step 1: Strip code-fence wrappers the LLM sometimes emits
   let extractionText = content
@@ -374,37 +414,37 @@ async function parseJsonObject(content: string): Promise<Record<string, unknown>
   }
 }
 
-// â”€â”€ Section B: Strict structural normalization layer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€ Section B: Strict structural normalization layer â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 function normalizeChartData(
   data: Record<string, unknown>,
   requestDetails: RequestDetails,
   chartText: string
 ): ExtractedChartData & { validation: any } {
 
-  // â”€â”€ B1: Critical string fields â€” default to "Not Documented" when falsy â”€â”€
+  // â"€â"€ B1: Critical string fields â€" default to "Not Documented" when falsy â"€â"€
   const patientName = nullableString(data.patient_name);
   const primaryComplaint = nullableString(data.primary_complaint);
   const symptomDuration = nullableString(data.symptom_duration);
   const requestedProcedure = nullableString(data.requested_procedure);
   const surgicalApproach = nullableString(data.surgical_approach_if_mentioned);
 
-  // â”€â”€ B2: Numerical fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ B2: Numerical fields â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   const bmi = safeNumeric(data.bmi);
   const asa_classification = safeAsaClassification(data.asa_classification);
 
-  // â”€â”€ B3: Flat arrays â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ B3: Flat arrays â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   const diagnosisCodes = stringArray(data.diagnosis_codes);
   const functionalLimitations = stringArray(data.functional_limitations);
   const denialRiskFlags = normalizeDenialRiskFlags(data.denial_risk_flags);
   const objectiveMeasurements = stringArray(data.objective_measurements);
 
-  // â”€â”€ B4: Conservative treatments â€” coerce strings and ensure key safety â”€â”€â”€
+  // â"€â"€ B4: Conservative treatments â€" coerce strings and ensure key safety â"€â"€â"€
   const conservativeTreatments = normalizeConservativeTreatments(data.conservative_treatments_attempted);
 
-  // â”€â”€ B5: Nested imaging findings object â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ B5: Nested imaging findings object â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   const imagingFindings = normalizeImagingFindings(data.imaging_findings);
 
-  // â”€â”€ B6: Validation object (hard_blocks, soft_warnings) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ B6: Validation object (hard_blocks, soft_warnings) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   // We re-derive hard_blocks and soft_warnings from validated data rather than
   // trusting what the LLM returned, so the PA Strength Meter always reflects
   // the true state of normalized data.
@@ -511,27 +551,26 @@ function normalizeChartData(
   };
 }
 
-// â”€â”€ Section B4: Conservative treatment normalization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function normalizeConservativeTreatments(raw: unknown): Array<{
   treatment: string | null;
   duration: string | null;
   outcome: string | null;
   dates: string | null;
+  relief_duration: string | null;
 }> {
   if (!Array.isArray(raw)) return [];
 
   return raw.map((item) => {
-    // If the element is a flat string, coerce it into a structured object
     if (typeof item === "string" && item.trim()) {
       return {
         treatment: item.trim(),
         duration: "Unknown",
         outcome: "Failed",
-        dates: "Not documented"
+        dates: "Not documented",
+        relief_duration: null
       };
     }
 
-    // If the element is an object, ensure key safety with fallbacks
     if (isObject(item)) {
       const treatmentName = nullableString(
         item.treatment_name ?? item.treatment ?? item.name
@@ -540,34 +579,60 @@ function normalizeConservativeTreatments(raw: unknown): Array<{
         treatment: treatmentName ?? "Unknown Treatment",
         duration: nullableString(item.duration) ?? "Unknown",
         outcome: nullableString(item.outcome) ?? "Failed",
-        dates: nullableString(item.dates) ?? "Not documented"
+        dates: nullableString(item.dates) ?? "Not documented",
+        relief_duration: nullableString(item.relief_duration)
       };
     }
 
-    // Unrecognised element shape â€” return safe sentinel
     return {
       treatment: "Unknown Treatment",
       duration: "Unknown",
       outcome: "Failed",
-      dates: "Not documented"
+      dates: "Not documented",
+      relief_duration: null
     };
   });
 }
 
-// â”€â”€ Section B5: Imaging findings normalization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function normalizeImagingFindings(raw: unknown): { modality: string | null; key_findings: string | null } | null {
   if (!isObject(raw)) return null;
 
+  // Handle new xray/mri nested schema from extraction prompt
+  if (isObject(raw.xray) || isObject(raw.mri)) {
+    const parts: string[] = [];
+    const findings: string[] = [];
+
+    if (isObject(raw.xray) && raw.xray.completed === true) {
+      parts.push("X-ray");
+      const xrayDate = nullableString(raw.xray.date);
+      const xrayFindings = nullableString(raw.xray.findings);
+      if (xrayFindings) findings.push(xrayDate ? `X-ray (${xrayDate}): ${xrayFindings}` : `X-ray: ${xrayFindings}`);
+    }
+    if (isObject(raw.mri) && raw.mri.completed === true) {
+      parts.push("MRI");
+      const mriDate = nullableString(raw.mri.date);
+      const mriFindings = nullableString(raw.mri.findings);
+      if (mriFindings) findings.push(mriDate ? `MRI (${mriDate}): ${mriFindings}` : `MRI: ${mriFindings}`);
+    }
+
+    if (parts.length === 0) return null;
+
+    return {
+      modality: parts.join(" and "),
+      key_findings: findings.join("; ") || null
+    };
+  }
+
+  // Legacy { modality, key_findings } format
   const modality = nullableString(raw.modality);
   const key_findings = nullableString(raw.key_findings ?? raw.findings);
 
-  // Return null when both keys are absent â€” preserves existing soft-warning logic
   if (!modality && !key_findings) return null;
 
   return { modality, key_findings };
 }
 
-// â”€â”€ Section B2: Numerical helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€ Section B2: Numerical helpers â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 function safeNumeric(value: unknown): number | null {
   if (typeof value === "number" && !isNaN(value)) return value;
   if (typeof value === "string") {
@@ -586,7 +651,7 @@ function safeAsaClassification(value: unknown): string | null {
   return s || null;
 }
 
-// â”€â”€ Section B3b: Denial risk flag normalization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€ Section B3b: Denial risk flag normalization â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 function normalizeDenialRiskFlags(raw: unknown): DenialRiskFlag[] {
   if (!Array.isArray(raw)) return [];
   const validSeverities = ['high', 'medium', 'low'] as const;
@@ -617,7 +682,7 @@ function normalizeDenialRiskFlags(raw: unknown): DenialRiskFlag[] {
   });
 }
 
-// â”€â”€ Section B6: PA Strength normalization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€ Section B6: PA Strength normalization â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 function normalizePaStrength(value: unknown): PaStrength {
   const source = isObject(value) ? value : {};
 

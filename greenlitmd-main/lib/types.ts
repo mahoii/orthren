@@ -3,6 +3,7 @@ export type ConservativeTreatment = {
   duration: string | null;
   outcome: string | null;
   dates: string | null;
+  relief_duration?: string | null;
 };
 
 export type ImagingFindings = {
