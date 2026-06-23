@@ -7,13 +7,24 @@ export async function callAnthropic({
   system,
   prompt,
   maxTokens = 2000,
-  useStructuredOutput = false
+  useStructuredOutput = false,
+  temperature
 }: {
   system: string;
   prompt: string;
   maxTokens?: number;
   useStructuredOutput?: boolean;
+  /**
+   * Explicit sampling temperature. When omitted, structured-output calls run at
+   * 0 and all others use the API default. An explicit value always wins — letter
+   * generation sets temperature: 0 to maximize compliance with the prompt rules
+   * without claiming JSON structured output.
+   */
+  temperature?: number;
 }): Promise<string> {
+  const resolvedTemperature =
+    temperature !== undefined ? temperature : useStructuredOutput ? 0 : undefined;
+
   const requestBody: Record<string, unknown> = {
     model: "claude-sonnet-4-6",
     max_tokens: maxTokens,
@@ -24,7 +35,7 @@ export async function callAnthropic({
         content: prompt
       }
     ],
-    ...(useStructuredOutput ? { temperature: 0 } : {})
+    ...(resolvedTemperature !== undefined ? { temperature: resolvedTemperature } : {})
   };
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {

@@ -5,6 +5,7 @@ import { sanitizeLetterPlaceholders } from "@/lib/letter-placeholders";
 import type { ExtractedChartData, DenialRiskFlag, PaStrength, PaStrengthFactor } from "@/lib/types";
 import { rateLimiter } from "@/lib/rate-limit";
 import { letterSystemPrompt } from "@/lib/letter-system-prompt";
+import { buildBmiAsaPromptLines, postProcessLetter } from "@/lib/letter-postprocess";
 import { callAnthropicWithRetry } from "@/lib/anthropic";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import { deidentify, reidentify } from "@/lib/deidentify";
@@ -291,10 +292,6 @@ async function generateLetter(
     day: "numeric"
   });
 
-  // Fix 7: Extract BMI and ASA from extracted data for injection
-  const bmi = (chartDataOnly as any).bmi || null;
-  const asaClassification = (chartDataOnly as any).asa_classification || null;
-
   // Build imaging findings JSON string for injection
   const imagingFindingsJson = JSON.stringify(extracted.imaging_findings || null);
 
@@ -306,6 +303,16 @@ async function generateLetter(
   const objectiveMeasurementsStr = extracted.objective_measurements?.length
     ? `\nObjective measurements: ${extracted.objective_measurements.join("; ")}`
     : "";
+
+  // BMI/ASA trigger lines the prompt rules scan the user message for.
+  const bmiAsaLines = buildBmiAsaPromptLines(extracted);
+
+  if (process.env.NODE_ENV === "development") {
+    console.log("[generate-pa] BMI/ASA before letter call:", {
+      bmi: (extracted as any).bmi ?? null,
+      asa_classification: (extracted as any).asa_classification ?? null
+    });
+  }
 
   // Fix 3: Pass letter_date to prompt context
   let letter = await callAnthropicWithRetry({
@@ -319,18 +326,14 @@ Insurance payer: ${requestDetails.payerName}
 Requesting provider: ${requestDetails.providerName}
 Practice name: ${requestDetails.practiceName}
 
-Letter date: ${today}
-${bmi ? "Patient BMI: " + bmi : ""}
-${asaClassification ? "ASA Classification: " + asaClassification : ""}${objectiveMeasurementsStr}`,
-    maxTokens: 8000
+Letter date: ${today}${bmiAsaLines}${objectiveMeasurementsStr}`,
+    maxTokens: 8000,
+    temperature: 0
   });
 
-  // Fix 4: Remove duplicate signature blocks
-  letter = removeDuplicateSignatureBlocks(letter);
-  letter = injectBmiAsa(letter, extracted);
-
-  // Remove "not documented" language and sentences containing it
-  letter = removeNotDocumentedLanguage(letter);
+  // Deterministic post-processing (dedupe signature, inject BMI/ASA fallback,
+  // strip "not documented" language) — shared with the regeneration path.
+  letter = postProcessLetter(letter, extracted);
 
   letter = reidentify(letter, phiMap);
 
@@ -342,75 +345,6 @@ ${asaClassification ? "ASA Classification: " + asaClassification : ""}${objectiv
     cptCode: requestDetails.cptCode,
     requestedProcedure: extracted.requested_procedure
   });
-}
-
-// Programmatic safety net: inject BMI/ASA sentences if the model omitted them
-function injectBmiAsa(letter: string, extracted: ExtractedChartData): string {
-  const bmi = (extracted as any).bmi as number | null | undefined;
-  const asa = (extracted as any).asa_classification as string | null | undefined;
-
-  if (bmi != null && !/\bBMI\b/i.test(letter)) {
-    const obesityClass =
-      bmi >= 40 ? "Class III obesity, " :
-      bmi >= 35 ? "Class II obesity, " :
-      bmi >= 30 ? "Class I obesity, " : "";
-    const sentence = `The patient has a documented BMI of ${bmi}, ${obesityClass}which represents a significant contributor to articular cartilage loading and disease progression.`;
-    letter = letter.replace(
-      /(CLINICAL HISTORY AND PRESENTING COMPLAINT\s*\n+[^.!?]+[.!?])/i,
-      `$1 ${sentence}`
-    );
-  }
-
-  if (asa != null && !/\bASA\b/i.test(letter)) {
-    const sentence = `The patient carries an ASA ${asa} classification, reflecting the anesthetic risk profile accounted for in the perioperative surgical plan.`;
-    letter = letter.replace(
-      /(REQUESTED PROCEDURE\s*\n+)/i,
-      `$1${sentence} `
-    );
-  }
-
-  return letter;
-}
-
-// Remove duplicate signature blocks — keep only the last "Sincerely," onwards
-function removeDuplicateSignatureBlocks(letter: string) {
-  const occurrences: number[] = [];
-  const re = /Sincerely,/gi;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(letter)) !== null) occurrences.push(m.index);
-  if (occurrences.length <= 1) return letter;
-
-  const firstIdx = occurrences[0];
-  const lastIdx = occurrences[occurrences.length - 1];
-  return letter.slice(0, firstIdx).trimEnd() + "\n\n" + letter.slice(lastIdx);
-}
-
-// Fix 5: Remove "not documented" language and sentences containing it
-function removeNotDocumentedLanguage(letter: string) {
-  const phrases = [
-    "not documented",
-    "not well-documented",
-    "not recorded",
-    "not on file",
-    "are not recorded",
-    "is not recorded",
-    "duration and outcome are not",
-    "exact duration and follow-up are not"
-  ];
-
-  // First pass: replace phrases with placeholder
-  phrases.forEach((phrase) => {
-    letter = letter.replace(new RegExp(phrase, "gi"), "was not available for review");
-  });
-
-  // Second pass: remove entire sentences containing "was not available for review"
-  // Match sentences that start with capital letter and end with period
-  letter = letter.replace(/[^.!?]*was not available for review[^.!?]*[.!?]/gi, "");
-
-  // Clean up any resulting double spaces or weird punctuation
-  letter = letter.replace(/\s+/g, " ").replace(/\s+([.!?,])/g, "$1");
-
-  return letter;
 }
 
 // â"€â"€ Section A: Defensive regex boundary parser â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€

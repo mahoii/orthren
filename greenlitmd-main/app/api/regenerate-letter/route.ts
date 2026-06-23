@@ -3,6 +3,7 @@ import { sanitizeLetterPlaceholders } from "@/lib/letter-placeholders";
 import type { ExtractedChartDataWithValidation } from "@/lib/types";
 import { rateLimiter } from "@/lib/rate-limit";
 import { letterSystemPrompt } from "@/lib/letter-system-prompt";
+import { buildBmiAsaPromptLines, postProcessLetter } from "@/lib/letter-postprocess";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import { callAnthropicWithRetry } from "@/lib/anthropic";
 
@@ -66,7 +67,18 @@ export async function POST(request: Request) {
     const objectiveMeasurementsStr = (body.extracted.objective_measurements ?? []).length
       ? `\nObjective measurements: ${body.extracted.objective_measurements.join("; ")}`
       : "";
-    const letter = await callAnthropicWithRetry({
+    // BMI/ASA trigger lines the prompt rules scan the user message for — the
+    // initial-generation path injects these too, and they must match here.
+    const bmiAsaLines = buildBmiAsaPromptLines(body.extracted);
+
+    if (process.env.NODE_ENV === "development") {
+      console.log("[regenerate-letter] BMI/ASA before letter call:", {
+        bmi: (body.extracted as any).bmi ?? null,
+        asa_classification: (body.extracted as any).asa_classification ?? null
+      });
+    }
+
+    let letter = await callAnthropicWithRetry({
       system: systemPromptWithContext,
       prompt: `Structured patient data:
 ${JSON.stringify(chartDataOnly, null, 2)}
@@ -77,9 +89,15 @@ Insurance payer: ${body.requestDetails.payerName}
 Requesting provider: ${body.requestDetails.providerName}
 Practice name: ${body.requestDetails.practiceName}
 
-Letter date: ${today}${objectiveMeasurementsStr}${buildSoftWarningContext(body.softWarningResolutions)}`,
-      maxTokens: 6000
+Letter date: ${today}${bmiAsaLines}${objectiveMeasurementsStr}${buildSoftWarningContext(body.softWarningResolutions)}`,
+      maxTokens: 6000,
+      temperature: 0
     });
+
+    // Deterministic post-processing — identical to the initial-generation path.
+    // Without this, regeneration had no backstop for double signatures or
+    // omitted BMI/ASA, which is why those rules failed on every regenerate.
+    letter = postProcessLetter(letter, body.extracted);
 
     const sanitized = sanitizeLetterPlaceholders(letter, {
       patientName: body.extracted.patient_name,
