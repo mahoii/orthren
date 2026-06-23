@@ -272,7 +272,7 @@ Mr. Chen completed the following conservative interventions prior to this surgic
 
   2. NSAIDs — Meloxicam 15mg (6 weeks): Prescribed for pain and inflammation management. Patient reported mild partial relief but persistent functional impairment.
 
-  3. Subacromial Corticosteroid Injection (x1): Subacromial injection administered under ultrasound guidance. Patient reported 3–4 weeks of partial pain relief followed by return of baseline symptoms.
+  3. Subacromial Corticosteroid Injection (x1): Subacromial corticosteroid injection was administered. Patient reported 3–4 weeks of partial pain relief followed by return of baseline symptoms.
 
 Despite completion of conservative management, Mr. Chen continues to demonstrate pain, weakness, and functional impairment consistent with a surgically significant full-thickness rotator cuff tear. Conservative measures have been exhausted.
 
@@ -479,7 +479,7 @@ MEDICAL NECESSITY SUMMARY
   • Confirmed lumbar disc displacement at L4-L5 with neurogenic claudication
   • Progressive symptoms over 6 months with significant functional impairment
   • Documented limitations affecting mobility and daily activities
-  • Surgical fusion indicated to stabilize the affected segment and relieve neural compression
+  • Advanced imaging is required to confirm nerve root compression prior to surgical authorization.
 
 I respectfully request approval for CPT 22630 — Lumbar Interbody Fusion for Ms. Eleanor Vance.
 
