@@ -54,7 +54,7 @@ export async function callAnthropic({
 
 export async function callAnthropicWithRetry(
   params: Parameters<typeof callAnthropic>[0],
-  retries = 2
+  retries = 4
 ): Promise<string> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -64,7 +64,7 @@ export async function callAnthropicWithRetry(
       const message = err instanceof Error ? err.message : "";
       const isOverloaded = isAnthropicOverloadedError(message);
       if (isOverloaded && attempt < retries) {
-        await new Promise((res) => setTimeout(res, 3000 * (attempt + 1)));
+        await new Promise((res) => setTimeout(res, 5000 * (attempt + 1)));
         continue;
       }
       throw err;

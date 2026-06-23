@@ -326,7 +326,11 @@ export default function ReviewPage() {
         showToast('Letter regenerated with your updates');
       }
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Regeneration failed — please try again');
+      const msg = err instanceof Error ? err.message : '';
+      const isOverloaded = msg.toLowerCase().includes('overloaded');
+      showToast(isOverloaded
+        ? 'AI service is busy — please wait a moment and try again'
+        : (msg || 'Regeneration failed — please try again'));
     } finally {
       setIsRegenerating(false);
     }
