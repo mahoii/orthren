@@ -3,6 +3,7 @@ import { sanitizeLetterPlaceholders } from "@/lib/letter-placeholders";
 import type { ExtractedChartDataWithValidation } from "@/lib/types";
 import { rateLimiter } from "@/lib/rate-limit";
 import { callAnthropicWithRetry } from "@/lib/anthropic";
+import { postProcessLetter } from "@/lib/letter-postprocess";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -63,7 +64,13 @@ export async function POST(request: Request) {
       useStructuredOutput: true,
     });
 
-    const sanitized = sanitizeLetterPlaceholders(letter, {
+    const processed = postProcessLetter(letter, body.extractedData);
+    if (process.env.NODE_ENV === "development") {
+      console.log("[denial-fix] processed letter start:", processed.slice(0, 200));
+      console.log("[denial-fix] processed letter end:", processed.slice(-200));
+    }
+
+    const sanitized = sanitizeLetterPlaceholders(processed, {
       patientName: body.extractedData.patient_name,
       payerName: body.requestDetails.payerName,
       providerName: body.requestDetails.providerName,
