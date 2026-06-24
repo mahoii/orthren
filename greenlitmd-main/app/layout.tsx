@@ -8,7 +8,6 @@ import "./globals.css";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
-  axes: ["opsz"],
   weight: ["400", "500", "600", "700"],
   display: "swap",
   variable: "--font-dm-sans",
