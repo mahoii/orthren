@@ -1,9 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { DM_Sans } from "next/font/google";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import SignOutButton from "@/components/SignOutButton";
 import Logo from "@/components/Logo";
 import "./globals.css";
+
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  axes: ["opsz"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-dm-sans",
+});
 
 export const metadata: Metadata = {
   title: "Orthren",
@@ -28,15 +37,9 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="en">
+    <html lang="en" className={dmSans.variable}>
       <head>
         <link rel="icon" type="image/svg+xml" href="/favicon-svg.svg" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap"
-          rel="stylesheet"
-        />
       </head>
       <body>
         <header className="sticky top-0 z-50 border-b border-[#E2E8F0] bg-white/90 backdrop-blur">
