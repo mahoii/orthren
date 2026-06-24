@@ -32,6 +32,10 @@ MANDATORY EXTRACTION RULES — violating any of these is a critical error:
 
 DATES: Extract dates exactly as written in the source. If the source says "03/01/2025", output "03/01/2025". Never infer the year. Never substitute the current date. If a date is genuinely absent, output null.
 
+DATE OF BIRTH: Extract date_of_birth exactly as written in the chart. Look for labels: DOB, Date of Birth, D.O.B., Birth Date. Return as MM/DD/YYYY string. Never return null if a date is present anywhere in the document.
+
+ASA CLASSIFICATION: Extract asa_classification. Look for: ASA I, ASA II, ASA III, ASA IV, ASA 1, ASA 2, ASA 3, ASA 4, or any reference to ASA physical status. Return as a string (e.g., "ASA III"). Return null only if no ASA reference exists anywhere in the document.
+
 DURATIONS: Each treatment has its own independent duration field. Do NOT carry over durations from one treatment to another. Extract the exact language used ("4 months", "6 weeks", "3 days"). If no duration is stated, output null.
 
 OUTCOMES/RELIEF DURATION: Extract only what the source explicitly states. If source says "2 weeks of relief", output "2 weeks". Do not round up or infer.
@@ -56,7 +60,7 @@ Extract ALL conservative treatments attempted by the patient before surgery. For
 For each treatment found return an object with exactly these fields:
 
 treatment_name: the specific name of the treatment (e.g. Physical Therapy, Ibuprofen/NSAID, Corticosteroid Injection — Kenalog, Hyaluronic Acid Injection — Synvisc). Never return null. If ambiguous, make the most reasonable clinical inference from context.
-duration: how long the treatment was attempted (e.g. 6 months, 8 weeks). Extract exact language from source. If explicit duration is not stated BUT dates are provided, calculate the duration based on the dates. Return null only if neither duration nor dates are mentioned.
+duration: how long the treatment was attempted (e.g. 6 months, 8 weeks). Extract exact language from source. Look for: weeks, months, sessions, visit counts, or date ranges. If a number of weeks or months is stated anywhere in proximity to the treatment name, extract it. If explicit duration is not stated BUT dates are provided, calculate the duration based on the dates. Only return null if absolutely no duration indicator exists — never return "Unknown".
 outcome: what happened (e.g. failed, minimal improvement, GI intolerance developed, temporary relief only, no improvement). Use the exact language from the chart where possible.
 dates: any specific dates mentioned for this treatment. Return null if not found.
 relief_duration: if the treatment provided any period of relief, extract exactly how long as stated in the source (e.g. "2 weeks", "3 days"). Return null if not stated.
