@@ -14,9 +14,14 @@ export function createSupabaseAuthServerClient() {
           return cookieStore.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          );
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // Cookie writes are only allowed in Server Actions / Route Handlers.
+            // During page rendering this is a no-op; the middleware will handle refresh.
+          }
         }
       }
     }

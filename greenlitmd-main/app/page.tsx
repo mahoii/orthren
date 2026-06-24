@@ -333,13 +333,15 @@ export default function LandingPage() {
                   ))}
                 </ul>
               </div>
-              <Link
-                href="/#waitlist-form"
+              <a
+                href="https://calendly.com/kamarishabazz/30min"
+                target="_blank"
+                rel="noopener noreferrer"
                 id="pricing-solo-cta"
                 className="mt-8 block w-full rounded-lg border-2 border-clinical-navy px-4 py-2.5 text-center text-sm font-semibold text-clinical-navy transition hover:bg-slate-50"
               >
-                Request Early Access
-              </Link>
+                Book a Free Demo
+              </a>
             </div>
 
             {/* Small Practice */}
@@ -369,13 +371,15 @@ export default function LandingPage() {
                   ))}
                 </ul>
               </div>
-              <Link
-                href="/#waitlist-form"
+              <a
+                href="https://calendly.com/kamarishabazz/30min"
+                target="_blank"
+                rel="noopener noreferrer"
                 id="pricing-practice-cta"
                 className="mt-8 block w-full rounded-lg bg-clinical-navy px-4 py-2.5 text-center text-sm font-semibold text-white shadow transition hover:bg-clinical-blue"
               >
-                Request Early Access
-              </Link>
+                Book a Free Demo
+              </a>
             </div>
           </div>
         </div>

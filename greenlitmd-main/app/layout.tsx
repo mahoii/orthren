@@ -58,12 +58,14 @@ export default async function RootLayout({
               {isAuthenticated ? (
                 <SignOutButton />
               ) : (
-                <Link
-                  href="/#waitlist-form"
+                <a
+                  href="https://calendly.com/kamarishabazz/30min"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="rounded-md bg-clinical-navy px-4 py-2 text-sm font-semibold text-white transition hover:bg-clinical-blue hover:shadow-md"
                 >
-                  Request Early Access
-                </Link>
+                  Book a Free Demo
+                </a>
               )}
             </div>
           </nav>
