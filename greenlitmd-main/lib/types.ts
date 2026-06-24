@@ -49,6 +49,8 @@ export type ExtractedChartData = {
   imaging_findings: ImagingFindings | null;
   requested_procedure: string | null;
   surgical_approach_if_mentioned: string | null;
+  bmi?: number | string | null;
+  asa_classification?: string | null;
   denial_risk_flags: DenialRiskFlag[];
   pa_strength: PaStrength;
 };

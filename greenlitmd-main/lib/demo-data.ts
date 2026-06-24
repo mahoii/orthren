@@ -19,7 +19,7 @@ I am writing to request prior authorization for bilateral total knee arthroplast
 
 CLINICAL HISTORY AND PRESENTING COMPLAINT
 
-Ms. Delgado is a 64-year-old female with a 24-month history of progressive bilateral knee pain, left worse than right, consistent with advanced degenerative joint disease. She reports constant, moderate-to-severe pain rated 7–8/10 on the Visual Analog Scale at rest, escalating to 9/10 with activity. Symptoms have progressively worsened despite comprehensive conservative management and now significantly impair her activities of daily living.
+Ms. Delgado is a 64-year-old female with a BMI of 41.2 (Class III obesity) and a 24-month history of progressive bilateral knee pain, left worse than right, consistent with advanced degenerative joint disease. She reports constant, moderate-to-severe pain rated 7–8/10 on the Visual Analog Scale at rest, escalating to 9/10 with activity. Symptoms have progressively worsened despite comprehensive conservative management and now significantly impair her activities of daily living.
 
 DIAGNOSIS
 
@@ -50,7 +50,7 @@ Ms. Delgado has undergone an extensive and documented course of conservative tre
 
   3. Corticosteroid Injection — Left Knee: Intra-articular corticosteroid injection was administered to the left knee. Patient reported temporary pain relief of approximately three weeks duration, followed by return of baseline pain. The short-lived benefit supports progression of disease beyond the scope of injectable management.
 
-  4. Corticosteroid Injection — Right Knee: Intra-articular corticosteroid injection was also performed on the right knee to manage bilateral symptom burden.
+  4. Corticosteroid Injection — Right Knee: Intra-articular corticosteroid injection was also performed on the right knee. The patient experienced minimal sustained benefit, with symptoms returning to baseline within weeks of injection.
 
   5. Weight Loss Counseling: Ms. Delgado was referred to a structured weight loss counseling program to address obesity as a modifiable risk factor for knee OA progression and surgical candidacy.
 
@@ -61,6 +61,7 @@ REQUESTED PROCEDURE
 Procedure: Bilateral Total Knee Arthroplasty
 CPT Code: 27447
 Surgical Approach: Cemented implant, bilateral
+Anesthetic Risk Classification: ASA III
 Facility: Westbrook Orthopedic Surgery Center
 
 Bilateral simultaneous TKA is appropriate for this patient given the symmetric severity of disease in both knees, as documented radiographically and clinically. A staged approach would expose the patient to two separate anesthetic events and prolonged periods of impaired function.
@@ -79,7 +80,7 @@ I respectfully request approval for CPT 27447 — Bilateral Total Knee Arthropla
 
 Sincerely,
 
-Dr. R. Chambers, MD
+R. Chambers, MD
 Westbrook Orthopedic Surgery Center`,
 
   extracted: {
@@ -117,7 +118,7 @@ Westbrook Orthopedic Surgery Center`,
       {
         treatment: "Corticosteroid injection (right knee)",
         duration: null,
-        outcome: null,
+        outcome: "Minimal sustained benefit; symptoms returned to baseline within weeks of injection",
         dates: null
       },
       {
@@ -134,6 +135,8 @@ Westbrook Orthopedic Surgery Center`,
     },
     requested_procedure: "Bilateral Total Knee Arthroplasty",
     surgical_approach_if_mentioned: "Cemented implant, bilateral",
+    bmi: 41.2,
+    asa_classification: "ASA III",
     denial_risk_flags: [
       {
         id: "flag-pt-duration",
