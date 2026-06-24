@@ -40,7 +40,7 @@ export default async function RootLayout({
       <head>
         <link rel="icon" type="image/svg+xml" href="/favicon-svg.svg" />
       </head>
-      <body>
+      <body className="font-sans">
         <header className="sticky top-0 z-50 border-b border-[#E2E8F0] bg-white/90 backdrop-blur">
           <nav className="mx-auto flex h-14 max-w-7xl items-center px-6" aria-label="Primary">
             <div className="flex flex-1 items-center gap-2">
