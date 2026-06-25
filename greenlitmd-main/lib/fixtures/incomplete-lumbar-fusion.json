@@ -1,0 +1,38 @@
+{
+  "_meta": {
+    "chart": "public/samples/incomplete-lumbar-fusion.txt",
+    "patient": "Eleanor Vance",
+    "scenario": "Incomplete PA packet — no conservative care documented, X-ray only"
+  },
+  "patient_name": {
+    "exact": "Eleanor Vance",
+    "description": "Must not include date artifacts (e.g., 'Eleanor Vance Date of Visit: 05/18/2026')"
+  },
+  "date_of_birth": {
+    "exact": "04/05/1966"
+  },
+  "diagnosis_codes": {
+    "must_include": ["M51.26"]
+  },
+  "requested_procedure": {
+    "contains_ci": "fusion",
+    "description": "Posterior lumbar interbody fusion (PLIF) at L4-L5"
+  },
+  "conservative_treatments_attempted": {
+    "min_count": 1,
+    "description": "Expect one placeholder entry since none are documented in the chart"
+  },
+  "imaging_findings": {
+    "present": true,
+    "modality_contains_ci": "x-ray",
+    "description": "X-ray lumbar spine — L4-L5 disc space narrowing. No MRI."
+  },
+  "functional_limitations": {
+    "min_count": 2
+  },
+  "pa_strength": {
+    "diagnosis_codes": { "score": 1 },
+    "conservative_treatments_named": { "score": 0 },
+    "imaging_findings": { "score": 1 }
+  }
+}

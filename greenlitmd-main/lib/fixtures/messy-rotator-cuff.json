@@ -1,0 +1,37 @@
+{
+  "_meta": {
+    "chart": "public/samples/messy-rotator-cuff.txt",
+    "patient": "Robert Chen",
+    "scenario": "Messy fax — patient name on first line with DOB, garbled text, OCR artifacts"
+  },
+  "patient_name": {
+    "exact": "Robert Chen",
+    "description": "Must not include DOB (11/14/1978), must not be null, must not be reversed"
+  },
+  "date_of_birth": {
+    "exact": "11/14/1978"
+  },
+  "diagnosis_codes": {
+    "must_include": ["M75.121"]
+  },
+  "requested_procedure": {
+    "contains_ci": "rotator cuff repair"
+  },
+  "conservative_treatments_attempted": {
+    "min_count": 2,
+    "description": "PT (6 weeks), NSAIDs (Meloxicam), corticosteroid injection documented"
+  },
+  "imaging_findings": {
+    "present": true,
+    "modality_contains_ci": "mri",
+    "description": "MRI March 2026 — full-thickness supraspinatus tear"
+  },
+  "functional_limitations": {
+    "min_count": 2
+  },
+  "pa_strength": {
+    "diagnosis_codes": { "score": 1 },
+    "conservative_treatments_named": { "score": 1 },
+    "imaging_findings": { "score": 1 }
+  }
+}

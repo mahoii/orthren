@@ -1,0 +1,38 @@
+{
+  "_meta": {
+    "chart": "public/samples/clean-tka.txt",
+    "patient": "Maria A. Delgado",
+    "scenario": "Clean TKA — all fields present, high PA strength"
+  },
+  "patient_name": {
+    "exact": "Maria A. Delgado",
+    "description": "Must not be null, must not include DOB or MRN"
+  },
+  "date_of_birth": {
+    "exact": "09/22/1959"
+  },
+  "diagnosis_codes": {
+    "must_include": ["M17.11", "M17.12"]
+  },
+  "requested_procedure": {
+    "contains_ci": "total knee arthroplasty"
+  },
+  "conservative_treatments_attempted": {
+    "min_count": 3,
+    "description": "PT, NSAIDs, corticosteroid injection(s), weight loss counseling all present"
+  },
+  "imaging_findings": {
+    "present": true,
+    "modality_contains_ci": "x-ray"
+  },
+  "functional_limitations": {
+    "min_count": 3
+  },
+  "pa_strength": {
+    "diagnosis_codes": { "score": 1 },
+    "conservative_treatments_named": { "score": 1 },
+    "imaging_findings": { "score": 1 },
+    "functional_limitations": { "score": 1 },
+    "symptom_duration": { "score": 1 }
+  }
+}
