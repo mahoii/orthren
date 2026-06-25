@@ -156,7 +156,7 @@ function checklistPage(extracted: ExtractedChartData) {
     { label: "Authorization form attached", missing: false },
     {
       label: "Imaging reports attached",
-      missing: !extracted.imaging_findings?.key_findings
+      missing: extracted.imaging_findings === null
     },
     {
       label: "PT/conservative care notes attached",
