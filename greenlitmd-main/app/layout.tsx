@@ -60,14 +60,22 @@ export default async function RootLayout({
               {isAuthenticated ? (
                 <SignOutButton email={userEmail} />
               ) : (
-                <a
-                  href="https://calendly.com/kamarishabazz/30min"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-md bg-clinical-navy px-4 py-2 text-sm font-semibold text-white transition hover:bg-clinical-blue hover:shadow-md"
-                >
-                  Book a Free Demo
-                </a>
+                <div className="flex items-center gap-3">
+                  <Link
+                    href="/login"
+                    className="rounded-md border border-[#CBD5E1] px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                  >
+                    Sign in
+                  </Link>
+                  <a
+                    href="https://calendly.com/kamarishabazz/30min"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-md bg-clinical-navy px-4 py-2 text-sm font-semibold text-white transition hover:bg-clinical-blue hover:shadow-md"
+                  >
+                    Book a Free Demo
+                  </a>
+                </div>
               )}
             </div>
           </nav>
