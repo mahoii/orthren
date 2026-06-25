@@ -2,8 +2,17 @@ import Link from "next/link";
 import Logo from "@/components/Logo";
 import WaitlistForm from "@/components/WaitlistForm";
 import ScrollButton from "@/components/ScrollButton";
+import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  let isAuthenticated = false;
+  try {
+    const supabase = createSupabaseAuthServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    isAuthenticated = !!user;
+  } catch {
+    // cookies() unavailable in some static contexts — treat as unauthenticated
+  }
 
   return (
     <div className="min-h-screen bg-white text-slate-900 selection:bg-clinical-navy selection:text-white">
@@ -50,7 +59,7 @@ export default function LandingPage() {
           {/* Sandbox CTA */}
           <div className="mt-4 flex justify-center">
             <Link
-              href="/login?redirect=/builder"
+              href={isAuthenticated ? "/builder" : "/login?redirect=/builder"}
               id="hero-sandbox-cta"
               className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-clinical-blue hover:border-clinical-blue focus:outline-none focus:ring-2 focus:ring-clinical-blue focus:ring-offset-2"
             >
