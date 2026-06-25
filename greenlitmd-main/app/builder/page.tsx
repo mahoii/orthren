@@ -2,6 +2,7 @@
 
 import { ChangeEvent, DragEvent, FormEvent, ReactNode, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { usePostHog } from "posthog-js/react";
 import Link from "next/link";
 import type { GeneratePaResponse } from "@/lib/types";
 import { CLEAN_TKA, MESSY_ROTATOR_CUFF, INCOMPLETE_LUMBAR_FUSION } from "@/lib/demo-data";
@@ -102,6 +103,7 @@ const commonOrthopedicCptCodes = [
 
 export default function UploadPage() {
   const router = useRouter();
+  const posthog = usePostHog();
   const [file, setFile] = useState<File | null>(null);
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [activeTestCase, setActiveTestCase] = useState<ProfileKey | null>(null);
@@ -294,10 +296,20 @@ export default function UploadPage() {
         throw new Error("error" in payload && payload.error ? payload.error : "Unable to generate PA packet.");
       }
 
+      const reviewPayload = payload as GeneratePaResponse;
+      posthog?.capture('pa_generated', {
+        cpt_code: cptCode.trim(),
+        payer_name: payerName.trim(),
+        pa_strength_score: reviewPayload.extracted?.pa_strength
+          ? Object.values(reviewPayload.extracted.pa_strength).reduce(
+              (sum, f) => sum + (f?.score ?? 0), 0
+            )
+          : null,
+      });
       sessionStorage.setItem(
         "pa-review-data",
         JSON.stringify({
-          ...(payload as GeneratePaResponse),
+          ...reviewPayload,
           cptCode: cptCode.trim(),
           payerName: payerName.trim(),
           providerName: providerName.trim(),

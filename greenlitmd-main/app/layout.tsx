@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DM_Sans } from "next/font/google";
+import { Suspense } from "react";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import SignOutButton from "@/components/SignOutButton";
 import Logo from "@/components/Logo";
+import { PHProvider, PostHogPageview } from "./providers";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -43,54 +45,59 @@ export default async function RootLayout({
         <link rel="icon" type="image/svg+xml" href="/favicon-svg.svg" />
       </head>
       <body className="font-sans">
-        <header className="sticky top-0 z-50 border-b border-[#E2E8F0] bg-white/90 backdrop-blur">
-          <nav className="mx-auto flex h-14 max-w-7xl items-center px-6" aria-label="Primary">
-            <div className="flex flex-1 items-center gap-2">
-              <Link
-                href="/"
-                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-              >
-                <Logo size="md" />
-                <span className="rounded-full border border-[#CBD5E1] bg-[#F8F9FB] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
-                  Beta
-                </span>
-              </Link>
-            </div>
-            <div className="flex items-center">
-              {isAuthenticated ? (
-                <div className="flex items-center gap-3">
-                  <a
-                    href="https://calendly.com/kamarishabazz/30min"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-md bg-clinical-navy px-4 py-2 text-sm font-semibold text-white transition hover:bg-clinical-blue hover:shadow-md"
-                  >
-                    Book a Free Demo
-                  </a>
-                  <SignOutButton email={userEmail} />
-                </div>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <Link
-                    href="/login"
-                    className="rounded-md border border-[#CBD5E1] px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
-                  >
-                    Sign in
-                  </Link>
-                  <a
-                    href="https://calendly.com/kamarishabazz/30min"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-md bg-clinical-navy px-4 py-2 text-sm font-semibold text-white transition hover:bg-clinical-blue hover:shadow-md"
-                  >
-                    Book a Free Demo
-                  </a>
-                </div>
-              )}
-            </div>
-          </nav>
-        </header>
-        {children}
+        <PHProvider>
+          <Suspense fallback={null}>
+            <PostHogPageview />
+          </Suspense>
+          <header className="sticky top-0 z-50 border-b border-[#E2E8F0] bg-white/90 backdrop-blur">
+            <nav className="mx-auto flex h-14 max-w-7xl items-center px-6" aria-label="Primary">
+              <div className="flex flex-1 items-center gap-2">
+                <Link
+                  href="/"
+                  className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                >
+                  <Logo size="md" />
+                  <span className="rounded-full border border-[#CBD5E1] bg-[#F8F9FB] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                    Beta
+                  </span>
+                </Link>
+              </div>
+              <div className="flex items-center">
+                {isAuthenticated ? (
+                  <div className="flex items-center gap-3">
+                    <a
+                      href="https://calendly.com/kamarishabazz/30min"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-md bg-clinical-navy px-4 py-2 text-sm font-semibold text-white transition hover:bg-clinical-blue hover:shadow-md"
+                    >
+                      Book a Free Demo
+                    </a>
+                    <SignOutButton email={userEmail} />
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <Link
+                      href="/login"
+                      className="rounded-md border border-[#CBD5E1] px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                    >
+                      Sign in
+                    </Link>
+                    <a
+                      href="https://calendly.com/kamarishabazz/30min"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-md bg-clinical-navy px-4 py-2 text-sm font-semibold text-white transition hover:bg-clinical-blue hover:shadow-md"
+                    >
+                      Book a Free Demo
+                    </a>
+                  </div>
+                )}
+              </div>
+            </nav>
+          </header>
+          {children}
+        </PHProvider>
       </body>
     </html>
   );

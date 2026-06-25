@@ -2,6 +2,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { usePostHog } from "posthog-js/react";
 import Link from "next/link";
 import AnnotatedLetterComponent, { type AnnotationItem } from "@/components/AnnotatedLetter";
 import type { DenialRiskFlag, ExtractedChartData, ExtractedChartDataWithValidation, GeneratePaResponse } from "@/lib/types";
@@ -76,6 +77,7 @@ const FACTOR_LABELS: Record<PaStrengthFactorKey, string> = Object.fromEntries(
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function ReviewPage() {
+  const posthog = usePostHog();
   const [data, setData] = useState<ReviewData | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -271,6 +273,7 @@ export default function ReviewPage() {
       if (!res.ok) throw new Error(payload.error ?? 'Unable to generate a suggestion.');
       if (payload.suggestion) {
         setFixDrafts(cur => ({ ...cur, [factorKey]: payload.suggestion! }));
+        posthog?.capture('fix_suggested', { factor: label });
       }
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Unable to generate a suggestion.');
@@ -321,6 +324,7 @@ export default function ReviewPage() {
             };
           });
         }
+        posthog?.capture('letter_regenerated', { resolved_count: resolved.length });
         setResolved([]);
         setActiveIssue(null);
         showToast('Letter regenerated with your updates');
@@ -338,6 +342,7 @@ export default function ReviewPage() {
 
   async function handleDownload() {
     if (!data) return;
+    posthog?.capture('export_clicked', { cpt_code: data.cptCode, payer_name: data.payerName });
     setIsDownloading(true);
     setDownloadError(null);
     try {
