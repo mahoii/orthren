@@ -277,7 +277,7 @@ Mr. Chen completed the following conservative interventions prior to this surgic
 
   3. Subacromial Corticosteroid Injection (x1): Subacromial corticosteroid injection was administered. Patient reported 3–4 weeks of partial pain relief followed by return of baseline symptoms.
 
-Despite completion of conservative management, Mr. Chen continues to demonstrate pain, weakness, and functional impairment consistent with a surgically significant full-thickness rotator cuff tear. Conservative measures have been exhausted.
+Despite completion of conservative management, Mr. Chen continues to demonstrate pain, weakness, and functional impairment consistent with a surgically significant full-thickness rotator cuff tear. Conservative management to date has included structured physical therapy, NSAIDs, and subacromial corticosteroid injection, none of which has provided durable functional improvement.
 
 REQUESTED PROCEDURE
 
@@ -298,7 +298,7 @@ I respectfully request approval for CPT 29827 — Arthroscopic Rotator Cuff Repa
 
 Sincerely,
 
-Dr. Alex Mercer, MD
+Alex Mercer, MD
 Brooklyn Sports Medicine`,
 
   extracted: {
@@ -470,6 +470,10 @@ Ms. Vance's lumbar disc disease has resulted in the following documented functio
   2. Cannot sit for more than 20 minutes without increasing low back and leg pain — prevents sustained work activities.
   3. Cannot perform bending, lifting, or prolonged standing — limiting ability to perform household and occupational tasks.
 
+CONSERVATIVE TREATMENT HISTORY
+
+No conservative treatments are documented in the source record.
+
 REQUESTED PROCEDURE
 
 Procedure: Lumbar Interbody Fusion
@@ -482,13 +486,12 @@ MEDICAL NECESSITY SUMMARY
   • Confirmed lumbar disc displacement at L4-L5 with neurogenic claudication
   • Progressive symptoms over 6 months with significant functional impairment
   • Documented limitations affecting mobility and daily activities
-  • Advanced imaging is required to confirm nerve root compression prior to surgical authorization.
 
 I respectfully request approval for CPT 22630 — Lumbar Interbody Fusion for Ms. Eleanor Vance.
 
 Sincerely,
 
-Dr. Sarah Jenkins, MD
+Sarah Jenkins, MD
 Spine & Joint Institute`,
 
   extracted: {
