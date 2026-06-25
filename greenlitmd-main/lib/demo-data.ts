@@ -9,17 +9,20 @@ export const CLEAN_TKA: GeneratePaResponse = {
 BlueCross BlueShield
 Prior Authorization Department
 
-Re: Prior Authorization Request — Bilateral Total Knee Arthroplasty (CPT 27447)
-Patient: Maria A. Delgado | DOB: 09/22/1959
-Requesting Provider: Dr. R. Chambers, MD — Westbrook Orthopedic Surgery Center
+Re: Prior Authorization Request — Bilateral Total Knee Arthroplasty (CPT 27447) — M17.11, M17.12
+Member ID: See attached insurance card
+Patient: Maria A. Delgado
+Date of Birth: 09/22/1959
+Procedure: Bilateral Total Knee Arthroplasty
+CPT Code: 27447
 
 Dear Prior Authorization Reviewer,
 
-I am writing to request prior authorization for bilateral total knee arthroplasty (CPT 27447) on behalf of my patient, Maria A. Delgado (DOB: 09/22/1959). Ms. Delgado presents with end-stage bilateral knee osteoarthritis, confirmed by clinical examination, radiographic imaging, and an extended history of conservative treatment failure. This procedure is medically necessary and meets the established clinical criteria for surgical intervention under BlueCross BlueShield coverage guidelines.
+I am writing to request prior authorization for bilateral total knee arthroplasty (CPT 27447) on behalf of my patient, Maria A. Delgado (DOB: 09/22/1959). Ms. Delgado presents with advanced bilateral knee osteoarthritis with Kellgren-Lawrence Grade 3 changes, confirmed by clinical examination, radiographic imaging, and an extended history of conservative treatment failure. This procedure is medically necessary and meets the established clinical criteria for surgical intervention under BlueCross BlueShield coverage guidelines.
 
 CLINICAL HISTORY AND PRESENTING COMPLAINT
 
-Ms. Delgado is a 64-year-old female with a BMI of 41.2 (Class III obesity) and a 24-month history of progressive bilateral knee pain, left worse than right, consistent with advanced degenerative joint disease. She reports constant, moderate-to-severe pain rated 7–8/10 on the Visual Analog Scale at rest, escalating to 9/10 with activity. Symptoms have progressively worsened despite comprehensive conservative management and now significantly impair her activities of daily living.
+Ms. Delgado is a 64-year-old female with a 24-month history of progressive bilateral knee pain, left worse than right, consistent with advanced degenerative joint disease. Ms. Delgado has a documented BMI of 41.2, Class III obesity, which represents a significant contributor to articular cartilage loading and disease progression. She reports constant pain rated 7–8/10 at rest, escalating to 9/10 with activity. Symptoms have progressively worsened despite comprehensive conservative management and now significantly impair her activities of daily living.
 
 DIAGNOSIS
 
@@ -27,7 +30,7 @@ Primary diagnoses:
   • M17.11 — Primary osteoarthritis, right knee
   • M17.12 — Primary osteoarthritis, left knee
 
-Radiographic Assessment: Weight-bearing anteroposterior and lateral X-rays of bilateral knees demonstrate Kellgren-Lawrence Grade 3 changes bilaterally, with moderate-to-severe joint space narrowing and marginal osteophyte formation consistent with end-stage degenerative joint disease.
+Radiographic Assessment: Radiographs of bilateral knees demonstrate Kellgren-Lawrence Grade 3 changes bilaterally, with moderate joint space narrowing and marginal osteophyte formation.
 
 FUNCTIONAL LIMITATIONS
 
@@ -44,15 +47,15 @@ CONSERVATIVE TREATMENT HISTORY
 
 Ms. Delgado has undergone an extensive and documented course of conservative treatment prior to this surgical request. The following interventions have been attempted without achieving durable functional improvement:
 
-  1. Physical Therapy (4 weeks): Structured outpatient physical therapy was completed. Ms. Delgado demonstrated mild short-term improvement in ROM but experienced persistent pain with all weight-bearing activities. Therapy was discontinued due to inability to tolerate exercise intensity secondary to bilateral pain.
+  1. Physical Therapy (4 weeks): Physical therapy was completed. Ms. Delgado demonstrated mild improvement. Therapy was discontinued.
 
-  2. NSAIDs — Naproxen 500mg (January–March 2024, 3 months): Prescribed for pain management. Patient experienced partial relief during the first month; however, therapy was limited by the development of gastrointestinal discomfort, requiring dose reduction and eventual discontinuation.
+  2. NSAIDs — Naproxen 500mg (January–March 2024, 3 months): Prescribed for pain management. Patient experienced partial relief; gastrointestinal discomfort developed, and therapy was discontinued.
 
   3. Corticosteroid Injection — Left Knee: Intra-articular corticosteroid injection was administered to the left knee. Patient reported temporary pain relief of approximately three weeks duration, followed by return of baseline pain. The short-lived benefit supports progression of disease beyond the scope of injectable management.
 
   4. Corticosteroid Injection — Right Knee: Intra-articular corticosteroid injection was also performed on the right knee. The patient experienced minimal sustained benefit, with symptoms returning to baseline within weeks of injection.
 
-  5. Weight Loss Counseling: Ms. Delgado was referred to a structured weight loss counseling program to address obesity as a modifiable risk factor for knee OA progression and surgical candidacy.
+  5. Weight Loss Counseling: Ms. Delgado was referred to weight loss counseling to address obesity as a modifiable risk factor for knee OA progression and surgical candidacy.
 
 Despite this comprehensive conservative care program, Ms. Delgado continues to experience debilitating bilateral knee pain and functional limitation. The clinical evidence supports that she has exhausted appropriate non-operative options and is a suitable candidate for surgical intervention.
 
@@ -61,16 +64,15 @@ REQUESTED PROCEDURE
 Procedure: Bilateral Total Knee Arthroplasty
 CPT Code: 27447
 Surgical Approach: Cemented implant, bilateral
-Anesthetic Risk Classification: ASA III
 Facility: Westbrook Orthopedic Surgery Center
 
-Bilateral simultaneous TKA is appropriate for this patient given the symmetric severity of disease in both knees, as documented radiographically and clinically. A staged approach would expose the patient to two separate anesthetic events and prolonged periods of impaired function.
+The patient carries an ASA III classification, reflecting the anesthetic risk profile accounted for in the perioperative surgical plan.
 
 MEDICAL NECESSITY SUMMARY
 
 The request for bilateral total knee arthroplasty for Ms. Maria A. Delgado meets the criteria for medical necessity on the following grounds:
 
-  • Confirmed radiographic evidence of bilateral end-stage osteoarthritis (KL Grade 3)
+  • Confirmed radiographic evidence of bilateral osteoarthritis with Kellgren-Lawrence Grade 3 changes
   • 24-month history of progressive bilateral knee pain refractory to conservative treatment
   • Failure of multiple evidence-based conservative interventions over an extended treatment period
   • Documented, measurable functional impairment affecting activities of daily living and independent living
@@ -95,6 +97,7 @@ Westbrook Orthopedic Surgery Center`,
       "Significant difficulty with prolonged standing",
       "Unable to perform grocery shopping independently"
     ],
+    pain_score: "7-8/10 at rest, 9/10 with activity",
     objective_measurements: [],
     conservative_treatments_attempted: [
       {
@@ -187,7 +190,7 @@ Westbrook Orthopedic Surgery Center`,
       },
       imaging_findings: {
         score: 1,
-        note: "Bilateral weight-bearing X-rays with KL Grade 3 findings documented."
+        note: "Bilateral X-rays with KL Grade 3 findings documented."
       },
       functional_limitations: {
         score: 1,
@@ -239,9 +242,12 @@ export const MESSY_ROTATOR_CUFF: GeneratePaResponse = {
 UnitedHealthcare
 Prior Authorization Department
 
-Re: Prior Authorization Request — Arthroscopic Rotator Cuff Repair (CPT 29827)
-Patient: Robert Chen | DOB: 11/14/1978
-Requesting Provider: Dr. Alex Mercer, MD — Brooklyn Sports Medicine
+Re: Prior Authorization Request — Arthroscopic Rotator Cuff Repair (CPT 29827) — M75.121
+Member ID: See attached insurance card
+Patient: Robert Chen
+Date of Birth: 11/14/1978
+Procedure: Arthroscopic Rotator Cuff Repair
+CPT Code: 29827
 
 Dear Prior Authorization Reviewer,
 
@@ -256,7 +262,7 @@ DIAGNOSIS
 Primary diagnosis:
   • M75.121 — Complete rotator cuff tear, right shoulder, not specified as traumatic
 
-MRI Assessment (March 2026): MRI of the right shoulder demonstrates a full-thickness tear of the supraspinatus tendon measuring approximately 2.1 cm in the anterior-posterior dimension with mild retraction. Mild degenerative change at the acromioclavicular joint is noted. No biceps tendon pathology identified.
+MRI Assessment (March 2026): MRI of the right shoulder demonstrates a full-thickness tear of the supraspinatus tendon measuring approximately 2.1 cm in the anterior-posterior dimension with mild retraction. Mild degenerative change at the acromioclavicular joint is noted.
 
 FUNCTIONAL LIMITATIONS
 
@@ -271,7 +277,7 @@ CONSERVATIVE TREATMENT HISTORY
 
 Mr. Chen completed the following conservative interventions prior to this surgical request:
 
-  1. Physical Therapy (6 weeks): Structured rotator cuff strengthening and periscapular stabilization program completed. Patient showed limited improvement in ROM but persistent pain and weakness with resisted abduction and external rotation.
+  1. Physical Therapy (6 weeks): Structured physical therapy program completed. Patient showed limited improvement in ROM but persistent pain and weakness.
 
   2. NSAIDs — Meloxicam 15mg (6 weeks): Prescribed for pain and inflammation management. Patient reported mild partial relief but persistent functional impairment.
 
@@ -313,6 +319,7 @@ Brooklyn Sports Medicine`,
       "Sleep disruption due to positional shoulder pain",
       "Reduced grip strength and shoulder stability"
     ],
+    pain_score: "6-8/10 with overhead activity, 4/10 at rest",
     objective_measurements: [
       "Full-thickness supraspinatus tear — 2.1 cm AP dimension, mild retraction (MRI March 2026)"
     ],
@@ -443,17 +450,20 @@ export const INCOMPLETE_LUMBAR_FUSION: GeneratePaResponse = {
 Cigna
 Prior Authorization Department
 
-Re: Prior Authorization Request — Lumbar Interbody Fusion (CPT 22630)
-Patient: Eleanor Vance | DOB: 04/05/1966
-Requesting Provider: Dr. Sarah Jenkins, MD — Spine & Joint Institute
+Re: Prior Authorization Request — Lumbar Interbody Fusion (CPT 22630) — M51.26
+Member ID: See attached insurance card
+Patient: Eleanor Vance
+Date of Birth: 04/05/1966
+Procedure: Lumbar Interbody Fusion
+CPT Code: 22630
 
 Dear Prior Authorization Reviewer,
 
-I am writing to request prior authorization for lumbar interbody fusion (CPT 22630) for my patient, Eleanor Vance (DOB: 04/05/1966). Ms. Vance presents with lumbar disc displacement at L4-L5 with progressive neurogenic claudication and significant functional impairment. The requested surgical intervention is medically necessary given the severity of her symptoms and the impact on her daily activities.
+I am writing to request prior authorization for lumbar interbody fusion (CPT 22630) for my patient, Eleanor Vance (DOB: 04/05/1966). Ms. Vance presents with lumbar disc displacement at L4-L5 with progressive low back pain and bilateral lower extremity radiation, left worse than right, with significant functional impairment. The requested surgical intervention is medically necessary given the severity of her symptoms and the impact on her daily activities.
 
 CLINICAL HISTORY AND PRESENTING COMPLAINT
 
-Ms. Vance is a 60-year-old female with a history of low back pain and bilateral leg pain of approximately 6 months duration. She reports worsening low back pain rated 7/10 with radiation into both lower extremities, left worse than right, consistent with lumbar nerve root compression. Symptoms have progressed significantly over the past several weeks with increasing neurological involvement.
+Ms. Vance is a 60-year-old female with a history of low back pain and bilateral leg pain of approximately 6 months duration. She reports worsening low back pain rated 7/10 with radiation into both lower extremities, left worse than right. Symptoms have progressed significantly over the past several weeks with increasing neurological involvement.
 
 DIAGNOSIS
 
@@ -483,7 +493,7 @@ Facility: Spine & Joint Institute
 
 MEDICAL NECESSITY SUMMARY
 
-  • Confirmed lumbar disc displacement at L4-L5 with neurogenic claudication
+  • Confirmed lumbar disc displacement at L4-L5 with progressive low back pain and bilateral lower extremity radiation
   • Progressive symptoms over 6 months with significant functional impairment
   • Documented limitations affecting mobility and daily activities
 
@@ -505,6 +515,7 @@ Spine & Joint Institute`,
       "Cannot sit for more than 20 minutes without increasing pain",
       "Cannot perform bending, lifting, or prolonged standing"
     ],
+    pain_score: "7/10",
     objective_measurements: [],
     conservative_treatments_attempted: [],
     imaging_findings: {
@@ -603,20 +614,14 @@ Spine & Joint Institute`,
       }
     },
     validation: {
-      hard_blocks: [],
+      hard_blocks: [
+        {
+          field: "conservative_treatments_attempted",
+          label: "Conservative Treatments",
+          message: "No conservative care is documented. Payers require documented failure of conservative treatment before authorizing surgical intervention."
+        }
+      ],
       soft_warnings: [
-        {
-          field: "conservative_treatments_named",
-          label: "Conservative Treatment Documentation",
-          message:
-            "No physical therapy, chiropractic, or injection therapy is documented. Cigna requires documented failure of at least 6 weeks of structured conservative care before approving lumbar fusion."
-        },
-        {
-          field: "imaging_findings",
-          label: "Advanced Imaging Required",
-          message:
-            "MRI or CT of the lumbar spine is required to confirm disc herniation, nerve root compression, and degree of foraminal stenosis. X-ray alone does not meet Cigna's fusion authorization criteria."
-        },
         {
           field: "symptom_duration",
           label: "Symptom Duration vs. Treatment History",

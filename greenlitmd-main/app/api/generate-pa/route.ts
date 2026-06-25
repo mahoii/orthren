@@ -59,9 +59,11 @@ PATIENT NAME RULE: Extract patient_name as exactly [LastName, FirstName] with no
 
 BMI RULE: Only include bmi if explicitly recorded in vitals or note. If not recorded, return null. Never infer or estimate BMI.
 
-Include these chart data keys: patient_name, date_of_birth, diagnosis_codes (array), primary_complaint, symptom_duration (exact verbatim from source), functional_limitations (array — source-only, no inferences), objective_measurements (array), conservative_treatments_attempted (array — see schema below), imaging_findings (object — see schema below), requested_procedure, surgical_approach_if_mentioned (verbatim from source only), bmi, asa_classification, payer_name, denial_risk_flags (array of structured objects — see schema below). If information is not found, use null for strings and empty arrays for arrays, except conservative_treatments_attempted must follow the instruction below. After extracting all fields, also return a 'validation' object with hard_blocks and soft_warnings arrays. For hard_blocks, include any of these fields that are missing or null: patient_name, diagnosis_codes (if empty), requested_procedure. For soft_warnings, include any of these fields that are missing or null: surgical_approach_if_mentioned, imaging_findings, conservative_treatments_attempted (if empty), functional_limitations (if empty). Each block/warning object must have: {field, label, message}. Return the complete JSON including chart data and validation object.
+Include these chart data keys: patient_name, date_of_birth, diagnosis_codes (array), primary_complaint, symptom_duration (exact verbatim from source), functional_limitations (array — source-only, no inferences), objective_measurements (array), pain_score (string or null), conservative_treatments_attempted (array — see schema below), imaging_findings (object — see schema below), requested_procedure, surgical_approach_if_mentioned (verbatim from source only), bmi, asa_classification, payer_name, denial_risk_flags (array of structured objects — see schema below). If information is not found, use null for strings and empty arrays for arrays, except conservative_treatments_attempted must follow the instruction below. After extracting all fields, also return a 'validation' object with hard_blocks and soft_warnings arrays. For hard_blocks, include any of these fields that are missing or null: patient_name, diagnosis_codes (if empty), requested_procedure. For soft_warnings, include any of these fields that are missing or null: surgical_approach_if_mentioned, imaging_findings, conservative_treatments_attempted (if empty), functional_limitations (if empty). Each block/warning object must have: {field, label, message}. Return the complete JSON including chart data and validation object.
 
-For objective_measurements, extract ALL quantified clinical measurements documented in the chart. This includes: range of motion values (e.g. "Knee flexion limited to 85 degrees"), pain scale scores (e.g. "Pain rated 8/10 at rest"), functional outcome scores (e.g. "KOOS score 32/100", "Oxford Knee Score 18/48", "VAS 7.5"), strength measurements, walking distance or tolerance, and any other numeric clinical findings. Return each as a plain English string. Return an empty array if no quantified measurements are documented.
+For objective_measurements, extract ALL quantified clinical measurements documented in the chart. This includes: range of motion values (e.g. "Knee flexion limited to 85 degrees"), functional outcome scores (e.g. "KOOS score 32/100", "Oxford Knee Score 18/48", "VAS 7.5"), strength measurements, walking distance or tolerance, and any other numeric clinical findings. Do NOT include pain scale scores here — those go in pain_score. Return each as a plain English string. Return an empty array if no quantified measurements are documented.
+
+PAIN SCORE: Extract pain_score as a concise string capturing the documented pain scale rating(s). Include rest and activity ratings if both are documented (e.g., "4/10 at rest, 8/10 with activity"). If multiple scales are used, prefer VAS/NRS numeric scores. Return null if no pain scale value is explicitly documented in the chart.
 
 Extract ALL conservative treatments attempted by the patient before surgery. For each treatment found, you MUST provide the treatment_name — never return null or unknown for this field. Search the chart for any mention of: physical therapy (PT), occupational therapy (OT), NSAIDs (ibuprofen, naproxen, celecoxib, meloxicam), corticosteroid injections (cortisone, kenalog, depomedrol), hyaluronic acid injections (synvisc, hyalgan, euflexxa), bracing or orthotics, activity modification, weight loss programs, chiropractic care, acupuncture, topical medications, opioid or non-opioid analgesics, or any other conservative intervention mentioned.
 For each treatment found return an object with exactly these fields:
@@ -430,6 +432,7 @@ function normalizeChartData(
   // â"€â"€ B2: Numerical fields â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   const bmi = safeNumeric(data.bmi);
   const asa_classification = safeAsaClassification(data.asa_classification);
+  const painScore = nullableString(data.pain_score);
 
   // â"€â"€ B3: Flat arrays â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   const diagnosisCodes = stringArray(data.diagnosis_codes);
@@ -487,18 +490,18 @@ function normalizeChartData(
   }
 
   if (!imagingFindings) {
-    soft_warnings.push({
+    hard_blocks.push({
       field: "imaging_findings",
       label: "Imaging Findings",
-      message: "Imaging results provide critical objective evidence but may not always be documented."
+      message: "No imaging results are documented. Payers require objective imaging evidence to authorize surgical intervention."
     });
   }
 
   if (conservativeTreatments.length === 0) {
-    soft_warnings.push({
+    hard_blocks.push({
       field: "conservative_treatments_attempted",
       label: "Conservative Treatments",
-      message: "Documented prior conservative care is key to showing surgery is a last resort."
+      message: "No conservative care is documented. Payers require documented failure of conservative treatment before authorizing surgical intervention."
     });
   }
 
@@ -543,7 +546,8 @@ function normalizeChartData(
     surgical_approach_if_mentioned: surgicalApproach,
     denial_risk_flags: denialRiskFlags,
     pa_strength: normalizePaStrength(data.pa_strength),
-    // Expose bmi and asa_classification for letter generation (they pass through as any)
+    // Expose pain_score, bmi, and asa_classification for letter generation (they pass through as any)
+    ...(painScore !== null ? { pain_score: painScore } : {}),
     ...(bmi !== null ? { bmi } : {}),
     ...(asa_classification !== null ? { asa_classification } : {}),
     validation: { hard_blocks, soft_warnings }
