@@ -26,6 +26,27 @@ function AuthErrorBanner() {
   );
 }
 
+function SignedOutBanner() {
+  const searchParams = useSearchParams();
+  const signedOut = searchParams.get("signed_out") === "true";
+  const [dismissed, setDismissed] = useState(false);
+
+  if (!signedOut || dismissed) return null;
+
+  return (
+    <div className="mb-4 flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+      <span className="flex-1">You&apos;ve been signed out.</span>
+      <button
+        onClick={() => setDismissed(true)}
+        className="shrink-0 font-medium hover:text-slate-900"
+        aria-label="Dismiss"
+      >
+        &#x2715;
+      </button>
+    </div>
+  );
+}
+
 function LoginForm() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
@@ -104,6 +125,7 @@ export default function LoginPage() {
     <main className="flex min-h-[calc(100vh-56px)] items-center justify-center bg-[#F8F9FB] px-4">
       <div className="w-full max-w-sm">
         <Suspense fallback={null}>
+          <SignedOutBanner />
           <AuthErrorBanner />
         </Suspense>
         <div className="mb-8 flex flex-col items-center gap-3 text-center">

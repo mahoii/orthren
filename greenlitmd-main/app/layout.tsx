@@ -27,10 +27,12 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   let isAuthenticated = false;
+  let userEmail: string | null = null;
   try {
     const supabase = createSupabaseAuthServerClient();
     const { data: { user } } = await supabase.auth.getUser();
     isAuthenticated = !!user;
+    userEmail = user?.email ?? null;
   } catch {
     // cookies() unavailable in some static contexts — treat as unauthenticated
   }
@@ -56,7 +58,7 @@ export default async function RootLayout({
             </div>
             <div className="flex items-center">
               {isAuthenticated ? (
-                <SignOutButton />
+                <SignOutButton email={userEmail} />
               ) : (
                 <a
                   href="https://calendly.com/kamarishabazz/30min"
