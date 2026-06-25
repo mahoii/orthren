@@ -39,15 +39,25 @@ export function injectBmiAsa(letter: string, extracted: ExtractedChartData): str
   const bmi = typeof rawBmi === "string" ? Number(rawBmi) : rawBmi;
 
   if (bmi != null && !Number.isNaN(bmi) && !/\bBMI\b/i.test(letter)) {
-    const obesityClass =
-      bmi >= 40 ? "Class III obesity, " :
-      bmi >= 35 ? "Class II obesity, " :
-      bmi >= 30 ? "Class I obesity, " : "";
-    const sentence = `The patient has a documented BMI of ${bmi}, ${obesityClass}which represents a significant contributor to articular cartilage loading and disease progression.`;
-    letter = letter.replace(
-      /(CLINICAL HISTORY AND PRESENTING COMPLAINT\s*\n+[^.!?]+[.!?])/i,
-      `$1 ${sentence}`
-    );
+    if (bmi >= 30) {
+      const obesityClass =
+        bmi >= 40 ? "Class III obesity, " :
+        bmi >= 35 ? "Class II obesity, " :
+        "Class I obesity, ";
+      const sentence = `The patient has a documented BMI of ${bmi}, ${obesityClass}which represents a significant contributor to articular cartilage loading and disease progression.`;
+      letter = letter.replace(
+        /(CLINICAL HISTORY AND PRESENTING COMPLAINT\s*\n+[^.!?]+[.!?])/i,
+        `$1 ${sentence}`
+      );
+    } else if (bmi >= 25 && asa != null && asa !== "") {
+      // BMI 25–29.9: mention value in REQUESTED PROCEDURE only when ASA is also present
+      const sentence = `The patient's BMI of ${bmi} and ASA ${asa} classification have been factored into the perioperative surgical plan.`;
+      letter = letter.replace(
+        /(REQUESTED PROCEDURE\s*\n+)/i,
+        `$1${sentence} `
+      );
+    }
+    // BMI < 25: omit entirely
   }
 
   if (asa != null && asa !== "" && !/\bASA\b/i.test(letter)) {
