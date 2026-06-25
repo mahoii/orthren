@@ -508,7 +508,6 @@ export default function ReviewPage() {
                 animation: 'badge-fade-in 400ms ease forwards',
                 whiteSpace: 'nowrap',
               }}>
-                ✓ All fixes applied — regenerate first
               </span>
             )}
             <button
