@@ -58,7 +58,17 @@ export default async function RootLayout({
             </div>
             <div className="flex items-center">
               {isAuthenticated ? (
-                <SignOutButton email={userEmail} />
+                <div className="flex items-center gap-3">
+                  <a
+                    href="https://calendly.com/kamarishabazz/30min"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-md bg-clinical-navy px-4 py-2 text-sm font-semibold text-white transition hover:bg-clinical-blue hover:shadow-md"
+                  >
+                    Book a Free Demo
+                  </a>
+                  <SignOutButton email={userEmail} />
+                </div>
               ) : (
                 <div className="flex items-center gap-3">
                   <Link
