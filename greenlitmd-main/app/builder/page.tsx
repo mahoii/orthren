@@ -271,6 +271,12 @@ export default function UploadPage() {
       return;
     }
 
+    posthog?.capture("pa_generation_started", {
+      cpt_code: cptCode.trim(),
+      payer: payerName.trim(),
+      file_type: file!.type,
+    });
+
     const intervalTime = 7000;
     const progressTimer = window.setInterval(() => {
       setActiveStep((current) => Math.min(current + 1, progressSteps.length - 1));
@@ -297,10 +303,11 @@ export default function UploadPage() {
       }
 
       const reviewPayload = payload as GeneratePaResponse;
-      posthog?.capture('pa_generated', {
+      posthog?.capture("pa_generation_succeeded", {
         cpt_code: cptCode.trim(),
-        payer_name: payerName.trim(),
-        pa_strength_score: reviewPayload.extracted?.pa_strength
+        payer: payerName.trim(),
+        hard_block_count: reviewPayload.extracted?.validation?.hard_blocks?.length ?? 0,
+        pa_score: reviewPayload.extracted?.pa_strength
           ? Object.values(reviewPayload.extracted.pa_strength).reduce(
               (sum, f) => sum + (f?.score ?? 0), 0
             )

@@ -262,6 +262,7 @@ export default function ReviewPage() {
 
   async function handleSuggestFix(factorKey: PaStrengthFactorKey, label: string) {
     if (!data || isSuggesting[factorKey]) return;
+    posthog?.capture("suggest_fix_clicked", { factor: factorKey });
     setIsSuggesting(cur => ({ ...cur, [factorKey]: true }));
     try {
       const res = await fetch('/api/suggest-fix', {
@@ -273,7 +274,6 @@ export default function ReviewPage() {
       if (!res.ok) throw new Error(payload.error ?? 'Unable to generate a suggestion.');
       if (payload.suggestion) {
         setFixDrafts(cur => ({ ...cur, [factorKey]: payload.suggestion! }));
-        posthog?.capture('fix_suggested', { factor: label });
       }
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Unable to generate a suggestion.');
@@ -324,7 +324,13 @@ export default function ReviewPage() {
             };
           });
         }
-        posthog?.capture('letter_regenerated', { resolved_count: resolved.length });
+        posthog?.capture("letter_regenerated", {
+          resolved_count: resolved.length,
+          hard_block_count: data.extracted?.validation?.hard_blocks?.length ?? 0,
+          pa_score_before: data.extracted?.pa_strength
+            ? Object.values(data.extracted.pa_strength).reduce((sum, f) => sum + (f?.score ?? 0), 0)
+            : null,
+        });
         setResolved([]);
         setActiveIssue(null);
         showToast('Letter regenerated with your updates');
@@ -342,7 +348,7 @@ export default function ReviewPage() {
 
   async function handleDownload() {
     if (!data) return;
-    posthog?.capture('export_clicked', { cpt_code: data.cptCode, payer_name: data.payerName });
+    posthog?.capture("pa_packet_exported", { cpt_code: data.cptCode, payer: data.payerName });
     setIsDownloading(true);
     setDownloadError(null);
     try {

@@ -10,6 +10,7 @@ import { callAnthropicWithRetry } from "@/lib/anthropic";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import { deidentify, reidentify } from "@/lib/deidentify";
 import { validateExtraction } from "@/lib/extractionValidator";
+import { serverPosthog } from "@/lib/posthog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -86,6 +87,8 @@ Weight the overall score on the frontend as: diagnosis_codes 10%, conservative_t
 Return ONLY valid JSON. No markdown. No backticks. No preamble. No explanation. Start with { and end with }.`;
 
 export async function POST(request: Request) {
+  const startTime = Date.now();
+  let stage: "extraction" | "narrative" = "extraction";
   try {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "127.0.0.1";
     const { success } = await rateLimiter.limit(ip);
@@ -154,11 +157,35 @@ export async function POST(request: Request) {
       extractedWithWarnings.extraction_warnings = discrepancies;
     }
 
+    stage = "narrative";
     const letter = await generateLetter(extractedWithWarnings, requestDetails, phiMap);
+
+    const paScore = extractedWithWarnings.pa_strength
+      ? Object.values(extractedWithWarnings.pa_strength).reduce((sum, f) => sum + ((f as any)?.score ?? 0), 0)
+      : null;
+    serverPosthog.capture({
+      distinctId: user.id,
+      event: "pa_generation_succeeded",
+      properties: {
+        cpt_code: cptCode,
+        payer: payerName,
+        duration_ms: Date.now() - startTime,
+        hard_block_count: extractedWithWarnings.validation.hard_blocks.length,
+        pa_score: paScore,
+      },
+    });
 
     return NextResponse.json({ extracted: extractedWithWarnings, letter });
   } catch (error) {
     console.error("[generate-pa] POST handler error:", error);
+    serverPosthog.capture({
+      distinctId: "server",
+      event: "pa_generation_failed",
+      properties: {
+        error: error instanceof Error ? error.message : String(error),
+        stage,
+      },
+    });
     return NextResponse.json(
       { error: "AI service temporarily unavailable. Please try again." },
       { status: 500 }
