@@ -95,6 +95,7 @@ export default function ReviewPage() {
   const [strengthOpen, setStrengthOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [animatedScore, setAnimatedScore] = useState(0);
+  const [hasRegeneratedAfterMax, setHasRegeneratedAfterMax] = useState(false);
 
   const letterRef = useRef<HTMLDivElement>(null);
   const savedScrollRef = useRef<number>(0);
@@ -212,6 +213,10 @@ export default function ReviewPage() {
 
   useEffect(() => {
     if (hasAnimated.current) setAnimatedScore(earnedScore);
+  }, [earnedScore]);
+
+  useEffect(() => {
+    if (earnedScore < 100) setHasRegeneratedAfterMax(false);
   }, [earnedScore]);
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -490,24 +495,47 @@ export default function ReviewPage() {
           </div>
 
           {/* Regenerate */}
-          <button
-            type="button"
-            onClick={handleRegenerate}
-            disabled={resolved.length === 0 || isRegenerating}
-            style={{
-              background: '#fff',
-              border: '1px solid #e2e8f0',
-              borderRadius: 8,
-              padding: '9px 15px',
-              fontSize: 13,
-              fontWeight: 600,
-              color: resolved.length > 0 && !isRegenerating ? '#1d4f7a' : '#cbd5e1',
-              cursor: resolved.length > 0 && !isRegenerating ? 'pointer' : 'not-allowed',
-              fontFamily: 'inherit',
-            }}
-          >
-            {isRegenerating ? 'Regenerating…' : `Regenerate${resolved.length > 0 ? ` (${resolved.length})` : ''}`}
-          </button>
+          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            {earnedScore === 100 && !hasRegeneratedAfterMax && (
+              <span style={{
+                fontSize: 11,
+                color: '#16a34a',
+                background: '#f0fdf4',
+                borderRadius: 9999,
+                padding: '2px 10px',
+                border: '1px solid #bbf7d0',
+                marginBottom: 6,
+                animation: 'badge-fade-in 400ms ease forwards',
+                whiteSpace: 'nowrap',
+              }}>
+                ✓ All fixes applied — regenerate first
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                if (earnedScore === 100) setHasRegeneratedAfterMax(true);
+                handleRegenerate();
+              }}
+              disabled={resolved.length === 0 || isRegenerating}
+              style={{
+                background: '#fff',
+                border: earnedScore === 100 && !hasRegeneratedAfterMax ? '1.5px solid #22C55E' : '1px solid #e2e8f0',
+                borderRadius: 8,
+                padding: '9px 15px',
+                fontSize: 13,
+                fontWeight: 600,
+                color: resolved.length > 0 && !isRegenerating ? '#1d4f7a' : '#cbd5e1',
+                cursor: resolved.length > 0 && !isRegenerating ? 'pointer' : 'not-allowed',
+                fontFamily: 'inherit',
+                animation: earnedScore === 100 && !hasRegeneratedAfterMax
+                  ? 'glow-pulse 1.6s ease-out infinite, breath-scale 1.6s ease-in-out infinite'
+                  : 'none',
+              }}
+            >
+              {isRegenerating ? 'Regenerating…' : `Regenerate${resolved.length > 0 ? ` (${resolved.length})` : ''}`}
+            </button>
+          </div>
 
           {/* Download */}
           <button
@@ -808,6 +836,19 @@ export default function ReviewPage() {
         @keyframes fadeSlideIn {
           from { opacity: 0; transform: translateY(6px); }
           to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes glow-pulse {
+          0%   { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6); }
+          100% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+        }
+        @keyframes breath-scale {
+          0%   { transform: scale(1); }
+          50%  { transform: scale(1.025); }
+          100% { transform: scale(1); }
+        }
+        @keyframes badge-fade-in {
+          from { opacity: 0; }
+          to   { opacity: 1; }
         }
       `}</style>
     </div>
