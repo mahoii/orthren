@@ -1,6 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
 import { type EmailOtpType } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
@@ -13,16 +12,23 @@ export async function GET(request: NextRequest) {
     ? redirectParam
     : (searchParams.get('next') ?? '/builder')
 
-  const cookieStore = cookies()
+  // Build the success redirect first so we can attach cookies directly to it.
+  // Using cookies() from next/headers here would set cookies on a different
+  // response object than the NextResponse.redirect we return, so the session
+  // cookies would not be sent to the browser with the redirect.
+  const successUrl = `${origin}${next}`
+  const errorUrl = `${origin}/login?error=auth_failed`
+  const response = NextResponse.redirect(successUrl)
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll: () => cookieStore.getAll(),
+        getAll: () => request.cookies.getAll(),
         setAll: (pairs) =>
           pairs.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
+            response.cookies.set(name, value, options)
           ),
       },
     }
@@ -42,8 +48,8 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     console.error('[auth/callback] error:', error)
-    return NextResponse.redirect(`${origin}/login?error=auth_failed`)
+    return NextResponse.redirect(errorUrl)
   }
 
-  return NextResponse.redirect(`${origin}${next}`)
+  return response
 }
