@@ -1,3 +1,6 @@
+// DEPRECATED: This route is no longer called from the UI.
+// Suggest Fix redesigned to use deterministic template layer (lib/suggest-fix-templates.ts).
+// Do not delete until confirmed no external references. Scheduled for removal post-Phase 1.
 import { NextResponse } from "next/server";
 import type { ExtractedChartDataWithValidation } from "@/lib/types";
 import { rateLimiter } from "@/lib/rate-limit";

@@ -5,7 +5,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePostHog } from "posthog-js/react";
 import Link from "next/link";
 import AnnotatedLetterComponent, { type AnnotationItem } from "@/components/AnnotatedLetter";
-import type { DenialRiskFlag, ExtractedChartData, ExtractedChartDataWithValidation, GeneratePaResponse } from "@/lib/types";
+import type { DenialRiskFlag, ExtractedChartData, GeneratePaResponse } from "@/lib/types";
+import { getSuggestFixGuidance } from "@/lib/suggest-fix-templates";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -19,16 +20,13 @@ type ReviewData = GeneratePaResponse & {
 
 type PaStrengthFactorKey = keyof ExtractedChartData["pa_strength"];
 
-type ManualFix = {
-  value: string;
-  resolved: boolean;
-  source: "manual" | "ai";
-};
-
-type ManualFixes = Partial<Record<PaStrengthFactorKey, ManualFix>>;
-type SuggestionLoading = Partial<Record<PaStrengthFactorKey, boolean>>;
-
 type IssueKind = 'fix' | 'risk';
+
+type FixGuidance = {
+  guidance: string;
+  inputLabel: string;
+  inputPlaceholder: string;
+};
 
 interface AttentionItem {
   id: string;
@@ -40,6 +38,7 @@ interface AttentionItem {
   addendum?: string;
   placeholder?: string;
   done: boolean;
+  guidance?: FixGuidance | null;
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -70,10 +69,6 @@ const paStrengthFactors: Array<{
   { key: "symptom_duration", label: "Symptom Duration", placeholder: "e.g. 6 months" },
 ];
 
-const FACTOR_LABELS: Record<PaStrengthFactorKey, string> = Object.fromEntries(
-  paStrengthFactors.map(f => [f.key, f.label])
-) as Record<PaStrengthFactorKey, string>;
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function ReviewPage() {
@@ -83,15 +78,13 @@ export default function ReviewPage() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
 
-  // Attention stream state
   const [mode, setMode] = useState<'review' | 'edit'>('review');
   const [editedLetter, setEditedLetter] = useState("");
   const [activeIssue, setActiveIssue] = useState<string | null>(null);
   const [hoverAnchor, setHoverAnchor] = useState<string | null>(null);
-  const [resolved, setResolved] = useState<string[]>([]);
   const [acknowledged, setAcknowledged] = useState<string[]>([]);
-  const [fixDrafts, setFixDrafts] = useState<Record<string, string>>({});
-  const [isSuggesting, setIsSuggesting] = useState<SuggestionLoading>({});
+  const [supplements, setSupplements] = useState<Record<string, string>>({});
+  const [expandedFactors, setExpandedFactors] = useState<Set<string>>(new Set());
   const [strengthOpen, setStrengthOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [animatedScore, setAnimatedScore] = useState(0);
@@ -151,7 +144,8 @@ export default function ReviewPage() {
           anchor: f.anchorText,
           factorKey: f.key,
           placeholder: f.placeholder,
-          done: resolved.includes(f.key),
+          done: false,
+          guidance: getSuggestFixGuidance(f.key, f.score, f.note),
         });
       }
     }
@@ -167,17 +161,17 @@ export default function ReviewPage() {
       });
     }
     return items;
-  }, [scoreFactors, denialFlags, resolved, acknowledged]);
+  }, [scoreFactors, denialFlags, acknowledged]);
 
   const openCount = attentionItems.filter(i => !i.done).length;
 
   const earnedScore = useMemo(() => {
     let e = 0;
     for (const f of scoreFactors) {
-      if (f.score >= f.maxScore || resolved.includes(f.key)) e += f.weight;
+      if (f.score >= f.maxScore) e += f.weight;
     }
-    return e; // out of 100
-  }, [scoreFactors, resolved]);
+    return e;
+  }, [scoreFactors]);
 
   const displayScore = (earnedScore / 10).toFixed(1);
 
@@ -187,6 +181,12 @@ export default function ReviewPage() {
     if (v >= 5) return { color: '#d97706', label: 'Moderate — address gaps before submitting' };
     return { color: '#dc2626', label: 'High denial risk — major gaps' };
   }, [earnedScore, openCount]);
+
+  const activeSupplements = useMemo(
+    () => Object.fromEntries(Object.entries(supplements).filter(([, v]) => v.trim())),
+    [supplements]
+  );
+  const hasSupplements = Object.keys(activeSupplements).length > 0;
 
   const handleModeToggle = (newMode: 'review' | 'edit') => {
     if (letterRef.current) {
@@ -231,31 +231,49 @@ export default function ReviewPage() {
     return s.replace(/[^a-z0-9]/gi, '').slice(0, 24);
   }
 
-  function scrollToAnchor(id: string) {
-    const anchor = attentionItems.find(i => i.id === id)?.anchor;
-    if (!anchor) return;
-    setTimeout(() => {
-      const container = letterRef.current;
-      const el = document.getElementById('anno-' + slug(anchor));
-      if (container && el) {
-        container.scrollTo({ top: Math.max(0, el.offsetTop - container.clientHeight / 2 + 30), behavior: 'smooth' });
+  function toggleCard(id: string) {
+    const item = attentionItems.find(i => i.id === id);
+    const isExpanding = !expandedFactors.has(id);
+
+    setExpandedFactors(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
       }
-    }, 30);
+      return next;
+    });
+
+    if (isExpanding) {
+      setActiveIssue(id);
+      const anchor = item?.anchor;
+      if (anchor) {
+        setTimeout(() => {
+          const container = letterRef.current;
+          const el = document.getElementById('anno-' + slug(anchor));
+          if (container && el) {
+            container.scrollTo({ top: Math.max(0, el.offsetTop - container.clientHeight / 2 + 30), behavior: 'smooth' });
+          }
+        }, 30);
+      }
+      setTimeout(() => {
+        document.getElementById('rail-card-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 80);
+    } else {
+      setActiveIssue(null);
+    }
   }
 
-  function openIssue(id: string) {
-    setActiveIssue(id);
-    scrollToAnchor(id);
-    setTimeout(() => {
-      document.getElementById('rail-card-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }, 80);
-  }
-
-  function applyFix(factorKey: string) {
-    const draft = (fixDrafts[factorKey] || '').trim();
-    if (!draft) { showToast('Add a fix note or use Suggest first'); return; }
-    setResolved(prev => prev.includes(factorKey) ? prev : [...prev, factorKey]);
-    showToast('Gap resolved — regenerate to fold it into the letter');
+  function handleSupplementChange(factorKey: string, value: string) {
+    setSupplements(prev => {
+      if (!value) {
+        const next = { ...prev };
+        delete next[factorKey];
+        return next;
+      }
+      return { ...prev, [factorKey]: value };
+    });
   }
 
   function acknowledge(id: string) {
@@ -265,60 +283,32 @@ export default function ReviewPage() {
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
 
-  async function handleSuggestFix(factorKey: PaStrengthFactorKey, label: string) {
-    if (!data || isSuggesting[factorKey]) return;
-    posthog?.capture("suggest_fix_clicked", { factor: factorKey });
-    setIsSuggesting(cur => ({ ...cur, [factorKey]: true }));
-    try {
-      const res = await fetch('/api/suggest-fix', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ extracted: data.extracted, factor: label }),
-      });
-      const payload = await res.json() as { suggestion?: string; error?: string };
-      if (!res.ok) throw new Error(payload.error ?? 'Unable to generate a suggestion.');
-      if (payload.suggestion) {
-        setFixDrafts(cur => ({ ...cur, [factorKey]: payload.suggestion! }));
-      }
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Unable to generate a suggestion.');
-    } finally {
-      setIsSuggesting(cur => ({ ...cur, [factorKey]: false }));
-    }
-  }
-
   async function handleRegenerate() {
-    if (!data || resolved.length === 0 || isRegenerating) return;
-    const mfMap: ManualFixes = {};
-    for (const key of resolved) {
-      mfMap[key as PaStrengthFactorKey] = {
-        value: fixDrafts[key] ?? '',
-        resolved: true,
-        source: 'manual',
-      };
-    }
-    const resolutionContext = resolved
-      .map(k => `${FACTOR_LABELS[k as PaStrengthFactorKey]}: ${fixDrafts[k] ?? ''}`)
-      .join('\n');
-    const { updatedExtracted, updatedRequestDetails } = buildUpdatedPayload(data, mfMap);
+    if (!data || !hasSupplements || isRegenerating) return;
+
     setIsRegenerating(true);
     try {
-      const res = await fetch('/api/regenerate-letter', {
+      const res = await fetch('/api/regenerate-denial-fix', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ extracted: updatedExtracted, requestDetails: updatedRequestDetails, resolutionContext }),
+        body: JSON.stringify({
+          extractionJson: data.extracted,
+          currentLetter: editedLetter,
+          supplements: activeSupplements,
+        }),
       });
       const json = await res.json() as { letter?: string; error?: string };
       if (!res.ok) throw new Error(json.error ?? 'Unable to regenerate the letter.');
       if (json.letter) {
         setEditedLetter(json.letter);
-        // Persist resolved factors into pa_strength so the score doesn't
-        // regress when we clear the resolved[] array below.
-        if (resolved.length > 0) {
+
+        // Update pa_strength scores for supplemented factors so the score reflects the fix
+        const supplementedKeys = Object.keys(activeSupplements);
+        if (supplementedKeys.length > 0) {
           setData(prev => {
             if (!prev) return prev;
             const updatedPaStrength = { ...prev.extracted.pa_strength } as Record<string, { score: number; note: string; anchorText?: string }>;
-            for (const key of resolved) {
+            for (const key of supplementedKeys) {
               if (updatedPaStrength[key]) {
                 updatedPaStrength[key] = { ...updatedPaStrength[key], score: 1 };
               }
@@ -329,16 +319,18 @@ export default function ReviewPage() {
             };
           });
         }
-        posthog?.capture("letter_regenerated", {
-          resolved_count: resolved.length,
-          hard_block_count: data.extracted?.validation?.hard_blocks?.length ?? 0,
-          pa_score_before: data.extracted?.pa_strength
-            ? Object.values(data.extracted.pa_strength).reduce((sum, f) => sum + (f?.score ?? 0), 0)
-            : null,
+
+        posthog?.capture("letter_regenerated_denial_fix", {
+          supplement_count: supplementedKeys.length,
+          supplemented_factors: supplementedKeys,
         });
-        setResolved([]);
+
+        if (earnedScore === 100) setHasRegeneratedAfterMax(true);
+
+        setSupplements({});
+        setExpandedFactors(new Set());
         setActiveIssue(null);
-        showToast('Letter regenerated with your updates');
+        showToast('Letter revised with your clinical additions');
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
@@ -411,6 +403,8 @@ export default function ReviewPage() {
   const annotationItems: AnnotationItem[] = attentionItems
     .filter(i => i.anchor)
     .map(i => ({ id: i.id, kind: i.kind, anchor: i.anchor, done: i.done }));
+
+  const supplementBadgeKeys = Object.keys(activeSupplements);
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -495,8 +489,25 @@ export default function ReviewPage() {
           </div>
 
           {/* Regenerate */}
-          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            {earnedScore === 100 && !hasRegeneratedAfterMax && (
+          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+            {hasSupplements && !isRegenerating && (
+              <span style={{
+                fontSize: 10,
+                color: '#1d4f7a',
+                background: '#eff6ff',
+                borderRadius: 9999,
+                padding: '2px 8px',
+                border: '1px solid #bfdbfe',
+                marginBottom: 4,
+                whiteSpace: 'nowrap',
+                maxWidth: 260,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}>
+                Applying fixes to: {supplementBadgeKeys.join(', ')}
+              </span>
+            )}
+            {earnedScore === 100 && !hasRegeneratedAfterMax && !hasSupplements && (
               <span style={{
                 fontSize: 11,
                 color: '#16a34a',
@@ -512,27 +523,24 @@ export default function ReviewPage() {
             )}
             <button
               type="button"
-              onClick={() => {
-                if (earnedScore === 100) setHasRegeneratedAfterMax(true);
-                handleRegenerate();
-              }}
-              disabled={resolved.length === 0 || isRegenerating}
+              onClick={handleRegenerate}
+              disabled={!hasSupplements || isRegenerating}
               style={{
                 background: '#fff',
-                border: earnedScore === 100 && !hasRegeneratedAfterMax ? '1.5px solid #22C55E' : '1px solid #e2e8f0',
+                border: earnedScore === 100 && !hasRegeneratedAfterMax && hasSupplements ? '1.5px solid #22C55E' : '1px solid #e2e8f0',
                 borderRadius: 8,
                 padding: '9px 15px',
                 fontSize: 13,
                 fontWeight: 600,
-                color: resolved.length > 0 && !isRegenerating ? '#1d4f7a' : '#cbd5e1',
-                cursor: resolved.length > 0 && !isRegenerating ? 'pointer' : 'not-allowed',
+                color: hasSupplements && !isRegenerating ? '#1d4f7a' : '#cbd5e1',
+                cursor: hasSupplements && !isRegenerating ? 'pointer' : 'not-allowed',
                 fontFamily: 'inherit',
-                animation: earnedScore === 100 && !hasRegeneratedAfterMax
+                animation: earnedScore === 100 && !hasRegeneratedAfterMax && hasSupplements
                   ? 'glow-pulse 1.6s ease-out infinite, breath-scale 1.6s ease-in-out infinite'
                   : 'none',
               }}
             >
-              {isRegenerating ? 'Regenerating…' : `Regenerate${resolved.length > 0 ? ` (${resolved.length})` : ''}`}
+              {isRegenerating ? 'Regenerating…' : `Regenerate${hasSupplements ? ` (${supplementBadgeKeys.length})` : ''}`}
             </button>
           </div>
 
@@ -594,7 +602,7 @@ export default function ReviewPage() {
                   items={annotationItems}
                   activeIssue={activeIssue}
                   hoverAnchor={hoverAnchor}
-                  onIssueClick={openIssue}
+                  onIssueClick={toggleCard}
                   onHover={setHoverAnchor}
                 />
               </div>
@@ -686,15 +694,13 @@ export default function ReviewPage() {
             <StreamCard
               key={item.id}
               item={item}
+              isExpanded={expandedFactors.has(item.id)}
               activeIssue={activeIssue}
-              fixDraft={fixDrafts[item.id] ?? ''}
-              isSuggesting={Boolean(isSuggesting[item.factorKey as PaStrengthFactorKey])}
-              onToggle={() => activeIssue === item.id ? setActiveIssue(null) : openIssue(item.id)}
+              supplement={supplements[item.id] ?? ''}
+              onToggle={() => toggleCard(item.id)}
               onHoverEnter={() => setHoverAnchor(item.anchor ?? null)}
               onHoverLeave={() => setHoverAnchor(null)}
-              onFixChange={v => setFixDrafts(cur => ({ ...cur, [item.id]: v }))}
-              onSuggestFix={() => item.factorKey && handleSuggestFix(item.factorKey, item.label)}
-              onApplyFix={() => applyFix(item.id)}
+              onSupplementChange={v => handleSupplementChange(item.id, v)}
               onAcknowledge={() => acknowledge(item.id)}
             />
           ))}
@@ -733,21 +739,18 @@ export default function ReviewPage() {
           {strengthOpen && (
             <div style={{ marginTop: 6, animation: 'fadeSlideIn 0.15s ease' }}>
               {scoreFactors.map(f => {
-                const isFixed = resolved.includes(f.key);
                 const isOk = f.score >= f.maxScore;
-                const isGap = !isOk && !isFixed;
-                const iconBg = isFixed
-                  ? { bg: '#eff6ff', border: '#bfdbfe', color: '#1d4f7a' }
-                  : isOk
+                const isGap = !isOk;
+                const iconBg = isOk
                   ? { bg: '#ecfdf3', border: '#bbf7d0', color: '#16a34a' }
                   : { bg: '#fffbeb', border: '#fde68a', color: '#d97706' };
-                const statusText = isFixed ? 'Fixed' : isOk ? 'OK' : 'Gap';
-                const statusColor = isFixed ? '#1d4f7a' : isOk ? '#16a34a' : '#d97706';
+                const statusText = isOk ? 'OK' : 'Gap';
+                const statusColor = isOk ? '#16a34a' : '#d97706';
                 return (
                   <div
                     key={f.key}
                     style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 8, cursor: isGap ? 'pointer' : 'default' }}
-                    onClick={() => isGap && openIssue(f.key)}
+                    onClick={() => isGap && toggleCard(f.key)}
                   >
                     <span
                       style={{
@@ -765,7 +768,7 @@ export default function ReviewPage() {
                         fontWeight: 700,
                       }}
                     >
-                      {isFixed ? '✓' : isOk ? '✓' : '!'}
+                      {isOk ? '✓' : '!'}
                     </span>
                     <span style={{ flex: 1, fontSize: 12.5, fontWeight: 500, color: '#334155' }}>{f.label}</span>
                     <span style={{ fontSize: 10.5, fontWeight: 700, color: statusColor }}>{statusText}</span>
@@ -858,30 +861,26 @@ export default function ReviewPage() {
 
 function StreamCard({
   item,
+  isExpanded,
   activeIssue,
-  fixDraft,
-  isSuggesting,
+  supplement,
   onToggle,
   onHoverEnter,
   onHoverLeave,
-  onFixChange,
-  onSuggestFix,
-  onApplyFix,
+  onSupplementChange,
   onAcknowledge,
 }: {
   item: AttentionItem;
+  isExpanded: boolean;
   activeIssue: string | null;
-  fixDraft: string;
-  isSuggesting: boolean;
+  supplement: string;
   onToggle: () => void;
   onHoverEnter: () => void;
   onHoverLeave: () => void;
-  onFixChange: (v: string) => void;
-  onSuggestFix: () => void;
-  onApplyFix: () => void;
+  onSupplementChange: (v: string) => void;
   onAcknowledge: () => void;
 }) {
-  const isOpen = activeIssue === item.id;
+  const isOpen = isExpanded || (item.kind === 'risk' && activeIssue === item.id);
   const itemColor = item.done ? '#16a34a' : item.kind === 'fix' ? '#d97706' : '#dc2626';
 
   const iconContent = item.done ? '✓' : item.kind === 'fix' ? '▲' : '!';
@@ -981,12 +980,8 @@ function StreamCard({
           {item.kind === 'fix' ? (
             <FixDetail
               item={item}
-              fixDraft={fixDraft}
-              isSuggesting={isSuggesting}
-              isResolved={item.done}
-              onFixChange={onFixChange}
-              onSuggestFix={onSuggestFix}
-              onApplyFix={onApplyFix}
+              supplement={supplement}
+              onSupplementChange={onSupplementChange}
             />
           ) : (
             <RiskDetail
@@ -1005,96 +1000,54 @@ function StreamCard({
 
 function FixDetail({
   item,
-  fixDraft,
-  isSuggesting,
-  isResolved,
-  onFixChange,
-  onSuggestFix,
-  onApplyFix,
+  supplement,
+  onSupplementChange,
 }: {
   item: AttentionItem;
-  fixDraft: string;
-  isSuggesting: boolean;
-  isResolved: boolean;
-  onFixChange: (v: string) => void;
-  onSuggestFix: () => void;
-  onApplyFix: () => void;
+  supplement: string;
+  onSupplementChange: (v: string) => void;
 }) {
+  const g = item.guidance;
+
   return (
     <>
       <div>
         <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#b45309', margin: '0 0 4px' }}>
-          Why payers flag this
+          What to add
         </p>
-        <p style={{ fontSize: 12.5, lineHeight: 1.6, color: '#475569', margin: 0 }}>{item.note}</p>
+        <p style={{ fontSize: 12.5, lineHeight: 1.6, color: '#475569', margin: 0 }}>
+          {g?.guidance ?? item.note}
+        </p>
       </div>
 
-      {isResolved ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderRadius: 9, border: '1px solid #bbf7d0', background: '#f0fdf4', padding: '9px 12px' }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#16a34a' }}>✓</span>
-          <span style={{ fontSize: 12, fontWeight: 600, color: '#15803d' }}>Fix applied — regenerate the letter to fold it in</span>
-        </div>
-      ) : (
-        <>
-          <textarea
-            value={fixDraft}
-            onChange={e => onFixChange(e.target.value)}
-            placeholder={item.placeholder ?? 'Add the missing documentation, or paste from the chart…'}
-            style={{
-              minHeight: 84,
-              resize: 'vertical',
-              border: '1px solid #e2e8f0',
-              borderRadius: 9,
-              padding: 10,
-              fontSize: 12.5,
-              fontFamily: 'inherit',
-              width: '100%',
-              boxSizing: 'border-box',
-              outline: 'none',
-              color: '#334155',
-            }}
-          />
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              type="button"
-              onClick={onSuggestFix}
-              disabled={isSuggesting}
-              style={{
-                border: '1px solid #e2e8f0',
-                background: '#fff',
-                borderRadius: 8,
-                padding: '8px 12px',
-                fontSize: 12,
-                fontWeight: 600,
-                color: '#1d4f7a',
-                cursor: isSuggesting ? 'not-allowed' : 'pointer',
-                fontFamily: 'inherit',
-              }}
-            >
-              {isSuggesting ? 'Suggesting…' : '✦ Suggest fix'}
-            </button>
-            <button
-              type="button"
-              onClick={onApplyFix}
-              disabled={!fixDraft.trim()}
-              style={{
-                flex: 1,
-                background: fixDraft.trim() ? '#1E3A5F' : '#e2e8f0',
-                color: fixDraft.trim() ? '#fff' : '#94a3b8',
-                border: 'none',
-                borderRadius: 8,
-                padding: '8px 12px',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: fixDraft.trim() ? 'pointer' : 'not-allowed',
-                fontFamily: 'inherit',
-              }}
-            >
-              Apply fix
-            </button>
-          </div>
-        </>
-      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        {g?.inputLabel && (
+          <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', letterSpacing: '0.04em' }}>
+            {g.inputLabel}
+          </label>
+        )}
+        <textarea
+          value={supplement}
+          onChange={e => onSupplementChange(e.target.value)}
+          placeholder={g?.inputPlaceholder ?? (item.placeholder ?? 'Paste the missing data from the chart…')}
+          rows={4}
+          style={{
+            resize: 'vertical',
+            border: '1px solid #e2e8f0',
+            borderRadius: 9,
+            padding: 10,
+            fontSize: 12.5,
+            fontFamily: 'inherit',
+            width: '100%',
+            boxSizing: 'border-box',
+            outline: 'none',
+            color: '#334155',
+          }}
+        />
+        <span style={{ fontSize: 11, color: '#94a3b8', textAlign: 'right' }}>
+          {supplement.length} chars
+        </span>
+      </div>
     </>
   );
 }
@@ -1277,74 +1230,4 @@ function buildDownloadName(patientName: string | null, cptCode: string) {
     .replace(/^-|-$/g, '')
     .toLowerCase();
   return `${safePatient}-pa-packet-cpt-${cptCode}.docx`;
-}
-
-function buildUpdatedPayload(data: ReviewData, manualFixes: ManualFixes) {
-  const updatedExtracted = applyManualFixes(data.extracted, manualFixes);
-  const cptOverride = manualFixes.cpt_code_valid?.resolved
-    ? manualFixes.cpt_code_valid.value.trim()
-    : data.cptCode;
-  return {
-    updatedExtracted,
-    updatedRequestDetails: {
-      cptCode: cptOverride || data.cptCode,
-      payerName: data.payerName,
-      providerName: data.providerName,
-      practiceName: data.practiceName ?? '',
-    },
-  };
-}
-
-function applyManualFixes(extracted: ExtractedChartDataWithValidation, manualFixes: ManualFixes) {
-  const updated: ExtractedChartDataWithValidation = {
-    ...extracted,
-    diagnosis_codes: [...extracted.diagnosis_codes],
-    functional_limitations: [...extracted.functional_limitations],
-    conservative_treatments_attempted: extracted.conservative_treatments_attempted.map(t => ({ ...t })),
-    imaging_findings: extracted.imaging_findings ? { ...extracted.imaging_findings } : null,
-  };
-
-  const diagnosisFix = manualFixes.diagnosis_codes?.resolved ? manualFixes.diagnosis_codes.value : '';
-  if (diagnosisFix) updated.diagnosis_codes = splitListValues(diagnosisFix);
-
-  const treatmentsNamed = manualFixes.conservative_treatments_named?.resolved ? manualFixes.conservative_treatments_named.value : '';
-  if (treatmentsNamed) {
-    updated.conservative_treatments_attempted = splitListValues(treatmentsNamed).map(name => ({
-      treatment: name, duration: null, outcome: null, dates: null,
-    }));
-  }
-
-  const treatmentDuration = manualFixes.conservative_treatment_duration?.resolved ? manualFixes.conservative_treatment_duration.value.trim() : '';
-  if (treatmentDuration) {
-    if (updated.conservative_treatments_attempted.length === 0) {
-      updated.conservative_treatments_attempted = [{ treatment: 'Conservative treatment', duration: treatmentDuration, outcome: null, dates: null }];
-    } else {
-      updated.conservative_treatments_attempted = updated.conservative_treatments_attempted.map(t => ({ ...t, duration: t.duration ?? treatmentDuration }));
-    }
-  }
-
-  const imagingFix = manualFixes.imaging_findings?.resolved ? manualFixes.imaging_findings.value : '';
-  if (imagingFix) updated.imaging_findings = parseImagingInput(imagingFix);
-
-  const limitationsFix = manualFixes.functional_limitations?.resolved ? manualFixes.functional_limitations.value : '';
-  if (limitationsFix) updated.functional_limitations = splitListValues(limitationsFix);
-
-  const surgicalFix = manualFixes.surgical_approach?.resolved ? manualFixes.surgical_approach.value.trim() : '';
-  if (surgicalFix) updated.surgical_approach_if_mentioned = surgicalFix;
-
-  const symptomFix = manualFixes.symptom_duration?.resolved ? manualFixes.symptom_duration.value.trim() : '';
-  if (symptomFix) updated.symptom_duration = symptomFix;
-
-  return updated;
-}
-
-function splitListValues(value: string) {
-  return value.split(/[,;\n]/g).map(s => s.trim()).filter(Boolean);
-}
-
-function parseImagingInput(value: string) {
-  const [modality, ...rest] = value.split(':');
-  const findings = rest.join(':').trim();
-  if (findings) return { modality: modality.trim() || null, key_findings: findings };
-  return { modality: null, key_findings: value.trim() || null };
 }
