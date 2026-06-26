@@ -1,6 +1,6 @@
 ---
 name: docx-export-verifier
-description: Verifies DOCX export output contains all required letter fields and has no structural defects (double sig block, missing Re: line, CPT mismatch). Run after any change to /api/export, /api/regenerate-denial-fix, or postProcessLetter.
+description: "Verifies DOCX export output contains all required letter fields and has no structural defects (double sig block, missing Re: line, CPT mismatch). Run after any change to /api/export, /api/regenerate-denial-fix, or postProcessLetter."
 tools: Read, Bash
 model: sonnet
 ---
