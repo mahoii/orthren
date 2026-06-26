@@ -1,7 +1,7 @@
 'use client';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 
 function ConfirmInner() {
   const params = useSearchParams();
@@ -9,25 +9,51 @@ function ConfirmInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const redirectTo = (() => {
+    const r = params.get('redirect');
+    return r && r.startsWith('/') ? r : '/builder';
+  })();
+
+  // When the PKCE flow is used, createBrowserClient's detectSessionInUrl
+  // auto-exchanges the ?code= param. Listen for that and redirect.
+  useEffect(() => {
+    const supabase = createSupabaseBrowserClient();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        router.push(redirectTo);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [router, redirectTo]);
+
   const handleSignIn = async () => {
     setLoading(true);
     setError(null);
-    const token_hash = params.get('token_hash');
-    const type = params.get('type') as 'magiclink' | 'email';
 
-    if (!token_hash || !type) {
+    const code = params.get('code');
+    const token_hash = params.get('token_hash');
+    const type = params.get('type') as 'magiclink' | 'email' | null;
+
+    const supabase = createSupabaseBrowserClient();
+
+    let err: { message: string } | null = null;
+
+    if (code) {
+      ({ error: err } = await supabase.auth.exchangeCodeForSession(code));
+    } else if (token_hash && type) {
+      ({ error: err } = await supabase.auth.verifyOtp({ token_hash, type }));
+    } else {
       setError('Invalid sign-in link. Please request a new one.');
       setLoading(false);
       return;
     }
 
-    const supabase = createSupabaseBrowserClient();
-    const { error } = await supabase.auth.verifyOtp({ token_hash, type });
-    if (error) {
+    if (err) {
       setError('Sign-in failed. Please request a new magic link.');
     } else {
-      router.push('/builder');
+      router.push(redirectTo);
     }
+
     setLoading(false);
   };
 

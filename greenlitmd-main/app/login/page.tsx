@@ -58,9 +58,7 @@ function LoginForm() {
     setLoading(true);
     setError(null);
 
-    const base = process.env.NEXT_PUBLIC_SITE_URL
-      ? `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback`
-      : `${window.location.origin}/api/auth/callback`;
+    const base = `${window.location.origin}/auth/confirm`;
     const callbackUrl = new URL(base);
     const redirectParam = new URLSearchParams(window.location.search).get("redirect");
     if (redirectParam && redirectParam.startsWith("/")) {
