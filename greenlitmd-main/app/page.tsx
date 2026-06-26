@@ -36,7 +36,7 @@ export default async function LandingPage() {
         <div className="mx-auto max-w-4xl text-center">
           {/* Pill badge */}
           <div className="mx-auto mb-7 inline-flex items-center gap-2 rounded-full border border-green-100 bg-green-50 px-4 py-1.5 text-xs font-semibold tracking-wide text-green-700 shadow-sm">
-            ✓ HIPAA compliant - ✓ No EHR required
+            ✓ HIPAA compliant  ✓ No EHR required
           </div>
 
           <h1 className="text-4xl font-extrabold tracking-tight text-clinical-navy sm:text-5xl lg:text-6xl lg:leading-[1.1]">
