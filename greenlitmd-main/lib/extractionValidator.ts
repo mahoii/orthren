@@ -2,15 +2,17 @@
 // Returns array of discrepancy strings. Empty array = clean.
 
 import { callAnthropicWithRetry } from "@/lib/anthropic";
+import { deidentify } from "@/lib/deidentify";
 
 export async function validateExtraction(
   chartText: string,
   extractedJson: Record<string, unknown>
 ): Promise<string[]> {
+  const { redacted: deidentifiedText } = deidentify(chartText);
   const prompt = `You are a medical data auditor. Compare the EXTRACTED JSON against the SOURCE CHART TEXT and identify any factual discrepancies.
 
 SOURCE CHART TEXT:
-${chartText}
+${deidentifiedText}
 
 EXTRACTED JSON:
 ${JSON.stringify(extractedJson, null, 2)}
