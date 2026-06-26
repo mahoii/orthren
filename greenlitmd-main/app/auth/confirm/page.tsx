@@ -6,7 +6,7 @@ import { useState, useEffect, Suspense } from 'react';
 function ConfirmInner() {
   const params = useSearchParams();
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const redirectTo = (() => {
@@ -14,64 +14,64 @@ function ConfirmInner() {
     return r && r.startsWith('/') ? r : '/builder';
   })();
 
-  // When the PKCE flow is used, createBrowserClient's detectSessionInUrl
-  // auto-exchanges the ?code= param. Listen for that and redirect.
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
+    const code = params.get('code');
+    const token_hash = params.get('token_hash');
+    const type = params.get('type') as 'magiclink' | 'email' | null;
+
+    // Listen for auto-exchange (PKCE flow)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_IN') {
         router.push(redirectTo);
       }
     });
+
+    // Manually exchange if params are present
+    const exchange = async () => {
+      setLoading(true);
+      let err: { message: string } | null = null;
+      if (code) {
+        ({ error: err } = await supabase.auth.exchangeCodeForSession(code));
+      } else if (token_hash && type) {
+        ({ error: err } = await supabase.auth.verifyOtp({ token_hash, type }));
+      } else {
+        setError('Invalid sign-in link. Please request a new one.');
+        setLoading(false);
+        return;
+      }
+      if (err) {
+        setError('Sign-in failed. Please request a new magic link.');
+        setLoading(false);
+      } else {
+        router.push(redirectTo);
+      }
+    };
+
+    exchange();
     return () => subscription.unsubscribe();
-  }, [router, redirectTo]);
-
-  const handleSignIn = async () => {
-    setLoading(true);
-    setError(null);
-
-    const code = params.get('code');
-    const token_hash = params.get('token_hash');
-    const type = params.get('type') as 'magiclink' | 'email' | null;
-
-    const supabase = createSupabaseBrowserClient();
-
-    let err: { message: string } | null = null;
-
-    if (code) {
-      ({ error: err } = await supabase.auth.exchangeCodeForSession(code));
-    } else if (token_hash && type) {
-      ({ error: err } = await supabase.auth.verifyOtp({ token_hash, type }));
-    } else {
-      setError('Invalid sign-in link. Please request a new one.');
-      setLoading(false);
-      return;
-    }
-
-    if (err) {
-      setError('Sign-in failed. Please request a new magic link.');
-    } else {
-      router.push(redirectTo);
-    }
-
-    setLoading(false);
-  };
+  }, [router, redirectTo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="bg-white rounded-xl shadow-md p-8 max-w-sm w-full text-center space-y-4">
-        <h1 className="text-xl font-semibold text-gray-900">Sign in to Orthren</h1>
-        <p className="text-sm text-gray-500">Click the button below to complete sign-in.</p>
-        {error && (
-          <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+        {error ? (
+          <>
+            <h1 className="text-xl font-semibold text-gray-900">Sign-in failed</h1>
+            <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+            <a
+              href="/login"
+              className="inline-block text-sm text-indigo-600 hover:underline"
+            >
+              Request a new magic link
+            </a>
+          </>
+        ) : (
+          <>
+            <h1 className="text-xl font-semibold text-gray-900">Signing you in…</h1>
+            <p className="text-sm text-gray-500">You&apos;ll be redirected automatically.</p>
+          </>
         )}
-        <button
-          onClick={handleSignIn}
-          disabled={loading}
-          className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          {loading ? 'Signing in…' : 'Click to sign in'}
-        </button>
       </div>
     </div>
   );
