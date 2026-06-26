@@ -71,17 +71,19 @@ export function injectBmiAsa(letter: string, extracted: ExtractedChartData): str
   return letter;
 }
 
-// Remove duplicate signature blocks — keep only the last "Sincerely," onwards.
+// Remove duplicate signature blocks — keep only the FIRST "Sincerely," block,
+// truncating everything that follows the first complete signature (provider + practice).
 export function removeDuplicateSignatureBlocks(letter: string): string {
-  const occurrences: number[] = [];
   const re = /Sincerely,/gi;
+  const occurrences: number[] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(letter)) !== null) occurrences.push(m.index);
   if (occurrences.length <= 1) return letter;
 
-  const firstIdx = occurrences[0];
-  const lastIdx = occurrences[occurrences.length - 1];
-  return letter.slice(0, firstIdx).trimEnd() + "\n\n" + letter.slice(lastIdx);
+  // Keep the first signature block: take everything up to (but not including)
+  // the second "Sincerely," and strip any trailing blank lines before it.
+  const secondIdx = occurrences[1];
+  return letter.slice(0, secondIdx).trimEnd();
 }
 
 // Remove "not documented" language and sentences containing it.

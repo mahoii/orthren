@@ -1,5 +1,9 @@
+**CRITICAL RULE — MAJOR JOINT PROCEDURE WITHOUT IMAGING:**
+
+imaging_findings is null. CPT 27130 is a major joint arthroplasty procedure. Per the governing rule:
+
 Cannot generate authorization letter: imaging_findings is null or absent. Major joint procedures require documented imaging (X-ray, MRI, or CT) to establish surgical indication and severity. Please obtain imaging and resubmit.
 
 Sincerely,
-Dr. James Holloway, MD
+James Holloway, MD
 Riverside Orthopedic Associates

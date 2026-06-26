@@ -25,7 +25,7 @@
     {
       "treatment": "Physical Therapy",
       "duration": "8 weeks",
-      "outcome": "minimal improvement, pain persisted with overhead activity",
+      "outcome": "Minimal improvement, pain persisted with overhead activity",
       "dates": "September–October 2024",
       "relief_duration": null
     },
@@ -39,7 +39,7 @@
     {
       "treatment": "NSAIDs — Meloxicam 15mg daily",
       "duration": "3 months",
-      "outcome": "inadequate pain control, GI intolerance developed",
+      "outcome": "Inadequate pain control, GI intolerance developed",
       "dates": "July–October 2024",
       "relief_duration": null
     }
@@ -56,40 +56,40 @@
       "label": "Corticosteroid Injection Duration Not Documented",
       "severity": "medium",
       "explanation": "The corticosteroid injection administered on 11/05/2024 has no documented treatment duration or number of injections attempted. Payers for CPT 29827 often require documentation of at least one injection trial with a defined observation period before approving surgical intervention.",
-      "recommendation": "Add a chart addendum specifying the observation period following the 11/05/2024 Kenalog injection and confirm whether a single injection was trialed or if repeat injections were considered and declined.",
+      "recommendation": "Add a chart addendum specifying the observation period following the 11/05/2024 Kenalog injection and confirm whether a second injection was considered or offered prior to surgical recommendation.",
       "anchorText": "Corticosteroid Injection — Kenalog 40mg"
     },
     {
       "id": "flag-2",
       "label": "Physical Therapy Duration Below Typical Threshold",
       "severity": "medium",
-      "explanation": "Only 8 weeks of physical therapy is documented. Many BCBS plans require a minimum of 6–12 weeks of structured PT with documented failure before approving CPT 29827, and some reviewers may consider 8 weeks borderline given the surgical nature of the request.",
-      "recommendation": "Add documentation clarifying why further PT was not pursued (e.g., structural tear size, functional decline, provider judgment) and confirm that PT was supervised and formally prescribed.",
+      "explanation": "Physical therapy was documented for 8 weeks (September–October 2024). Some BCBS plans require a minimum of 6–12 weeks of formal PT with documented visit counts and progress notes before approving rotator cuff repair under CPT 29827.",
+      "recommendation": "Supplement the record with PT visit logs, session counts, and progress notes from September–October 2024 to confirm the full course of therapy and demonstrate documented failure.",
       "anchorText": "Physical Therapy: 8 weeks"
     },
     {
       "id": "flag-3",
       "label": "Attending Surgeon Name Is a Placeholder",
       "severity": "high",
-      "explanation": "The attending surgeon is listed as Dr. Michael Torres, which is a placeholder token. Payers require a clearly identified requesting and operating provider for prior authorization review.",
-      "recommendation": "Ensure the actual attending surgeon name is populated in the final submission. The requesting provider field must match the operating surgeon on the authorization request.",
+      "explanation": "The attending surgeon is listed as Dr. Michael Torres, MD. Payers require a clearly identified requesting provider for prior authorization; a placeholder token may cause the submission to be rejected or returned as incomplete.",
+      "recommendation": "Confirm and populate the attending surgeon's full legal name before submitting the prior authorization request to Blue Cross Blue Shield.",
       "anchorText": "Dr. Michael Torres"
     },
     {
       "id": "flag-4",
-      "label": "Imaging Date Is a Placeholder",
+      "label": "Imaging Dates Are Placeholder Tokens",
       "severity": "high",
-      "explanation": "Both MRI and X-ray dates are listed as 01/22/2025, a placeholder token. Payers require confirmed imaging dates to verify that imaging was obtained within an acceptable pre-authorization window (typically within 6–12 months).",
-      "recommendation": "Replace 01/22/2025 with the actual imaging date before submission to confirm imaging recency and compliance with BCBS imaging currency requirements.",
+      "explanation": "Both the MRI and X-ray are dated 01/22/2025, which is a placeholder token. Payers require actual imaging dates to verify that imaging was performed within an acceptable timeframe prior to the requested procedure.",
+      "recommendation": "Replace 01/22/2025 with the actual imaging date before submission to ensure payer can confirm imaging recency and validity.",
       "anchorText": "01/22/2025"
     },
     {
       "id": "flag-5",
-      "label": "Injection Date Is a Placeholder",
+      "label": "Surgical Approach Inconsistency — Arthroscopic vs. Mini-Open",
       "severity": "medium",
-      "explanation": "The corticosteroid injection date is listed as 11/05/2024, a placeholder token. Payers require specific dates for all conservative treatments to verify the timeline of failed conservative care.",
-      "recommendation": "Replace 11/05/2024 with the actual injection date to establish a complete and verifiable conservative care timeline for BCBS review.",
-      "anchorText": "11/05/2024"
+      "explanation": "The requested procedure states 'Arthroscopic rotator cuff repair' (CPT 29827), but the surgical approach field documents 'Arthroscopic with mini-open rotator cuff repair.' A mini-open component may require a different or additional CPT code and could trigger a payer query or denial if the operative plan is not clearly reconciled.",
+      "recommendation": "Clarify the operative plan in the chart and confirm whether CPT 29827 alone covers the intended procedure or whether an additional code (e.g., CPT 23412) is needed for the mini-open component.",
+      "anchorText": "Arthroscopic with mini-open rotator cuff repair"
     }
   ],
   "pa_strength": {
@@ -99,32 +99,32 @@
     },
     "conservative_treatments_named": {
       "score": 1,
-      "note": "Three distinct conservative treatments are named: Physical Therapy, Corticosteroid Injection (Kenalog), and NSAIDs (Meloxicam)."
+      "note": "Three distinct conservative treatments are named: Physical Therapy, Corticosteroid Injection (Kenalog 40mg), and NSAIDs (Meloxicam 15mg daily)."
     },
     "conservative_treatment_duration": {
       "score": 0,
-      "note": "Physical therapy (8 weeks) and NSAIDs (3 months) have documented durations, but the corticosteroid injection has no documented duration or observation period, leaving the conservative care timeline incomplete.",
+      "note": "Physical therapy (8 weeks) and NSAIDs (3 months) have documented durations, but the corticosteroid injection has no documented duration or observation period, leaving one of three treatments incomplete.",
       "anchorText": "Corticosteroid Injection — Kenalog 40mg"
     },
     "imaging_findings": {
       "score": 1,
-      "note": "Both MRI and X-ray are documented as completed with detailed findings including tear size, retraction, and bursitis, strongly supporting surgical candidacy."
+      "note": "Both MRI and X-ray are documented as completed with detailed findings confirming a 2.1 cm full-thickness supraspinatus tear and supporting surgical candidacy."
     },
     "functional_limitations": {
       "score": 1,
-      "note": "Four specific functional limitations are explicitly documented, including inability to perform overhead work, sleep disturbance, and inability to return to work duties."
+      "note": "Four specific functional limitations are explicitly documented, including inability to perform overhead work, disturbed sleep, and inability to return to work duties."
     },
     "surgical_approach": {
       "score": 1,
-      "note": "Surgical approach is explicitly stated as arthroscopic with mini-open rotator cuff repair."
+      "note": "Surgical approach is explicitly documented as 'Arthroscopic with mini-open rotator cuff repair,' though an inconsistency with the CPT code description is noted."
     },
     "cpt_code_valid": {
       "score": 1,
-      "note": "CPT 29827 (arthroscopic rotator cuff repair) is correctly matched to the documented diagnosis of full-thickness rotator cuff tear."
+      "note": "CPT 29827 (arthroscopic rotator cuff repair) is a valid and appropriate code for the documented diagnosis of full-thickness rotator cuff tear."
     },
     "symptom_duration": {
       "score": 1,
-      "note": "Symptom duration is documented as 8 months of failed conservative management, with injury onset noted as June 2024."
+      "note": "Symptom duration is explicitly stated as 8 months of failed conservative management, with injury onset documented as June 2024."
     }
   },
   "pain_score": "7/10 at rest, 9/10 with overhead activity",

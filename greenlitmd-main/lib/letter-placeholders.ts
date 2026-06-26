@@ -165,8 +165,12 @@ function ensureSignatureBlock(text: string, providerName: string | null, practic
     return text;
   }
 
+  // Normalize the provider name the same way the letter prompt does: strip a leading
+  // "Dr." prefix so the check matches what the model actually outputs in the sig block.
+  const normalizedProviderName = providerName.replace(/^Dr\.\s*/i, "").trim();
+
   const closingLines = text.split(/\r?\n/).slice(-12).join("\n").toLowerCase();
-  const hasProvider = closingLines.includes(providerName.toLowerCase());
+  const hasProvider = closingLines.includes(normalizedProviderName.toLowerCase());
   const hasPractice = practiceName ? closingLines.includes(practiceName.toLowerCase()) : true;
 
   if (hasProvider && hasPractice) {
@@ -179,7 +183,8 @@ function ensureSignatureBlock(text: string, providerName: string | null, practic
 }
 
 function formatProviderSignatureName(providerName: string) {
-  return /\bM\.?D\.?\b|\bD\.?O\.?\b/i.test(providerName) ? providerName : `${providerName}, MD`;
+  const stripped = providerName.replace(/^Dr\.\s*/i, "").trim();
+  return /\bM\.?D\.?\b|\bD\.?O\.?\b/i.test(stripped) ? stripped : `${stripped}, MD`;
 }
 
 function escapeRegExp(value: string) {

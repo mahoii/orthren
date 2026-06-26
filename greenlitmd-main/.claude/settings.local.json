@@ -4,7 +4,8 @@
       "Bash(npm run *)",
       "Bash(grep -iE \"\\\\.env$|\\\\.env\\\\.\")",
       "Bash(grep -rn \"TARGET_FILE=\\\\|^echo\\\\|^exit\\\\|^fi$\" --include=\"*.ts\" --include=\"*.tsx\" --include=\"*.mjs\")",
-      "Bash(grep -E \"^TARGET_FILE=|^echo$|^exit$|^fi$\")"
+      "Bash(grep -E \"^TARGET_FILE=|^echo$|^exit$|^fi$\")",
+      "Bash(npx tsx *)"
     ]
   },
   "enabledMcpjsonServers": [

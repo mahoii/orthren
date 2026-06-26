@@ -36,14 +36,14 @@
       "relief_duration": "2-3 weeks each time"
     },
     {
-      "treatment": "Hyaluronic Acid Injection (Synvisc-One)",
+      "treatment": "Hyaluronic Acid Injection — Synvisc-One",
       "duration": "Unknown",
       "outcome": "minimal benefit",
       "dates": "06/2024",
       "relief_duration": null
     },
     {
-      "treatment": "Tylenol + Ibuprofen (OTC analgesics/NSAIDs)",
+      "treatment": "Acetaminophen (Tylenol) + Ibuprofen/NSAID (OTC)",
       "duration": "ongoing",
       "outcome": "not effective for weeks now",
       "dates": "Not documented",
@@ -61,84 +61,84 @@
       "id": "flag-1",
       "label": "Cortisone Injection Dates Undocumented",
       "severity": "medium",
-      "explanation": "The two corticosteroid injections are dated only as 'approx 2023, exact date unclear,' which does not meet payer documentation standards requiring specific dates for prior treatments. Aetna PPO typically requires verifiable dates for all conservative interventions.",
-      "recommendation": "Obtain and document the exact dates of the cortisone injections from the administering provider's records or pharmacy records, and add a chart addendum specifying those dates.",
+      "explanation": "The two corticosteroid injections are dated only as 'approx 2023, exact date unclear,' which does not meet payer documentation standards requiring specific dates for each injection administered.",
+      "recommendation": "Obtain and document exact dates for both cortisone injections from the administering provider's records or pharmacy records before submission.",
       "anchorText": "approx 2023, exact date unclear"
     },
     {
       "id": "flag-2",
       "label": "Physical Therapy Duration Below Payer Threshold",
       "severity": "high",
-      "explanation": "Only 6 weeks of physical therapy is documented. Aetna PPO and most major payers for CPT 27447 typically require a minimum of 6–8 weeks of formal PT with documented failure; 6 weeks is at the lower boundary and may be challenged if no functional outcome measures from PT are included.",
-      "recommendation": "Obtain PT discharge summary documenting specific functional outcomes, visit count, and clinical rationale for discontinuation to substantiate failure of conservative care.",
+      "explanation": "Only 6 weeks of physical therapy is documented. Aetna PPO typically requires a minimum of 6–8 weeks of formal PT with documented failure; 6 weeks is at the lower boundary and may be challenged if outcomes documentation is sparse.",
+      "recommendation": "Add a chart addendum specifying the number of PT sessions attended, the specific modalities used, and objective functional outcome measures at discharge to strengthen the failure documentation.",
       "anchorText": "PT at Lakeside Rehab for 6 weeks"
     },
     {
       "id": "flag-3",
-      "label": "No MRI Documented for Surgical Request",
+      "label": "No MRI Documented for Surgical Planning",
       "severity": "medium",
-      "explanation": "No MRI of the right knee is documented. While X-ray with KL Grade IV findings is strong evidence, some Aetna PPO policies for CPT 27447 require or prefer MRI to rule out other pathology and confirm surgical candidacy.",
-      "recommendation": "Consider obtaining an MRI of the right knee or document clinical rationale for why X-ray alone is sufficient given the severity of bone-on-bone KL Grade IV findings.",
+      "explanation": "No MRI of the right knee is documented. While X-ray findings are strong (KL Grade IV, bone-on-bone), some Aetna PPO policies require MRI to rule out soft tissue pathology or confirm surgical candidacy prior to TKA authorization.",
+      "recommendation": "Verify whether Aetna PPO's current TKA policy requires MRI; if so, order and document MRI results prior to submission.",
       "anchorText": "X-Ray Right Knee 02/15/2025"
     },
     {
       "id": "flag-4",
-      "label": "Hyaluronic Acid Injection Duration Not Documented",
-      "severity": "medium",
-      "explanation": "The Synvisc-One injection dated 06/2024 has no documented follow-up period or duration of observation before declaring failure. Payers may require a minimum observation window (typically 3–6 months) post-injection before approving surgical intervention.",
-      "recommendation": "Add a chart note documenting the follow-up assessment date after the 06/2024 Synvisc-One injection and the specific clinical findings that confirmed treatment failure.",
-      "anchorText": "Synvisc-One hyaluronic acid injection right knee 06/2024"
+      "label": "Elevated BMI May Require Additional Documentation",
+      "severity": "low",
+      "explanation": "Patient BMI is 34.2. Some payers require documentation of weight management counseling or a formal weight loss attempt prior to elective TKA when BMI exceeds 33–35.",
+      "recommendation": "Add a chart note documenting that BMI-related surgical risk was discussed with the patient and that weight management counseling was offered or completed.",
+      "anchorText": "BMI: 34.2"
     },
     {
       "id": "flag-5",
-      "label": "Elevated BMI May Require Additional Documentation",
-      "severity": "low",
-      "explanation": "BMI of 34.2 combined with ASA III status (HTN, DM, OSA) may trigger payer requests for pre-operative medical optimization documentation, particularly glycemic control evidence beyond A1c 7.1.",
-      "recommendation": "Include documentation of pre-operative medical clearance from the patient's primary care physician or endocrinologist confirming the patient is optimized for surgery.",
-      "anchorText": "BMI: 34.2"
+      "label": "Hyaluronic Acid Injection Duration Not Documented",
+      "severity": "medium",
+      "explanation": "The Synvisc-One injection dated 06/2024 has no documented duration of treatment effect or follow-up period, making it difficult to demonstrate adequate trial and failure of this modality.",
+      "recommendation": "Add a follow-up note documenting the patient's response at 4–12 weeks post-injection and confirming failure of the hyaluronic acid injection prior to surgical referral.",
+      "anchorText": "Synvisc-One hyaluronic acid injection right knee 06/2024"
     },
     {
       "id": "flag-6",
       "label": "Requesting Provider Discrepancy",
       "severity": "medium",
-      "explanation": "The chart lists Dr. Sandra Reyes MD as the operating surgeon in the OR field, while Dr. Sandra Reyes is listed as the requesting provider. Payer systems may flag a mismatch between the documented operating surgeon and the provider submitting the prior authorization.",
-      "recommendation": "Clarify and reconcile the operating surgeon name on the prior authorization submission to match the chart documentation, or add an addendum confirming Dr. Sandra Reyes as the attending surgeon of record.",
+      "explanation": "The OR field lists Dr. Sandra Reyes MD as the operating surgeon, while Dr. Sandra Reyes is listed as the requesting provider. Payers may flag a mismatch between the operating surgeon and the authorizing provider.",
+      "recommendation": "Clarify and reconcile the operating surgeon and requesting provider fields to ensure consistency across all authorization documents submitted to Aetna PPO.",
       "anchorText": "OR: Dr. Sandra Reyes MD"
     }
   ],
   "pa_strength": {
     "diagnosis_codes": {
       "score": 1,
-      "note": "Two valid ICD-10 codes (M17.11, M17.12) are documented and directly support the requested procedure."
+      "note": "Two ICD-10 codes are documented (M17.11, M17.12) with clear laterality and specificity."
     },
     "conservative_treatments_named": {
       "score": 1,
-      "note": "Four distinct conservative treatments are named: physical therapy, corticosteroid injections, hyaluronic acid injection, and OTC analgesics/NSAIDs."
+      "note": "Four distinct conservative treatments are named: physical therapy, corticosteroid injections, hyaluronic acid injection, and OTC analgesics."
     },
     "conservative_treatment_duration": {
       "score": 0,
-      "note": "Physical therapy has a documented duration (6 weeks), but corticosteroid injections and Synvisc-One injection lack documented duration or observation periods, weakening the conservative care timeline.",
+      "note": "Two of four treatments (cortisone injections and Synvisc-One) lack documented duration of the treatment trial, weakening the failure narrative.",
       "anchorText": "approx 2023, exact date unclear"
     },
     "imaging_findings": {
       "score": 1,
-      "note": "X-ray with KL Grade IV findings and bone-on-bone involvement is documented with a date, providing strong radiographic support for surgical necessity."
+      "note": "X-ray findings are strong with KL Grade IV, bone-on-bone medial compartment, and varus deformity documented with a specific date."
     },
     "functional_limitations": {
       "score": 1,
-      "note": "Three specific functional limitations are documented: walking distance under 1 block, stair use requiring handrail, and inability to perform coaching duties."
+      "note": "Three specific functional limitations are documented: walking distance, stair use, and occupational/volunteer activity restriction."
     },
     "surgical_approach": {
       "score": 1,
-      "note": "Anterior approach for standard primary TKA is explicitly documented in the plan."
+      "note": "Anterior approach is explicitly stated in the operative plan."
     },
     "cpt_code_valid": {
       "score": 1,
-      "note": "CPT 27447 is explicitly listed and matches the documented procedure of total knee arthroplasty."
+      "note": "CPT 27447 is explicitly documented and matches the requested procedure (right total knee arthroplasty)."
     },
     "symptom_duration": {
       "score": 1,
-      "note": "Symptom duration of 3+ years is explicitly documented in the HPI."
+      "note": "Symptom duration is explicitly stated as 3+ years."
     }
   },
   "pain_score": "8/10 with activity, 4/10 at rest",
