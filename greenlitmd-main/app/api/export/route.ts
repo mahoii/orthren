@@ -10,6 +10,7 @@ import {
   TextRun
 } from "docx";
 import { formatLetterDate, sanitizeLetterPlaceholders } from "@/lib/letter-placeholders";
+import { postProcessLetter } from "@/lib/letter-postprocess";
 import type { ExtractedChartData } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -42,13 +43,15 @@ export async function POST(request: Request) {
     const payerName = body.payerName?.trim() || "Payer not specified";
     const sanitizedLetter = sanitizeLetterPlaceholders(body.letter, {
       patientName: body.extracted.patient_name,
+      dateOfBirth: body.extracted.date_of_birth,
       payerName,
       providerName,
       practiceName,
       cptCode: body.cptCode,
       requestedProcedure: body.extracted.requested_procedure
     });
-    const letterBody = stripLetterHeading(sanitizedLetter);
+    const postProcessed = postProcessLetter(sanitizedLetter, body.extracted);
+    const letterBody = stripLetterHeading(postProcessed);
 
     const document = new Document({
       sections: [

@@ -1,5 +1,6 @@
 export type LetterPlaceholderContext = {
   patientName?: string | null;
+  dateOfBirth?: string | null;
   payerName?: string | null;
   providerName?: string | null;
   practiceName?: string | null;
@@ -11,6 +12,7 @@ export type LetterPlaceholderContext = {
 export function sanitizeLetterPlaceholders(letter: string, context: LetterPlaceholderContext) {
   const generatedDate = formatLetterDate(context.date ?? new Date());
   const patientName = cleanValue(context.patientName);
+  const dateOfBirth = cleanValue(context.dateOfBirth);
   const payerName = cleanValue(context.payerName);
   const providerName = cleanValue(context.providerName);
   const practiceName = cleanValue(context.practiceName);
@@ -34,6 +36,7 @@ export function sanitizeLetterPlaceholders(letter: string, context: LetterPlaceh
   sanitized = sanitized.replace(/\[([^\]]+)\]/g, (match, label: string) => {
     const value = knownPlaceholderValue(label, {
       patientName,
+      dateOfBirth,
       payerName,
       providerName,
       practiceName,
@@ -107,6 +110,7 @@ function knownPlaceholderValue(
   label: string,
   values: {
     patientName: string | null;
+    dateOfBirth: string | null;
     payerName: string | null;
     providerName: string | null;
     practiceName: string | null;
@@ -119,9 +123,10 @@ function knownPlaceholderValue(
   const valueByLabel: Record<string, string | null> = {
     date: values.generatedDate,
     "patient name": values.patientName,
+    "patient full name": values.patientName,
     patient: values.patientName,
-    "date of birth": null,
-    dob: null,
+    "date of birth": values.dateOfBirth,
+    dob: values.dateOfBirth,
     payer: values.payerName,
     "payer name": values.payerName,
     "insurance payer": values.payerName,
