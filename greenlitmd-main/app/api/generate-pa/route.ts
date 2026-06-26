@@ -75,20 +75,9 @@ export async function POST(request: Request) {
     const requestDetails: RequestDetails = { cptCode, payerName, providerName, practiceName };
     const { _phiMap, ...extracted } = await extractChartDataFromText(chartText, requestDetails);
 
-    if (process.env.NODE_ENV !== "production") {
-      console.log("EXTRACTION OUTPUT:", JSON.stringify(extracted, null, 2));
-    }
-
-    if (process.env.NODE_ENV === "development") {
-      console.log("[EXTRACTION JSON]", JSON.stringify(extracted, null, 2));
-    }
-
     const discrepancies = await validateExtraction(chartText, extracted as Record<string, unknown>);
     const extractedWithWarnings = extracted as typeof extracted & { extraction_warnings?: string[] };
     if (discrepancies.length > 0) {
-      if (process.env.NODE_ENV !== "production") {
-        discrepancies.forEach((d) => console.error("[EXTRACTION QA]", d));
-      }
       extractedWithWarnings.extraction_warnings = discrepancies;
     }
 

@@ -6,7 +6,6 @@ import { letterSystemPrompt } from "@/lib/letter-system-prompt";
 import { buildBmiAsaPromptLines, postProcessLetter } from "@/lib/letter-postprocess";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import { callAnthropicWithRetry } from "@/lib/anthropic";
-import { deidentify } from "@/lib/deidentify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -79,12 +78,12 @@ export async function POST(request: Request) {
       });
     }
 
-    const { redacted: deidentifiedChartData } = deidentify(JSON.stringify(chartDataOnly, null, 2));
+    const { patient_name, date_of_birth, ...deidentifiedChartData } = chartDataOnly;
 
     let letter = await callAnthropicWithRetry({
       system: systemPromptWithContext,
       prompt: `Structured patient data:
-${deidentifiedChartData}
+${JSON.stringify(deidentifiedChartData, null, 2)}
 
 Request details:
 CPT code: ${body.requestDetails.cptCode}
