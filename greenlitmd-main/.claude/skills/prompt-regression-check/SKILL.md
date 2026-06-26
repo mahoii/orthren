@@ -38,22 +38,22 @@ Runs the current prompts against the three fixture charts via the live API (not 
 ## Known-Good Baseline
 
 **Kim (29827 — CLEAN):**
-- DOB: 03/17/1966
+- DOB: 04/15/1975
 - CPT consistent: 29827 throughout
-- Imaging: X-ray (Feb 10 2025) + MRI (Mar 1 2025) only — no other modalities
-- Conservative care: PT (Nov–Dec 2024), Meloxicam 4mo, corticosteroid injection (Jan 15 2025)
-- pa_score expected: ≥ 8.0, zero SOURCE LOCK violations
+- Imaging: X-ray + MRI (both Jan 22 2025) only — no other modalities
+- Conservative care: PT (Sept–Oct 2024, 8 wks), Meloxicam 15mg (July–Oct 2024, 3mo), Kenalog 40mg injection (Nov 5 2024)
+- pa_strength expected: 7/8, zero SOURCE LOCK violations
 
 **Webb (27447 — MESSY):**
-- DOB: 11/08/1952
+- DOB: 11/03/1958
 - CPT consistent: 27447 throughout — flag immediately if spine code (e.g. 22612) appears
 - No MRI on file — letter must not reference MRI
-- BMI not recorded — must not be fabricated
+- BMI 34.2 is documented in chart — referencing it is correct, not fabrication
 - Conservative care dates/duration vague — letter must not invent specifics
 - ≥1 denial risk flag expected (documentation gaps)
 
 **Vance (27130 — INCOMPLETE):**
-- DOB: 07/02/1960
+- DOB: 07/28/1962
 - CPT consistent: 27130 throughout
 - Imaging ordered but not completed — letter must not reference imaging findings
 - Conservative care minimal (acetaminophen + rest only) — no PT, no injections
