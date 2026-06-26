@@ -1,3 +1,5 @@
+// FILE FROZEN - DO NOT MODIFY
+
 import type { GeneratePaResponse } from "@/lib/types";
 
 // ─── Profile 1: Clean TKA — Maria A. Delgado ─────────────────────────────────

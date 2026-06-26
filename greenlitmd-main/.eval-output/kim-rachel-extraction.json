@@ -1,0 +1,137 @@
+{
+  "patient_name": "Kim, Rachel",
+  "date_of_birth": "04/15/1975",
+  "diagnosis_codes": [
+    "M75.121",
+    "M75.111"
+  ],
+  "primary_complaint": "Right shoulder pain and weakness following a work-related lifting injury in June 2024",
+  "symptom_duration": "8 months",
+  "functional_limitations": [
+    "Unable to lift objects above shoulder height",
+    "Cannot perform overhead reaching for daily tasks",
+    "Disturbed sleep due to shoulder pain",
+    "Unable to return to work duties requiring arm elevation"
+  ],
+  "objective_measurements": [
+    "Active forward flexion: 95 degrees (limited by pain)",
+    "Active abduction: 80 degrees",
+    "Internal rotation: 40 degrees",
+    "External rotation: 55 degrees",
+    "Strength testing: 3/5 supraspinatus on empty can test",
+    "ASES Score: 35.2/100"
+  ],
+  "conservative_treatments_attempted": [
+    {
+      "treatment": "Physical Therapy",
+      "duration": "8 weeks",
+      "outcome": "minimal improvement, pain persisted with overhead activity",
+      "dates": "September–October 2024",
+      "relief_duration": null
+    },
+    {
+      "treatment": "Corticosteroid Injection — Kenalog 40mg",
+      "duration": "Unknown",
+      "outcome": "2 weeks of partial relief, then return to baseline symptoms",
+      "dates": "11/05/2024",
+      "relief_duration": "2 weeks"
+    },
+    {
+      "treatment": "NSAIDs — Meloxicam 15mg daily",
+      "duration": "3 months",
+      "outcome": "inadequate pain control, GI intolerance developed",
+      "dates": "July–October 2024",
+      "relief_duration": null
+    }
+  ],
+  "imaging_findings": {
+    "modality": "X-ray and MRI",
+    "key_findings": "X-ray (01/22/2025): AC joint arthrosis Grade II. No calcific deposits. No significant glenohumeral arthrosis.; MRI (01/22/2025): Full-thickness supraspinatus tear measuring 2.1 cm with retraction to the musculotendinous junction. Moderate subacromial bursitis. Intact subscapularis."
+  },
+  "requested_procedure": "Arthroscopic rotator cuff repair, right shoulder — CPT 29827",
+  "surgical_approach_if_mentioned": "Arthroscopic with mini-open rotator cuff repair",
+  "denial_risk_flags": [
+    {
+      "id": "flag-1",
+      "label": "Corticosteroid Injection Duration Not Documented",
+      "severity": "medium",
+      "explanation": "The corticosteroid injection administered on 11/05/2024 has no documented treatment duration or number of injections attempted. Payers for CPT 29827 often require documentation of at least one injection trial with a defined observation period before approving surgical intervention.",
+      "recommendation": "Add a chart addendum specifying the observation period following the 11/05/2024 Kenalog injection and confirm whether a single injection was trialed or if repeat injections were considered and declined.",
+      "anchorText": "Corticosteroid Injection — Kenalog 40mg"
+    },
+    {
+      "id": "flag-2",
+      "label": "Physical Therapy Duration Below Typical Threshold",
+      "severity": "medium",
+      "explanation": "Only 8 weeks of physical therapy is documented. Many BCBS plans require a minimum of 6–12 weeks of structured PT with documented failure before approving CPT 29827, and some reviewers may consider 8 weeks borderline given the surgical nature of the request.",
+      "recommendation": "Add documentation clarifying why further PT was not pursued (e.g., structural tear size, functional decline, provider judgment) and confirm that PT was supervised and formally prescribed.",
+      "anchorText": "Physical Therapy: 8 weeks"
+    },
+    {
+      "id": "flag-3",
+      "label": "Attending Surgeon Name Is a Placeholder",
+      "severity": "high",
+      "explanation": "The attending surgeon is listed as Dr. Michael Torres, which is a placeholder token. Payers require a clearly identified requesting and operating provider for prior authorization review.",
+      "recommendation": "Ensure the actual attending surgeon name is populated in the final submission. The requesting provider field must match the operating surgeon on the authorization request.",
+      "anchorText": "Dr. Michael Torres"
+    },
+    {
+      "id": "flag-4",
+      "label": "Imaging Date Is a Placeholder",
+      "severity": "high",
+      "explanation": "Both MRI and X-ray dates are listed as 01/22/2025, a placeholder token. Payers require confirmed imaging dates to verify that imaging was obtained within an acceptable pre-authorization window (typically within 6–12 months).",
+      "recommendation": "Replace 01/22/2025 with the actual imaging date before submission to confirm imaging recency and compliance with BCBS imaging currency requirements.",
+      "anchorText": "01/22/2025"
+    },
+    {
+      "id": "flag-5",
+      "label": "Injection Date Is a Placeholder",
+      "severity": "medium",
+      "explanation": "The corticosteroid injection date is listed as 11/05/2024, a placeholder token. Payers require specific dates for all conservative treatments to verify the timeline of failed conservative care.",
+      "recommendation": "Replace 11/05/2024 with the actual injection date to establish a complete and verifiable conservative care timeline for BCBS review.",
+      "anchorText": "11/05/2024"
+    }
+  ],
+  "pa_strength": {
+    "diagnosis_codes": {
+      "score": 1,
+      "note": "Two ICD-10 codes are documented (M75.121 and M75.111), clearly supporting the diagnosis of full-thickness rotator cuff tear and shoulder impingement."
+    },
+    "conservative_treatments_named": {
+      "score": 1,
+      "note": "Three distinct conservative treatments are named: Physical Therapy, Corticosteroid Injection (Kenalog), and NSAIDs (Meloxicam)."
+    },
+    "conservative_treatment_duration": {
+      "score": 0,
+      "note": "Physical therapy (8 weeks) and NSAIDs (3 months) have documented durations, but the corticosteroid injection has no documented duration or observation period, leaving the conservative care timeline incomplete.",
+      "anchorText": "Corticosteroid Injection — Kenalog 40mg"
+    },
+    "imaging_findings": {
+      "score": 1,
+      "note": "Both MRI and X-ray are documented as completed with detailed findings including tear size, retraction, and bursitis, strongly supporting surgical candidacy."
+    },
+    "functional_limitations": {
+      "score": 1,
+      "note": "Four specific functional limitations are explicitly documented, including inability to perform overhead work, sleep disturbance, and inability to return to work duties."
+    },
+    "surgical_approach": {
+      "score": 1,
+      "note": "Surgical approach is explicitly stated as arthroscopic with mini-open rotator cuff repair."
+    },
+    "cpt_code_valid": {
+      "score": 1,
+      "note": "CPT 29827 (arthroscopic rotator cuff repair) is correctly matched to the documented diagnosis of full-thickness rotator cuff tear."
+    },
+    "symptom_duration": {
+      "score": 1,
+      "note": "Symptom duration is documented as 8 months of failed conservative management, with injury onset noted as June 2024."
+    }
+  },
+  "pain_score": "7/10 at rest, 9/10 with overhead activity",
+  "bmi": 27.4,
+  "asa_classification": "ASA II",
+  "validation": {
+    "hard_blocks": [],
+    "soft_warnings": []
+  }
+}

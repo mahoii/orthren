@@ -1,0 +1,163 @@
+{
+  "patient_name": "Vance, Sandra M.",
+  "date_of_birth": "07/28/1962",
+  "diagnosis_codes": [
+    "M16.12"
+  ],
+  "primary_complaint": "Worsening left hip pain",
+  "symptom_duration": "over the past several months",
+  "functional_limitations": [
+    "Difficulty ambulating distances greater than 200 feet",
+    "Unable to perform prolonged standing"
+  ],
+  "objective_measurements": [],
+  "conservative_treatments_attempted": [
+    {
+      "treatment": "Over-the-counter pain medication",
+      "duration": "Unknown",
+      "outcome": "Failed",
+      "dates": "Not documented",
+      "relief_duration": null
+    }
+  ],
+  "imaging_findings": null,
+  "requested_procedure": "Left total hip arthroplasty — CPT 27130",
+  "surgical_approach_if_mentioned": null,
+  "denial_risk_flags": [
+    {
+      "id": "flag-1",
+      "label": "No Completed Imaging Prior to Submission",
+      "severity": "high",
+      "explanation": "Both the X-ray and MRI are either pending or not yet ordered. United Healthcare requires completed imaging results confirming the diagnosis before authorizing CPT 27130 (total hip arthroplasty).",
+      "recommendation": "Do not submit the prior authorization until the left hip X-ray results are available and documented in the chart. Consider ordering and completing an MRI as well to strengthen the clinical record.",
+      "anchorText": "results pending"
+    },
+    {
+      "id": "flag-pending-imaging",
+      "label": "Imaging Not Yet Complete",
+      "severity": "high",
+      "explanation": "Payers require completed imaging results before authorizing surgical procedures. The X-ray was ordered at today's visit with results pending, and MRI has not yet been ordered.",
+      "recommendation": "Do not submit until imaging results are available and documented.",
+      "anchorText": "Radiographic"
+    },
+    {
+      "id": "flag-conservative-care",
+      "label": "Insufficient Conservative Care",
+      "severity": "high",
+      "explanation": "Only 1 treatment documented (OTC pain medication with no duration or outcome). Payers for CPT 27130 typically require documented failure of physical therapy (minimum 6 weeks), NSAIDs, and at least one injection before approving surgical intervention.",
+      "recommendation": "Obtain records documenting additional conservative treatments or initiate and document further conservative care before submission.",
+      "anchorText": "CONSERVATIVE TREATMENT"
+    },
+    {
+      "id": "flag-2",
+      "label": "No Physical Therapy Documented",
+      "severity": "high",
+      "explanation": "The referral explicitly notes 'No formal physical therapy documented.' United Healthcare typically requires a minimum of 6 weeks of documented physical therapy failure before approving total joint arthroplasty (CPT 27130).",
+      "recommendation": "Initiate and document a formal physical therapy program of at least 6 weeks, or obtain prior PT records if therapy was completed elsewhere, before submitting the prior authorization.",
+      "anchorText": "No formal physical therapy documented"
+    },
+    {
+      "id": "flag-3",
+      "label": "OTC Medication — No Duration or Outcome",
+      "severity": "high",
+      "explanation": "The only documented conservative treatment is OTC pain medication with no duration, specific medication name, dosage, or outcome recorded. Payers require specific documentation of medication trials including drug name, dose, duration, and reason for failure.",
+      "recommendation": "Addend the chart to specify the medication name (e.g., ibuprofen, naproxen), dosage, duration of use, and the reason it was insufficient (e.g., inadequate pain relief, GI intolerance).",
+      "anchorText": "over-the-counter pain medication"
+    },
+    {
+      "id": "flag-4",
+      "label": "No Injection Therapy Documented",
+      "severity": "medium",
+      "explanation": "No corticosteroid or hyaluronic acid injections are documented. United Healthcare typically requires at least one injection trial before approving total hip arthroplasty for osteoarthritis.",
+      "recommendation": "Document whether injection therapy was attempted, contraindicated, or declined. If not yet attempted, consider a corticosteroid injection trial and document the outcome before submission.",
+      "anchorText": "Conservative Care"
+    },
+    {
+      "id": "flag-5",
+      "label": "Vague Symptom Duration — No Specific Timeframe",
+      "severity": "medium",
+      "explanation": "Symptom duration is documented only as 'over the past several months,' which is imprecise. Payers may require a specific duration to confirm chronicity and medical necessity for surgical intervention.",
+      "recommendation": "Addend the chart to specify the exact duration of symptoms (e.g., '8 months' or 'since [DATE]') to establish a clear timeline of disease progression.",
+      "anchorText": "over the past several months"
+    },
+    {
+      "id": "flag-6",
+      "label": "Preliminary Chart — Pre-op Workup Incomplete",
+      "severity": "medium",
+      "explanation": "The chart explicitly states this is 'preliminary referral documentation' with 'full pre-op workup pending.' Submitting a prior authorization on an incomplete chart increases the risk of denial due to insufficient clinical evidence.",
+      "recommendation": "Complete the pre-operative workup including imaging, ASA classification, BMI documentation, and full conservative care history before submitting the prior authorization to United Healthcare.",
+      "anchorText": "Chart is preliminary referral documentation"
+    },
+    {
+      "id": "flag-7",
+      "label": "No ASA Classification or BMI Documented",
+      "severity": "low",
+      "explanation": "ASA physical status classification and BMI are absent from the chart. These are commonly required by United Healthcare for surgical authorization of CPT 27130 to assess operative risk.",
+      "recommendation": "Document the patient's ASA classification and current BMI in the pre-operative assessment prior to submission.",
+      "anchorText": "surgical candidate pending imaging"
+    },
+    {
+      "id": "flag-8",
+      "label": "Requesting Provider Mismatch — Referral vs. Attending",
+      "severity": "low",
+      "explanation": "The chart lists Dr. Linda Park as both the referring PCP and the signing provider, while the requesting provider for the PA is listed as Dr. James Holloway. The operating/attending surgeon should be clearly identified in the chart to match the PA submission.",
+      "recommendation": "Ensure the chart explicitly documents Dr. James Holloway as the attending/operating surgeon performing CPT 27130, distinct from the referring provider Dr. Linda Park.",
+      "anchorText": "Provider: Dr. Linda Park, MD"
+    }
+  ],
+  "pa_strength": {
+    "diagnosis_codes": {
+      "score": 1,
+      "note": "ICD-10 code M16.12 (primary osteoarthritis, left hip) is explicitly documented and appropriate for CPT 27130."
+    },
+    "conservative_treatments_named": {
+      "score": 0,
+      "note": "Only one vague conservative treatment is named (OTC pain medication) with no specifics; physical therapy and injections are absent.",
+      "anchorText": "over-the-counter pain medication"
+    },
+    "conservative_treatment_duration": {
+      "score": 0,
+      "note": "No duration is documented for any conservative treatment attempted.",
+      "anchorText": "Conservative Care"
+    },
+    "imaging_findings": {
+      "score": 0,
+      "note": "No imaging has been completed; X-ray results are pending and MRI has not been ordered.",
+      "anchorText": "results pending"
+    },
+    "functional_limitations": {
+      "score": 1,
+      "note": "Two specific functional limitations are documented: ambulation limited to 200 feet and inability to perform prolonged standing."
+    },
+    "surgical_approach": {
+      "score": 0,
+      "note": "No surgical approach is documented for the total hip arthroplasty.",
+      "anchorText": "Left total hip arthroplasty"
+    },
+    "cpt_code_valid": {
+      "score": 1,
+      "note": "CPT 27130 is explicitly stated and is the correct code for total hip arthroplasty, consistent with the diagnosis of left hip osteoarthritis."
+    },
+    "symptom_duration": {
+      "score": 0,
+      "note": "Symptom duration is vague ('over the past several months') with no specific timeframe documented.",
+      "anchorText": "over the past several months"
+    }
+  },
+  "validation": {
+    "hard_blocks": [
+      {
+        "field": "imaging_findings",
+        "label": "Imaging Findings",
+        "message": "No imaging results are documented. Payers require objective imaging evidence to authorize surgical intervention."
+      }
+    ],
+    "soft_warnings": [
+      {
+        "field": "surgical_approach_if_mentioned",
+        "label": "Surgical Approach",
+        "message": "Anatomical approach details strengthen the surgical indication but can be inferred."
+      }
+    ]
+  }
+}
