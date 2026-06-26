@@ -1,6 +1,6 @@
 ---
 name: prompt-regression-check
-description: Runs the current generation prompts against the three synthetic patient charts and reports hallucinations, date injections, or non-conservative-treatment issues. Use before merging any change to the extraction prompt or letter system prompt.
+description: Runs extraction and letter generation prompts against the three live fixture charts and reports regressions. Use before merging any change to the extraction prompt, lib/letter-system-prompt.ts, or lib/anthropic.ts.
 context: fork
 agent: general-purpose
 ---
@@ -8,34 +8,56 @@ agent: general-purpose
 # Skill: Prompt Regression Check
 
 ## When to Use
-Run this before merging any change to:
-- The extraction system prompt in `app/api/generate-pa/route.ts`
+Run before merging any change to:
+- Extraction system prompt in `app/api/generate-pa/route.ts`
 - `lib/letter-system-prompt.ts`
-- `lib/anthropic.ts` (model, parameters)
+- `lib/anthropic.ts` (model, temperature, parameters)
 
 ## What This Skill Does
-Delegates to the `prompt-evaluator` subagent to run the current prompts against all three synthetic charts and report deviations from known-good behavior.
+Runs the current prompts against the three fixture charts via the live API (not lib/demo-data.ts — that file is a frozen UI fixture and must never be used for evaluation). Reports deviations from known-good baseline behavior.
 
 ## Instructions for Claude When Invoked
-1. Identify what changed in the prompt (read the current state of the relevant file)
-2. Invoke the `prompt-evaluator` subagent with this task:
 
-> Run the extraction prompt and letter generation prompt from `app/api/generate-pa/route.ts` and `lib/letter-system-prompt.ts` against each of the three synthetic charts in `lib/demo-data.ts`: Maria A. Delgado (CLEAN_TKA), Robert Chen (MESSY_ROTATOR_CUFF), Eleanor Vance (INCOMPLETE_LUMBAR_FUSION).
->
-> For each chart, report:
-> - Any hallucinated dates (dates not present in the chart text)
-> - Any fabricated treatment names (treatments not mentioned in the chart)
-> - Any non-conservative treatment claims (e.g., asserting surgery is conservative care)
-> - Any imaging findings that appear fabricated (not in the chart)
-> - Any `pa_strength` factor scores that seem inconsistent with the chart content
-> - Any `denial_risk_flags` that are generic rather than specific
->
-> Output: PASS (no deviations) or FAIL (list each deviation with chart name, field, and description).
+1. Read the current state of the changed prompt file
+2. Run `scripts/eval-pipeline.ts` against all three fixture charts:
+   - `chart-kim-rachel-rotator-cuff-cpt29827-CLEAN.docx` (CPT 29827)
+   - `chart-webb-marcus-tka-cpt27447-MESSY.docx` (CPT 27447)
+   - `chart-vance-sandra-tha-cpt27130-INCOMPLETE.docx` (CPT 27130)
+3. For each chart, evaluate the raw extraction JSON and generated letter for:
+   - **SOURCE LOCK violations** — any clinical finding, imaging result, or treatment not present in the source chart
+   - **CPT mismatch** — procedure name or code in the letter body doesn't match the fixture's CPT
+   - **Hallucinated surgical approach** — approach stated in letter not documented in chart
+   - **Date hallucination** — dates in letter not present in chart text
+   - **Imaging not in source** — imaging modality referenced that was not confirmed completed in chart
+   - **DOB extraction** — must be non-null for all three fixtures
+   - **Single signature block** — flag if more than one sig block present
+   - **Re: line format** — must include patient name, DOB, procedure, CPT, ICD-10
 
-3. Return the subagent's findings to the user
-4. If any FAIL is reported, do not merge — surface the issues for prompt revision
+4. Output: PASS or FAIL per chart, with field-level detail on any failure
 
-## Pass Criteria (known-good baseline)
-- Delgado (CLEAN_TKA): all 8 pa_strength factors should score 1, pa score ≥ 8.0, zero denial risk flags expected
-- Chen (MESSY_ROTATOR_CUFF): conservative care gap expected, ≥1 high-severity flag
-- Vance (INCOMPLETE_LUMBAR_FUSION): imaging and surgical approach gaps expected, score in amber range
+## Known-Good Baseline
+
+**Kim (29827 — CLEAN):**
+- DOB: 03/17/1966
+- CPT consistent: 29827 throughout
+- Imaging: X-ray (Feb 10 2025) + MRI (Mar 1 2025) only — no other modalities
+- Conservative care: PT (Nov–Dec 2024), Meloxicam 4mo, corticosteroid injection (Jan 15 2025)
+- pa_score expected: ≥ 8.0, zero SOURCE LOCK violations
+
+**Webb (27447 — MESSY):**
+- DOB: 11/08/1952
+- CPT consistent: 27447 throughout — flag immediately if spine code (e.g. 22612) appears
+- No MRI on file — letter must not reference MRI
+- BMI not recorded — must not be fabricated
+- Conservative care dates/duration vague — letter must not invent specifics
+- ≥1 denial risk flag expected (documentation gaps)
+
+**Vance (27130 — INCOMPLETE):**
+- DOB: 07/02/1960
+- CPT consistent: 27130 throughout
+- Imaging ordered but not completed — letter must not reference imaging findings
+- Conservative care minimal (acetaminophen + rest only) — no PT, no injections
+- pa_score expected: amber range, imaging and conservative care flags expected
+
+## Merge Gate
+Any FAIL blocks merge. Surface findings for prompt revision before proceeding.
