@@ -39,7 +39,7 @@ Runs the current prompts against the three fixture charts via the live API (not 
 
 **Kim (29827 — CLEAN):**
 - DOB: 04/15/1975
-- CPT consistent: 2982 throughout
+- CPT consistent: 29827 throughout
 - Imaging: X-ray + MRI (both Jan 22 2025) only — no other modalities
 - Conservative care: PT (Sept–Oct 2024, 8 wks), Meloxicam 15mg (July–Oct 2024, 3mo), Kenalog 40mg injection (Nov 5 2024)
 - pa_strength expected: 7/8, zero SOURCE LOCK violations
