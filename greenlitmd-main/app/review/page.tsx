@@ -90,10 +90,13 @@ export default function ReviewPage() {
   const [animatedScore, setAnimatedScore] = useState(0);
   const [hasRegeneratedAfterMax, setHasRegeneratedAfterMax] = useState(false);
 
+  const [changedParaIds, setChangedParaIds] = useState<Set<number>>(new Set());
+
   const letterRef = useRef<HTMLDivElement>(null);
   const savedScrollRef = useRef<number>(0);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasAnimated = useRef(false);
+  const prevLetterRef = useRef<string>("");
 
   useEffect(() => {
     const stored = sessionStorage.getItem("pa-review-data");
@@ -286,6 +289,7 @@ export default function ReviewPage() {
   async function handleRegenerate() {
     if (!data || !hasSupplements || isRegenerating) return;
 
+    prevLetterRef.current = editedLetter;
     setIsRegenerating(true);
     try {
       const res = await fetch('/api/regenerate-denial-fix', {
@@ -300,6 +304,14 @@ export default function ReviewPage() {
       const json = await res.json() as { letter?: string; error?: string };
       if (!res.ok) throw new Error(json.error ?? 'Unable to regenerate the letter.');
       if (json.letter) {
+        // Detect changed paragraphs for amber flash
+        const prevParas = prevLetterRef.current.split(/\n\n+/);
+        const nextParas = json.letter.split(/\n\n+/);
+        const changed = new Set<number>();
+        nextParas.forEach((p, i) => { if (p !== prevParas[i]) changed.add(i); });
+        setChangedParaIds(changed);
+        setTimeout(() => setChangedParaIds(new Set()), 1500);
+
         setEditedLetter(json.letter);
 
         // Update pa_strength scores for supplemented factors so the score reflects the fix
@@ -504,11 +516,19 @@ export default function ReviewPage() {
                 color: hasSupplements && !isRegenerating ? '#1d4f7a' : '#cbd5e1',
                 cursor: hasSupplements && !isRegenerating ? 'pointer' : 'not-allowed',
                 fontFamily: 'inherit',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 7,
                 animation: earnedScore === 100 && !hasRegeneratedAfterMax && hasSupplements
                   ? 'glow-pulse 1.6s ease-out infinite, breath-scale 1.6s ease-in-out infinite'
                   : 'none',
               }}
             >
+              {isRegenerating && (
+                <svg width="13" height="13" viewBox="0 0 13 13" style={{ animation: 'spin 0.8s linear infinite', flexShrink: 0 }}>
+                  <circle cx="6.5" cy="6.5" r="5" fill="none" stroke="#6366f1" strokeWidth="2" strokeDasharray="20 10" />
+                </svg>
+              )}
               {isRegenerating ? 'Regenerating…' : `Regenerate${hasSupplements ? ` (${supplementBadgeKeys.length})` : ''}`}
             </button>
           </div>
@@ -554,26 +574,93 @@ export default function ReviewPage() {
             )}
 
             {mode === 'review' ? (
-              <div
-                style={{
-                  background: '#fff',
-                  borderRadius: 6,
-                  boxShadow: '0 1px 3px rgba(15,31,51,0.08), 0 12px 36px rgba(15,31,51,0.10)',
-                  padding: '60px 64px',
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontSize: 15,
-                  lineHeight: 1.85,
-                  color: '#1f2733',
-                }}
-              >
-                <AnnotatedLetterComponent
-                  letter={editedLetter}
-                  items={annotationItems}
-                  activeIssue={activeIssue}
-                  hoverAnchor={hoverAnchor}
-                  onIssueClick={toggleCard}
-                  onHover={setHoverAnchor}
-                />
+              <div style={{ position: 'relative' }}>
+                {/* Regenerating pill badge */}
+                {isRegenerating && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 12,
+                      right: 12,
+                      zIndex: 10,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      background: '#eef2ff',
+                      border: '1px solid #c7d2fe',
+                      borderRadius: 999,
+                      padding: '4px 10px',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: '#4338ca',
+                      animation: 'badge-fade-in 0.2s ease',
+                      fontFamily: "'DM Sans', system-ui, sans-serif",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: '#6366f1',
+                        animation: 'regenDotPulse 1s ease-in-out infinite',
+                        flexShrink: 0,
+                      }}
+                    />
+                    Regenerating…
+                  </div>
+                )}
+
+                {/* Scanning beam overlay */}
+                {isRegenerating && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      borderRadius: 6,
+                      overflow: 'hidden',
+                      pointerEvents: 'none',
+                      zIndex: 5,
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        height: 120,
+                        background: 'linear-gradient(to bottom, transparent, rgba(99,102,241,0.15), transparent)',
+                        animation: 'scanBeam 1.8s ease-in-out infinite',
+                      }}
+                    />
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    background: '#fff',
+                    borderRadius: 6,
+                    boxShadow: '0 1px 3px rgba(15,31,51,0.08), 0 12px 36px rgba(15,31,51,0.10)',
+                    padding: '60px 64px',
+                    fontFamily: "Georgia, 'Times New Roman', serif",
+                    fontSize: 15,
+                    lineHeight: 1.85,
+                    color: '#1f2733',
+                    opacity: isRegenerating ? 0.4 : 1,
+                    pointerEvents: isRegenerating ? 'none' : 'auto',
+                    transition: 'opacity 0.3s ease',
+                  }}
+                >
+                  <LetterWithAmberFlash
+                    letter={editedLetter}
+                    changedParaIds={changedParaIds}
+                    annotationItems={annotationItems}
+                    activeIssue={activeIssue}
+                    hoverAnchor={hoverAnchor}
+                    onIssueClick={toggleCard}
+                    onHover={setHoverAnchor}
+                  />
+                </div>
               </div>
             ) : (
               <textarea
@@ -822,8 +909,71 @@ export default function ReviewPage() {
           from { opacity: 0; }
           to   { opacity: 1; }
         }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        @keyframes amberFlash {
+          0%   { background-color: #fef3c7; }
+          100% { background-color: transparent; }
+        }
+        .para-changed {
+          animation: amberFlash 1.2s ease-out forwards;
+          border-radius: 3px;
+        }
       `}</style>
     </div>
+  );
+}
+
+// ─── LetterWithAmberFlash ─────────────────────────────────────────────────────
+
+function LetterWithAmberFlash({
+  letter,
+  changedParaIds,
+  annotationItems,
+  activeIssue,
+  hoverAnchor,
+  onIssueClick,
+  onHover,
+}: {
+  letter: string;
+  changedParaIds: Set<number>;
+  annotationItems: AnnotationItem[];
+  activeIssue: string | null;
+  hoverAnchor: string | null;
+  onIssueClick: (id: string) => void;
+  onHover: (anchor: string | null) => void;
+}) {
+  if (changedParaIds.size === 0) {
+    return (
+      <AnnotatedLetterComponent
+        letter={letter}
+        items={annotationItems}
+        activeIssue={activeIssue}
+        hoverAnchor={hoverAnchor}
+        onIssueClick={onIssueClick}
+        onHover={onHover}
+      />
+    );
+  }
+
+  const paragraphs = letter.split(/\n\n+/);
+  return (
+    <>
+      {paragraphs.map((para, i) => (
+        <div key={i} className={changedParaIds.has(i) ? 'para-changed' : undefined} style={{ marginBottom: '1.85em' }}>
+          <AnnotatedLetterComponent
+            letter={para}
+            items={annotationItems}
+            activeIssue={activeIssue}
+            hoverAnchor={hoverAnchor}
+            onIssueClick={onIssueClick}
+            onHover={onHover}
+          />
+        </div>
+      ))}
+    </>
   );
 }
 
