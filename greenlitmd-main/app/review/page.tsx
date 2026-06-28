@@ -490,20 +490,6 @@ export default function ReviewPage() {
 
           {/* Regenerate */}
           <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-            {earnedScore === 100 && !hasRegeneratedAfterMax && !hasSupplements && (
-              <span style={{
-                fontSize: 11,
-                color: '#16a34a',
-                background: '#f0fdf4',
-                borderRadius: 9999,
-                padding: '2px 10px',
-                border: '1px solid #bbf7d0',
-                marginBottom: 6,
-                animation: 'badge-fade-in 400ms ease forwards',
-                whiteSpace: 'nowrap',
-              }}>
-              </span>
-            )}
             <button
               type="button"
               onClick={handleRegenerate}
