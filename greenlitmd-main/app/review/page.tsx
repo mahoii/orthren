@@ -490,23 +490,6 @@ export default function ReviewPage() {
 
           {/* Regenerate */}
           <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-            {hasSupplements && !isRegenerating && (
-              <span style={{
-                fontSize: 10,
-                color: '#1d4f7a',
-                background: '#eff6ff',
-                borderRadius: 9999,
-                padding: '2px 8px',
-                border: '1px solid #bfdbfe',
-                marginBottom: 4,
-                whiteSpace: 'nowrap',
-                maxWidth: 260,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}>
-                Applying fixes to: {supplementBadgeKeys.join(', ')}
-              </span>
-            )}
             {earnedScore === 100 && !hasRegeneratedAfterMax && !hasSupplements && (
               <span style={{
                 fontSize: 11,
@@ -701,6 +684,7 @@ export default function ReviewPage() {
               onHoverEnter={() => setHoverAnchor(item.anchor ?? null)}
               onHoverLeave={() => setHoverAnchor(null)}
               onSupplementChange={v => handleSupplementChange(item.id, v)}
+              onRegenerate={handleRegenerate}
               onAcknowledge={() => acknowledge(item.id)}
             />
           ))}
@@ -868,6 +852,7 @@ function StreamCard({
   onHoverEnter,
   onHoverLeave,
   onSupplementChange,
+  onRegenerate,
   onAcknowledge,
 }: {
   item: AttentionItem;
@@ -878,6 +863,7 @@ function StreamCard({
   onHoverEnter: () => void;
   onHoverLeave: () => void;
   onSupplementChange: (v: string) => void;
+  onRegenerate: () => void;
   onAcknowledge: () => void;
 }) {
   const isOpen = isExpanded || (item.kind === 'risk' && activeIssue === item.id);
@@ -982,6 +968,7 @@ function StreamCard({
               item={item}
               supplement={supplement}
               onSupplementChange={onSupplementChange}
+              onRegenerate={onRegenerate}
             />
           ) : (
             <RiskDetail
@@ -1002,10 +989,12 @@ function FixDetail({
   item,
   supplement,
   onSupplementChange,
+  onRegenerate,
 }: {
   item: AttentionItem;
   supplement: string;
   onSupplementChange: (v: string) => void;
+  onRegenerate: () => void;
 }) {
   const g = item.guidance;
 
@@ -1044,9 +1033,29 @@ function FixDetail({
             color: '#334155',
           }}
         />
-        <span style={{ fontSize: 11, color: '#94a3b8', textAlign: 'right' }}>
-          {supplement.length} chars
-        </span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: '#94a3b8' }}>
+            {supplement.length} chars
+          </span>
+          {supplement.trim() && (
+            <button
+              type="button"
+              onClick={onRegenerate}
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: '#fff',
+                background: '#d97706',
+                border: 'none',
+                borderRadius: 7,
+                padding: '4px 12px',
+                cursor: 'pointer',
+              }}
+            >
+              Apply fix
+            </button>
+          )}
+        </div>
       </div>
     </>
   );
