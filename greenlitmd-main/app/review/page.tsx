@@ -89,6 +89,7 @@ export default function ReviewPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [animatedScore, setAnimatedScore] = useState(0);
   const [hasRegeneratedAfterMax, setHasRegeneratedAfterMax] = useState(false);
+  const [appliedFixes, setAppliedFixes] = useState<Set<string>>(new Set());
 
   const [changedParaIds, setChangedParaIds] = useState<Set<number>>(new Set());
 
@@ -340,6 +341,7 @@ export default function ReviewPage() {
         if (earnedScore === 100) setHasRegeneratedAfterMax(true);
 
         setSupplements({});
+        setAppliedFixes(new Set());
         setExpandedFactors(new Set());
         setActiveIssue(null);
         showToast('Letter revised with your clinical additions');
@@ -753,11 +755,12 @@ export default function ReviewPage() {
               isExpanded={expandedFactors.has(item.id)}
               activeIssue={activeIssue}
               supplement={supplements[item.id] ?? ''}
+              isApplied={appliedFixes.has(item.id)}
               onToggle={() => toggleCard(item.id)}
               onHoverEnter={() => setHoverAnchor(item.anchor ?? null)}
               onHoverLeave={() => setHoverAnchor(null)}
               onSupplementChange={v => handleSupplementChange(item.id, v)}
-              onRegenerate={handleRegenerate}
+              onApplyFix={() => setAppliedFixes(prev => { const n = new Set(prev); n.add(item.id); return n; })}
               onAcknowledge={() => acknowledge(item.id)}
             />
           ))}
@@ -984,35 +987,38 @@ function StreamCard({
   isExpanded,
   activeIssue,
   supplement,
+  isApplied,
   onToggle,
   onHoverEnter,
   onHoverLeave,
   onSupplementChange,
-  onRegenerate,
+  onApplyFix,
   onAcknowledge,
 }: {
   item: AttentionItem;
   isExpanded: boolean;
   activeIssue: string | null;
   supplement: string;
+  isApplied: boolean;
   onToggle: () => void;
   onHoverEnter: () => void;
   onHoverLeave: () => void;
   onSupplementChange: (v: string) => void;
-  onRegenerate: () => void;
+  onApplyFix: () => void;
   onAcknowledge: () => void;
 }) {
+  const effectiveDone = item.done || isApplied;
   const isOpen = isExpanded || (item.kind === 'risk' && activeIssue === item.id);
-  const itemColor = item.done ? '#16a34a' : item.kind === 'fix' ? '#d97706' : '#dc2626';
+  const itemColor = effectiveDone ? '#16a34a' : item.kind === 'fix' ? '#d97706' : '#dc2626';
 
-  const iconContent = item.done ? '✓' : item.kind === 'fix' ? '▲' : '!';
-  const iconStyle: React.CSSProperties = item.done
+  const iconContent = effectiveDone ? '✓' : item.kind === 'fix' ? '▲' : '!';
+  const iconStyle: React.CSSProperties = effectiveDone
     ? { background: '#ecfdf3', color: '#16a34a' }
     : item.kind === 'fix'
     ? { background: '#fffbeb', color: '#d97706' }
     : { background: '#fef2f2', color: '#dc2626' };
 
-  const kindLabel = item.done ? 'Done' : item.kind === 'fix' ? 'Fixable' : 'Risk';
+  const kindLabel = effectiveDone ? 'Done' : item.kind === 'fix' ? 'Fixable' : 'Risk';
 
   return (
     <div
@@ -1020,7 +1026,7 @@ function StreamCard({
       onMouseEnter={onHoverEnter}
       onMouseLeave={onHoverLeave}
       style={{
-        border: `1px solid ${isOpen ? itemColor : item.done ? '#bbf7d0' : '#e2e8f0'}`,
+        border: `1px solid ${isOpen ? itemColor : effectiveDone ? '#bbf7d0' : '#e2e8f0'}`,
         borderRadius: 12,
         marginBottom: 9,
         overflow: 'hidden',
@@ -1100,12 +1106,19 @@ function StreamCard({
           }}
         >
           {item.kind === 'fix' ? (
-            <FixDetail
-              item={item}
-              supplement={supplement}
-              onSupplementChange={onSupplementChange}
-              onRegenerate={onRegenerate}
-            />
+            isApplied ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderRadius: 9, border: '1px solid #bbf7d0', background: '#f0fdf4', padding: '9px 12px' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#16a34a' }}>✓</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#15803d' }}>Reviewed — press Regenerate to update the letter</span>
+              </div>
+            ) : (
+              <FixDetail
+                item={item}
+                supplement={supplement}
+                onSupplementChange={onSupplementChange}
+                onApplyFix={onApplyFix}
+              />
+            )
           ) : (
             <RiskDetail
               item={item}
@@ -1125,12 +1138,12 @@ function FixDetail({
   item,
   supplement,
   onSupplementChange,
-  onRegenerate,
+  onApplyFix,
 }: {
   item: AttentionItem;
   supplement: string;
   onSupplementChange: (v: string) => void;
-  onRegenerate: () => void;
+  onApplyFix: () => void;
 }) {
   const g = item.guidance;
 
@@ -1173,24 +1186,25 @@ function FixDetail({
           <span style={{ fontSize: 11, color: '#94a3b8' }}>
             {supplement.length} chars
           </span>
-          {supplement.trim() && (
-            <button
-              type="button"
-              onClick={onRegenerate}
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                color: '#fff',
-                background: '#d97706',
-                border: 'none',
-                borderRadius: 7,
-                padding: '4px 12px',
-                cursor: 'pointer',
-              }}
-            >
-              Apply fix
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={onApplyFix}
+            disabled={!supplement.trim()}
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#fff',
+              background: '#d97706',
+              border: 'none',
+              borderRadius: 7,
+              padding: '4px 12px',
+              cursor: supplement.trim() ? 'pointer' : 'default',
+              opacity: supplement.trim() ? 1 : 0.25,
+              transition: 'opacity 0.15s',
+            }}
+          >
+            Apply fix
+          </button>
         </div>
       </div>
     </>
