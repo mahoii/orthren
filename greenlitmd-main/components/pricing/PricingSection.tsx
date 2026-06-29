@@ -151,7 +151,7 @@ export default function PricingSection() {
           Prior auth denials cost your practice $15K–$50K each. We help prevent them.
         </h1>
         <p className="mt-4 text-slate-500 text-sm sm:text-base max-w-md mx-auto leading-relaxed">
-          Submission-ready PA packets in under 60 seconds. Used by independent orthopedic practices in Brooklyn, NY.
+          Predictable costs that scale with your practice — no per-submission fees or surprise charges.
         </p>
       </section>
 
