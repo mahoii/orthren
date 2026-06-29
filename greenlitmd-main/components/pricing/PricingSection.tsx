@@ -178,11 +178,9 @@ export default function PricingSection() {
         <span className={`text-sm ${isAnnual ? "text-slate-900 font-medium" : "text-slate-400"}`}>
           Annual
         </span>
-        {isAnnual && (
-          <span className="rounded-full border border-green-100 bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
-            2 months free
-          </span>
-        )}
+        <span className={`rounded-full border border-green-100 bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700 transition-opacity ${isAnnual ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+          2 months free
+        </span>
       </div>
 
       {/* 3. Pricing cards */}
