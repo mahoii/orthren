@@ -306,17 +306,32 @@ export default function PricingSection() {
             className="w-full accent-clinical-navy"
           />
 
-          <div className="mt-6 grid sm:grid-cols-2 gap-4 items-center">
-            <div>
-              <p className="text-sm font-medium text-slate-700">
-                Estimated monthly staff time cost
-              </p>
-              <p className="mt-1 text-xs text-slate-400">
-                At $16/submission industry average · vs. $299/month for Orthren
-              </p>
+          <div className="mt-6 space-y-3">
+            <div className="grid sm:grid-cols-2 gap-4 items-center">
+              <div>
+                <p className="text-sm font-medium text-slate-700">
+                  Estimated monthly staff time cost
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  At $16/submission industry average
+                </p>
+              </div>
+              <div className="sm:text-right">
+                <p className="text-2xl font-medium text-red-500">{roiResult}</p>
+              </div>
             </div>
-            <div className="sm:text-right">
-              <p className="text-2xl font-medium text-green-600">{roiResult}</p>
+            <div className="grid sm:grid-cols-2 gap-4 items-center">
+              <div>
+                <p className="text-sm font-medium text-slate-700">
+                  vs. Orthren
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Flat monthly rate — no per-submission fees
+                </p>
+              </div>
+              <div className="sm:text-right">
+                <p className="text-2xl font-medium text-green-600">$599/mo</p>
+              </div>
             </div>
           </div>
         </div>
@@ -361,7 +376,7 @@ export default function PricingSection() {
       <section className="px-6 pb-16 bg-slate-50 py-16">
         <div className="mx-auto max-w-2xl">
           <h2 className="text-center text-xl font-medium text-clinical-navy mb-8">
-            Common questions
+            Common Questions
           </h2>
           <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white overflow-hidden">
             {FAQS.map((faq, i) => {
