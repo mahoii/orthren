@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, DragEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, DragEvent, FormEvent, ReactNode, Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { usePostHog } from "posthog-js/react";
 import Link from "next/link";
@@ -111,7 +111,7 @@ const PUBLIC_DEMO_META = {
   practice: "Atlantic Orthopedics",
 } as const;
 
-export default function UploadPage() {
+function UploadPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isPublicDemo = searchParams.get("demo") === "true";
@@ -664,6 +664,14 @@ export default function UploadPage() {
         </form>
       </section>
     </main>
+  );
+}
+
+export default function BuilderPage() {
+  return (
+    <Suspense>
+      <UploadPage />
+    </Suspense>
   );
 }
 
