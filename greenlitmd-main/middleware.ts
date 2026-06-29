@@ -3,6 +3,14 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  // Public demo mode — bypass auth entirely for /builder?demo=true
+  if (
+    request.nextUrl.pathname === "/builder" &&
+    request.nextUrl.searchParams.get("demo") === "true"
+  ) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(

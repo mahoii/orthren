@@ -1,11 +1,12 @@
 "use client";
 
-import { ChangeEvent, DragEvent, FormEvent, ReactNode, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { ChangeEvent, DragEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { usePostHog } from "posthog-js/react";
 import Link from "next/link";
 import type { GeneratePaResponse } from "@/lib/types";
 import { CLEAN_TKA, MESSY_ROTATOR_CUFF, INCOMPLETE_LUMBAR_FUSION } from "@/lib/demo-data";
+import { DemoModeBar } from "./DemoModeBar";
 
 type ProfileKey = "CLEAN_TKA" | "MESSY_ROTATOR_CUFF" | "INCOMPLETE_LUMBAR_FUSION";
 
@@ -101,16 +102,29 @@ const commonOrthopedicCptCodes = [
   { code: "27695", description: "Ankle ligament repair" }
 ];
 
+// Demo fixture for ?demo=true — CLEAN_TKA data (CPT 27447) with public-facing metadata
+const PUBLIC_DEMO_PROFILE_KEY: ProfileKey = "CLEAN_TKA";
+const PUBLIC_DEMO_META = {
+  cpt: "27447",
+  payer: "United Healthcare",
+  provider: "Dr. Elena Marchetti",
+  practice: "Atlantic Orthopedics",
+} as const;
+
 export default function UploadPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isPublicDemo = searchParams.get("demo") === "true";
   const posthog = usePostHog();
   const [file, setFile] = useState<File | null>(null);
-  const [isDemoMode, setIsDemoMode] = useState(false);
-  const [activeTestCase, setActiveTestCase] = useState<ProfileKey | null>(null);
-  const [cptCode, setCptCode] = useState("");
-  const [payerName, setPayerName] = useState("");
-  const [providerName, setProviderName] = useState("");
-  const [practiceName, setPracticeName] = useState("");
+  const [isDemoMode, setIsDemoMode] = useState(isPublicDemo);
+  const [activeTestCase, setActiveTestCase] = useState<ProfileKey | null>(
+    isPublicDemo ? PUBLIC_DEMO_PROFILE_KEY : null
+  );
+  const [cptCode, setCptCode] = useState(isPublicDemo ? PUBLIC_DEMO_META.cpt : "");
+  const [payerName, setPayerName] = useState(isPublicDemo ? PUBLIC_DEMO_META.payer : "");
+  const [providerName, setProviderName] = useState(isPublicDemo ? PUBLIC_DEMO_META.provider : "");
+  const [practiceName, setPracticeName] = useState(isPublicDemo ? PUBLIC_DEMO_META.practice : "");
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
@@ -334,6 +348,7 @@ export default function UploadPage() {
 
   return (
     <main className="min-h-[calc(100vh-3.5rem)] bg-[#F8F9FB]">
+      {isPublicDemo && <DemoModeBar />}
       <section className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-5xl flex-col justify-center px-6 py-10">
 
         {/* ── Header — conditional on sandbox mode ───────────────────────── */}
@@ -466,6 +481,23 @@ export default function UploadPage() {
                   </p>
                 </div>
               </>
+            ) : isPublicDemo ? (
+              /* Public demo — upload disabled */
+              <div className="flex min-h-80 flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-8 text-center">
+                <span className="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-200 mb-4" aria-hidden="true">
+                  <svg className="h-7 w-7 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                  </svg>
+                </span>
+                <p className="text-sm font-semibold text-slate-500">Demo mode — file upload disabled</p>
+                <p className="mt-2 text-xs text-slate-400 max-w-xs">
+                  A sample chart is pre-loaded below.{" "}
+                  <Link href="/login?redirect=/builder" className="text-clinical-blue underline underline-offset-2 hover:text-clinical-navy">
+                    Sign in
+                  </Link>{" "}
+                  to upload real patient charts.
+                </p>
+              </div>
             ) : (
               /* Drag-and-drop file upload zone */
               <label
