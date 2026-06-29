@@ -2,6 +2,7 @@ import Link from "next/link";
 import Logo from "@/components/Logo";
 import WaitlistForm from "@/components/WaitlistForm";
 import ScrollButton from "@/components/ScrollButton";
+import PricingSection from "@/components/pricing/PricingSection";
 export default async function LandingPage() {
   return (
     <div className="min-h-screen bg-white text-slate-900 selection:bg-clinical-navy selection:text-white">
@@ -294,93 +295,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ── 6. PRICING ─────────────────────────────────────────────────────── */}
-      <section className="px-6 py-20 lg:py-32 bg-slate-50">
-        <div className="mx-auto max-w-4xl">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl font-bold tracking-tight text-clinical-navy sm:text-4xl">
-              Transparent, flat-rate pricing
-            </h2>
-            <p className="mt-4 max-w-md mx-auto text-slate-600">
-              Predictable costs that scale with your practice — no per-submission fees or surprise charges.
-            </p>
-          </div>
-
-          <div className="grid gap-8 md:grid-cols-2">
-            {/* Solo Practice */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5">
-              <div>
-                <h3 className="text-xl font-bold text-clinical-navy">Solo Practice</h3>
-                <p className="mt-1 text-sm text-slate-500">For single surgeons and solo practitioners</p>
-                <div className="mt-6 flex items-baseline gap-1">
-                  <span className="text-5xl font-extrabold tracking-tight text-slate-900">$299</span>
-                  <span className="text-sm font-semibold text-slate-500">/month</span>
-                </div>
-                <ul className="mt-8 space-y-3 text-sm text-slate-600">
-                  {[
-                    "1 active surgeon",
-                    "Unlimited prior authorization packets",
-                    "Core orthopedic templates (TKA, THA, Spine, Shoulder)",
-                    "Live PA Strength Score dashboard",
-                    "DOCX export",
-                  ].map((f) => (
-                    <li key={f} className="flex items-start gap-3">
-                      <span className="mt-0.5 font-bold text-green-500 shrink-0">✓</span>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <a
-                href="https://calendly.com/kamarishabazz/30min"
-                target="_blank"
-                rel="noopener noreferrer"
-                id="pricing-solo-cta"
-                className="mt-8 block w-full rounded-lg border-2 border-clinical-navy px-4 py-2.5 text-center text-sm font-semibold text-clinical-navy transition hover:bg-slate-50"
-              >
-                Book a Free Demo
-              </a>
-            </div>
-
-            {/* Small Practice */}
-            <div className="relative rounded-2xl border-2 border-clinical-navy bg-white p-8 shadow-lg flex flex-col justify-between transition-all hover:shadow-xl hover:-translate-y-0.5">
-              <span className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-clinical-navy px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-white shadow">
-                Most Popular
-              </span>
-              <div>
-                <h3 className="text-xl font-bold text-clinical-navy">Small Practice</h3>
-                <p className="mt-1 text-sm text-slate-500">For growing multi-surgeon clinics</p>
-                <div className="mt-6 flex items-baseline gap-1">
-                  <span className="text-5xl font-extrabold tracking-tight text-slate-900">$599</span>
-                  <span className="text-sm font-semibold text-slate-500">/month</span>
-                </div>
-                <ul className="mt-8 space-y-3 text-sm text-slate-600">
-                  {[
-                    "2–5 active surgeons",
-                    "Unlimited prior authorization packets",
-                    "Priority clinical agent throughput",
-                    "Shared clinician login portal",
-                    "Dedicated onboarding support",
-                  ].map((f) => (
-                    <li key={f} className="flex items-start gap-3">
-                      <span className="mt-0.5 font-bold text-green-500 shrink-0">✓</span>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <a
-                href="https://calendly.com/kamarishabazz/30min"
-                target="_blank"
-                rel="noopener noreferrer"
-                id="pricing-practice-cta"
-                className="mt-8 block w-full rounded-lg bg-clinical-navy px-4 py-2.5 text-center text-sm font-semibold text-white shadow transition hover:bg-clinical-blue"
-              >
-                Book a Free Demo
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
+      <PricingSection />
 
       {/* ── 7. FOOTER ──────────────────────────────────────────────────────── */}
       <footer className="border-t border-slate-200 bg-white px-6 py-10 text-xs text-slate-500">
