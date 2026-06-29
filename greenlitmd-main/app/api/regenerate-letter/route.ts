@@ -6,6 +6,7 @@ import { letterSystemPrompt } from "@/lib/letter-system-prompt";
 import { buildBmiAsaPromptLines, postProcessLetter } from "@/lib/letter-postprocess";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import { callAnthropicWithRetry } from "@/lib/anthropic";
+import { deidentify, reidentify } from "@/lib/deidentify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,12 +79,12 @@ export async function POST(request: Request) {
       });
     }
 
-    const { patient_name, date_of_birth, ...deidentifiedChartData } = chartDataOnly;
+    const { redacted: redactedChartData, map: letterPhiMap } = deidentify(JSON.stringify(chartDataOnly, null, 2));
 
     let letter = await callAnthropicWithRetry({
       system: systemPromptWithContext,
       prompt: `Structured patient data:
-${JSON.stringify(deidentifiedChartData, null, 2)}
+${redactedChartData}
 
 Request details:
 CPT code: ${body.requestDetails.cptCode}
@@ -100,6 +101,7 @@ Letter date: ${today}${bmiAsaLines}${objectiveMeasurementsStr}${buildSoftWarning
     // Without this, regeneration had no backstop for double signatures or
     // omitted BMI/ASA, which is why those rules failed on every regenerate.
     letter = postProcessLetter(letter, body.extracted);
+    letter = reidentify(letter, letterPhiMap);
 
     const sanitized = sanitizeLetterPlaceholders(letter, {
       patientName: body.extracted.patient_name,

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { rateLimiter } from "@/lib/rate-limit";
 import { callAnthropicWithRetry } from "@/lib/anthropic";
+import { deidentify, reidentify } from "@/lib/deidentify";
 import { postProcessLetter } from "@/lib/letter-postprocess";
 import { letterSystemPrompt } from "@/lib/letter-system-prompt";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
@@ -51,13 +52,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No supplemental data provided." }, { status: 400 });
     }
 
+    const { redacted: redactedExtraction, map: extractionPhiMap } = deidentify(JSON.stringify(extractionJson, null, 2));
+    const { redacted: redactedLetter, map: letterPhiMap } = deidentify(currentLetter);
+    const mergedPhiMap = { ...extractionPhiMap, ...letterPhiMap };
+
     const userMessage = `You are performing a surgical revision of an existing Letter of Medical Necessity.
 
 ORIGINAL EXTRACTION DATA:
-${JSON.stringify(extractionJson, null, 2)}
+${redactedExtraction}
 
 CURRENT LETTER:
-${currentLetter}
+${redactedLetter}
 
 PHYSICIAN-SUPPLIED SUPPLEMENTAL DATA:
 The following clinical details were verified and supplied by the requesting physician to correct gaps in the original chart extraction:
@@ -84,7 +89,10 @@ REVISION INSTRUCTIONS:
       temperature: 0,
     });
 
-    const processedLetter = postProcessLetter(rawLetterText, extractionJson as ExtractedChartData);
+    const processedLetter = reidentify(
+      postProcessLetter(rawLetterText, extractionJson as ExtractedChartData),
+      mergedPhiMap
+    );
 
     if (process.env.NODE_ENV === "development") {
       console.log("[regenerate-denial-fix] processed letter start:", processedLetter.slice(0, 200));

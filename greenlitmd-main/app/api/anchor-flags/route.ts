@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { rateLimiter } from "@/lib/rate-limit";
 import { callAnthropicWithRetry } from "@/lib/anthropic";
+import { deidentify } from "@/lib/deidentify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +32,8 @@ export async function POST(request: Request) {
     }
 
     const { letter, flags } = body;
-    const userMessage = `Letter:\n${letter}\n\nFlags:\n${flags.map((f, i) => `${i}: ${f}`).join("\n")}`;
+    const { redacted: redactedLetter } = deidentify(letter);
+    const userMessage = `Letter:\n${redactedLetter}\n\nFlags:\n${flags.map((f, i) => `${i}: ${f}`).join("\n")}`;
 
     let anchors: { flagIndex: number; anchorText: string | null }[];
     try {

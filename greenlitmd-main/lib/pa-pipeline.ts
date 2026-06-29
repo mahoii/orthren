@@ -143,10 +143,12 @@ export async function generateLetterFromExtraction(
 
   const bmiAsaLines = buildBmiAsaPromptLines(extracted);
 
+  const { redacted: redactedChartData, map: letterPhiMap } = deidentify(JSON.stringify(chartDataOnly, null, 2));
+
   let letter = await callAnthropicWithRetry({
     system: systemPromptWithContext,
     prompt: `Structured patient data:
-${JSON.stringify(chartDataOnly, null, 2)}
+${redactedChartData}
 
 Request details:
 CPT code: ${requestDetails.cptCode}
@@ -160,7 +162,7 @@ Letter date: ${today}${bmiAsaLines}${objectiveMeasurementsStr}`,
   });
 
   letter = postProcessLetter(letter, extracted);
-  letter = reidentify(letter, phiMap);
+  letter = reidentify(letter, letterPhiMap);
 
   return sanitizeLetterPlaceholders(letter, {
     patientName: extracted.patient_name,

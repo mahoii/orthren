@@ -9,13 +9,14 @@ export async function validateExtraction(
   extractedJson: Record<string, unknown>
 ): Promise<string[]> {
   const { redacted: deidentifiedText } = deidentify(chartText);
+  const { redacted: redactedJson } = deidentify(JSON.stringify(extractedJson, null, 2));
   const prompt = `You are a medical data auditor. Compare the EXTRACTED JSON against the SOURCE CHART TEXT and identify any factual discrepancies.
 
 SOURCE CHART TEXT:
 ${deidentifiedText}
 
 EXTRACTED JSON:
-${JSON.stringify(extractedJson, null, 2)}
+${redactedJson}
 
 Check specifically:
 1. Are all dates in the JSON exactly as written in the source? Flag any year changes.
