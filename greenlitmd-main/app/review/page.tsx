@@ -94,6 +94,9 @@ export default function ReviewPage() {
   const [changedParaIds, setChangedParaIds] = useState<Set<number>>(new Set());
 
   const letterRef = useRef<HTMLDivElement>(null);
+  const editDivRef = useRef<HTMLDivElement>(null);
+  const annotationSourceRef = useRef<HTMLDivElement>(null);
+  const inputDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedScrollRef = useRef<number>(0);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasAnimated = useRef(false);
@@ -196,8 +199,34 @@ export default function ReviewPage() {
     if (letterRef.current) {
       savedScrollRef.current = letterRef.current.scrollTop;
     }
-    setMode(newMode);
+    if (newMode === 'edit') {
+      // Flush any pending debounce before entering edit so state is current
+      if (inputDebounceRef.current) clearTimeout(inputDebounceRef.current);
+      setMode(newMode);
+      // After render, seed contenteditable with the annotated HTML
+      requestAnimationFrame(() => {
+        if (editDivRef.current && annotationSourceRef.current) {
+          editDivRef.current.innerHTML = annotationSourceRef.current.innerHTML;
+        }
+      });
+    } else {
+      // Leaving edit: flush innerText to state synchronously before re-render
+      if (inputDebounceRef.current) clearTimeout(inputDebounceRef.current);
+      if (editDivRef.current) {
+        setEditedLetter(editDivRef.current.innerText);
+      }
+      setMode(newMode);
+    }
   };
+
+  function handleContentEditableInput() {
+    if (inputDebounceRef.current) clearTimeout(inputDebounceRef.current);
+    inputDebounceRef.current = setTimeout(() => {
+      if (editDivRef.current) {
+        setEditedLetter(editDivRef.current.innerText);
+      }
+    }, 300);
+  }
 
   useLayoutEffect(() => {
     if (letterRef.current) {
@@ -575,6 +604,18 @@ export default function ReviewPage() {
               </div>
             )}
 
+            {/* Hidden annotation source — always rendered so we can read its innerHTML when entering edit mode */}
+            <div ref={annotationSourceRef} style={{ display: 'none' }} aria-hidden="true">
+              <AnnotatedLetterComponent
+                letter={editedLetter}
+                items={annotationItems}
+                activeIssue={activeIssue}
+                hoverAnchor={hoverAnchor}
+                onIssueClick={toggleCard}
+                onHover={setHoverAnchor}
+              />
+            </div>
+
             {mode === 'review' ? (
               <div style={{ position: 'relative' }}>
                 {/* Regenerating pill badge */}
@@ -665,14 +706,16 @@ export default function ReviewPage() {
                 </div>
               </div>
             ) : (
-              <textarea
-                value={editedLetter}
-                onChange={e => setEditedLetter(e.target.value)}
+              <div
+                ref={editDivRef}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={handleContentEditableInput}
                 style={{
                   display: 'block',
                   width: '100%',
                   boxSizing: 'border-box',
-                  border: '1px solid #d7dee8',
+                  border: '1.5px solid #a5b4fc',
                   borderRadius: 6,
                   fontFamily: "Georgia, 'Times New Roman', serif",
                   fontSize: 15,
@@ -680,10 +723,11 @@ export default function ReviewPage() {
                   color: '#1f2733',
                   boxShadow: '0 12px 36px rgba(15,31,51,0.1)',
                   minHeight: '70vh',
-                  resize: 'vertical',
                   padding: '60px 64px',
                   outline: 'none',
                   background: '#fff',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
                 }}
               />
             )}
