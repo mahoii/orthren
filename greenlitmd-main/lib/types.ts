@@ -1,3 +1,5 @@
+import type { PayerRule } from "@/lib/payer-rules";
+
 export type ConservativeTreatment = {
   treatment: string | null;
   duration: string | null;
@@ -74,4 +76,5 @@ export type ExtractedChartDataWithValidation = ExtractedChartData & {
 export type GeneratePaResponse = {
   extracted: ExtractedChartDataWithValidation;
   letter: string;
+  payerRule?: PayerRule | null;
 };

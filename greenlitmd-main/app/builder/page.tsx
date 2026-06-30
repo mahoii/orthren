@@ -7,6 +7,7 @@ import Link from "next/link";
 import type { GeneratePaResponse } from "@/lib/types";
 import { CLEAN_TKA, MESSY_ROTATOR_CUFF, INCOMPLETE_LUMBAR_FUSION } from "@/lib/demo-data";
 import { DemoModeBar } from "./DemoModeBar";
+import PayerCombobox from "@/components/PayerCombobox";
 
 type ProfileKey = "CLEAN_TKA" | "MESSY_ROTATOR_CUFF" | "INCOMPLETE_LUMBAR_FUSION";
 
@@ -573,11 +574,10 @@ function UploadPage() {
                       </div>
                     ) : null}
                   </Field>
-                  <Field
-                    label="Insurance payer name"
+                  <PayerCombobox
                     value={payerName}
                     onChange={setPayerName}
-                    placeholder="e.g. Aetna"
+                    cptCode={cptCode}
                     disabled={isLoading}
                   />
                   <Field

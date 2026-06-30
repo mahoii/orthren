@@ -7,6 +7,7 @@ import Link from "next/link";
 import AnnotatedLetterComponent, { type AnnotationItem } from "@/components/AnnotatedLetter";
 import type { DenialRiskFlag, ExtractedChartData, GeneratePaResponse } from "@/lib/types";
 import { getSuggestFixGuidance } from "@/lib/suggest-fix-templates";
+import { getPayerChecklist, type PayerRule } from "@/lib/payer-rules";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -777,6 +778,9 @@ export default function ReviewPage() {
             </p>
           </div>
 
+          {/* Payer Criteria Panel */}
+          <PayerCriteriaPanel payerRule={data?.payerRule ?? null} />
+
           {/* Needs Attention Header */}
           <div style={{ margin: '26px 2px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <h2 style={{ fontSize: 14, fontWeight: 700, color: '#1E3A5F', margin: 0 }}>Needs attention</h2>
@@ -969,6 +973,75 @@ export default function ReviewPage() {
           border-radius: 3px;
         }
       `}</style>
+    </div>
+  );
+}
+
+// ─── PayerCriteriaPanel ───────────────────────────────────────────────────────
+
+function PayerCriteriaPanel({ payerRule }: { payerRule: PayerRule | null }) {
+  const [open, setOpen] = useState(false);
+  const [checked, setChecked] = useState<Set<number>>(new Set());
+
+  const items = payerRule ? getPayerChecklist(payerRule) : [];
+
+  function toggle(i: number) {
+    setChecked(prev => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i); else next.add(i);
+      return next;
+    });
+  }
+
+  return (
+    <div style={{ marginTop: 18, border: '1px solid #e2e8f0', borderRadius: 14, background: 'linear-gradient(180deg, #fbfdff, #f7fafc)', overflow: 'hidden' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '14px 16px', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#94a3b8', whiteSpace: 'nowrap' }}>Payer Criteria</span>
+          {payerRule ? (
+            <span style={{ background: '#eef2ff', color: '#4338ca', borderRadius: 999, padding: '2px 8px', fontSize: 10, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {payerRule.payer_name}
+            </span>
+          ) : null}
+        </span>
+        <span style={{ color: '#94a3b8', fontSize: 11, flexShrink: 0, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s ease' }}>▶</span>
+      </button>
+
+      {open ? (
+        <div style={{ padding: '0 16px 16px' }}>
+          {!payerRule ? (
+            <p style={{ fontSize: 13, color: '#64748b', margin: 0, lineHeight: 1.5 }}>
+              No specific payer criteria loaded — using general guidelines.
+            </p>
+          ) : (
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 9 }}>
+              {items.map((item, i) => (
+                <li key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <input
+                    type="checkbox"
+                    checked={checked.has(i)}
+                    onChange={() => toggle(i)}
+                    style={{ marginTop: 3, flexShrink: 0, cursor: 'pointer', accentColor: item.isHardRequirement ? '#dc2626' : '#d97706' }}
+                  />
+                  <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: item.isHardRequirement ? '#dc2626' : '#b45309' }}>
+                      {item.label}
+                      {item.isHardRequirement ? null : (
+                        <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>optional</span>
+                      )}
+                    </span>
+                    <span style={{ fontSize: 12, color: '#64748b', lineHeight: 1.4 }}>{item.requirement}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
