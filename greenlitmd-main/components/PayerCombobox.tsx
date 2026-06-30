@@ -61,7 +61,6 @@ export default function PayerCombobox({ value, onChange, error, cptCode, disable
   function selectOption(option: PayerOption) {
     if (option.value === "Other") {
       setIsOtherMode(true);
-      onChange("");
       setOpen(false);
       requestAnimationFrame(() => inputRef.current?.focus());
       return;
