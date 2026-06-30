@@ -1,11 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export function DemoModeBar() {
   const [dismissed, setDismissed] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
+  useEffect(() => {
+    const supabase = createSupabaseBrowserClient();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsLoggedIn(!!session?.user);
+    });
+  }, []);
+
+  // Still loading auth state — render nothing to avoid flash
+  if (isLoggedIn === null) return null;
+  // User is signed in — bar is irrelevant
+  if (isLoggedIn) return null;
+  // User manually dismissed
   if (dismissed) return null;
 
   return (
