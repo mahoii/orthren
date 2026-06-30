@@ -8,6 +8,15 @@ export function deidentify(chartText: string): DeidentifyResult {
   let text = chartText;
   let dateCounter = 1;
   const dateIndex = new Map<string, string>();
+  let memberIdCounter = 1;
+  let zipCounter = 1;
+  let npiCounter = 1;
+  let deaCounter = 1;
+  let emailCounter = 1;
+  let ssnCounter = 1;
+  let faxCounter = 1;
+  let providerCounter = 1;
+  const providerIndex = new Map<string, string>();
 
   const getOrCreateDatePlaceholder = (raw: string): string => {
     const key = raw.trim().toLowerCase();
@@ -19,12 +28,41 @@ export function deidentify(chartText: string): DeidentifyResult {
     return dateIndex.get(key)!;
   };
 
+  // SSN labeled — before unlabeled and before phone to prevent digit confusion
+  text = text.replace(
+    /\b(SSN|Social\s+Security(?:\s+Number)?)\s*[:\-#]?\s*(\d{3}-\d{2}-\d{4})\b/gi,
+    (_, label, ssn) => {
+      const ph = `[SSN_${ssnCounter++}]`;
+      map[ph] = ssn;
+      return `${label}: ${ph}`;
+    }
+  );
+  // SSN unlabeled — after labeled to avoid double-tokenizing
+  text = text.replace(
+    /\b(\d{3}-\d{2}-\d{4})\b/g,
+    (match) => {
+      const ph = `[SSN_${ssnCounter++}]`;
+      map[ph] = match;
+      return ph;
+    }
+  );
+
+  // Fax — labeled only, before phone (same digit format)
+  text = text.replace(
+    /(Fax\s*#?)\s*[:\-]?\s*(\(?\d{3}\)?[\s.\-]\d{3}[\s.\-]\d{4})\b/gi,
+    (_, label, num) => {
+      const ph = `[FAX_${faxCounter++}]`;
+      map[ph] = num.trim();
+      return `${label}: ${ph}`;
+    }
+  );
+
   // MRN — before dates to avoid digit overlap
   text = text.replace(
-    /\b(mrn|chart\s*(?:number|no\.?|#)?|record\s*(?:number|no\.?|#)?|patient\s*(?:id|number|no\.?|#))\s*[:\-#]?\s*([A-Z0-9][A-Z0-9\-]{3,})/gi,
-    (_, label, id) => {
+    /\b(mrn|chart\s*(?:number|no\.?|#)?|record\s*(?:number|no\.?|#)?|patient\s*(?:id|number|no\.?|#))(\s*[:\-#]?\s*)([A-Z0-9][A-Z0-9\-]{3,})/gi,
+    (_, label, sep, id) => {
       if (!map["[MRN]"]) map["[MRN]"] = id;
-      return `${label} [MRN]`;
+      return `${label}${sep}[MRN]`;
     }
   );
 
@@ -37,6 +75,46 @@ export function deidentify(chartText: string): DeidentifyResult {
     }
   );
 
+  // Health plan / member ID (labeled fields only)
+  text = text.replace(
+    /\b(Member\s+ID|Health\s+Plan\s+ID|Beneficiary\s+ID|Policy\s+#|Policy\s+Number)\s*[:\-]?\s*([A-Z0-9][A-Z0-9\-]{2,})\b/gi,
+    (_, label, id) => {
+      const ph = `[MEMBERID_${memberIdCounter++}]`;
+      map[ph] = id.trim();
+      return `${label}: ${ph}`;
+    }
+  );
+
+  // NPI — labeled only (10 digits)
+  text = text.replace(
+    /\b(NPI\s*#?)\s*[:\-]?\s*(\d{10})\b/gi,
+    (_, label, npi) => {
+      const ph = `[NPI_${npiCounter++}]`;
+      map[ph] = npi;
+      return `${label}: ${ph}`;
+    }
+  );
+
+  // DEA — labeled only (2 letters + 7 digits)
+  text = text.replace(
+    /\b(DEA\s*#?)\s*[:\-]?\s*([A-Z]{2}\d{7})\b/gi,
+    (_, label, dea) => {
+      const ph = `[DEA_${deaCounter++}]`;
+      map[ph] = dea;
+      return `${label}: ${ph}`;
+    }
+  );
+
+  // Email — global, before facility/provider name patterns
+  text = text.replace(
+    /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g,
+    (match) => {
+      const ph = `[EMAIL_${emailCounter++}]`;
+      map[ph] = match;
+      return ph;
+    }
+  );
+
   // Labeled DOB — before general date sweep
   text = text.replace(
     /\b(d\.?o\.?b\.?|date\s+of\s+birth)\s*[:\-]?\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/gi,
@@ -44,6 +122,12 @@ export function deidentify(chartText: string): DeidentifyResult {
       if (!map["[DOB]"]) map["[DOB]"] = date;
       return `${label}: [DOB]`;
     }
+  );
+
+  // ISO dates YYYY-MM-DD — before MM/DD/YYYY to avoid partial re-capture
+  text = text.replace(
+    /\b(\d{4})-(\d{2})-(\d{2})\b/g,
+    (match) => getOrCreateDatePlaceholder(match)
   );
 
   // Numeric dates (MM/DD/YYYY, MM-DD-YYYY, etc.)
@@ -58,12 +142,35 @@ export function deidentify(chartText: string): DeidentifyResult {
     (match) => getOrCreateDatePlaceholder(match)
   );
 
+  // "Month YYYY" partial dates (e.g. "March 2024") — no day between month and year
+  text = text.replace(
+    /\b(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+\d{4}\b/gi,
+    (match) => getOrCreateDatePlaceholder(match)
+  );
+
+  // "late/early YYYY" partial date references
+  text = text.replace(
+    /\b(late|early)\s+(\d{4})\b/gi,
+    (match) => getOrCreateDatePlaceholder(match)
+  );
+
   // Addresses (street number + street name + suffix)
   text = text.replace(
     /\b\d{1,5}\s+[A-Z][a-zA-Z]+(?:\s+[A-Za-z]+)*\s+(?:Street|St|Avenue|Ave|Boulevard|Blvd|Drive|Dr|Road|Rd|Lane|Ln|Way|Court|Ct|Place|Pl)\.?(?:\s+(?:Suite|Ste|Apt|Unit)\.?\s*[A-Z0-9]+)?\b/g,
     (match) => {
       if (!map["[ADDRESS]"]) map["[ADDRESS]"] = match.trim();
       return "[ADDRESS]";
+    }
+  );
+
+  // ZIP codes — after address redaction; only match when preceded by state abbreviation context
+  // Lookbehind ensures we only redact ZIPs in "City, ST NNNNN" format, not CPT/diagnosis codes
+  text = text.replace(
+    /(?<=,\s*[A-Z]{2}\s+)(\d{5}(?:-\d{4})?)\b/g,
+    (match) => {
+      const ph = `[ZIP_${zipCounter++}]`;
+      map[ph] = match;
+      return ph;
     }
   );
 
@@ -86,12 +193,17 @@ export function deidentify(chartText: string): DeidentifyResult {
     }
   );
 
-  // Provider names (Dr. / Dr variants)
+  // Provider names (Dr. / Dr variants) — distinct names get distinct tokens; [ \t]+ prevents cross-line capture
   text = text.replace(
-    /\bDr\.?\s+([A-Z][a-zA-Z'\-]+(?:\s+[A-Z][a-zA-Z'\-]+)?)\b/g,
+    /\bDr\.?[ \t]+([A-Z][a-zA-Z'\-]+(?:[ \t]+[A-Z][a-zA-Z'\-]+)?)\b/g,
     (match) => {
-      if (!map["[PROVIDER]"]) map["[PROVIDER]"] = match.trim();
-      return "[PROVIDER]";
+      const key = match.trim().toLowerCase();
+      if (!providerIndex.has(key)) {
+        const ph = `[PROVIDER_${providerCounter++}]`;
+        providerIndex.set(key, ph);
+        map[ph] = match.trim();
+      }
+      return providerIndex.get(key)!;
     }
   );
 
