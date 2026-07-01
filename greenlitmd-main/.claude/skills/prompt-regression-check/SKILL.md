@@ -42,7 +42,14 @@ Runs the current prompts against the three fixture charts via the live API (not 
 - CPT consistent: 29827 throughout
 - Imaging: X-ray + MRI (both Jan 22 2025) only — no other modalities
 - Conservative care: PT (Sept–Oct 2024, 8 wks), Meloxicam 15mg (July–Oct 2024, 3mo), Kenalog 40mg injection (Nov 5 2024)
-- pa_strength expected: 7/8, zero SOURCE LOCK violations
+- pa_strength expected: 8/8, zero SOURCE LOCK violations. `conservative_treatment_duration` scores 1: two of the
+  three treatments (PT, Meloxicam) have an explicit documented duration; the injection does not, but per the
+  documented rubric (`.claude/skills/pa-scoring-conventions/SKILL.md`) this factor scores 0 only when NO treatment
+  has a documented duration. (Corrected 2026-06-30 — a prior run of this fixture scored this factor 0/7-8-total;
+  that was an incorrect stricter reading requiring duration on *every* treatment, not supported by the rubric or
+  by the extraction prompt's own "0 = missing or insufficient, 1 = present and adequate" wording. Root cause was
+  LLM run-to-run judgment variance on an ambiguous scoring call, not a code or prompt-logic regression — no
+  scoring code or extraction prompt text changed between the two runs.)
 
 **Webb (27447 — MESSY):**
 - DOB: 11/03/1958

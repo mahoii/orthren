@@ -150,6 +150,10 @@ export const PAYER_RULES: PayerRule[] = [
     ],
   },
   {
+    // Do not re-attempt web-search validation on this rule — confirmed blocked
+    // as of 2026-06-30, requires portal access or licensed source. No dedicated
+    // Aetna CPB exists for this procedure (see guideline_source below); this is
+    // not a search-effort gap, it's an absent primary source.
     payer_id: "aetna",
     payer_name: "Aetna",
     cpt_code: "29827",
@@ -199,6 +203,10 @@ export const PAYER_RULES: PayerRule[] = [
     ],
   },
   {
+    // Do not re-attempt web-search validation on this rule — confirmed blocked
+    // as of 2026-06-30, requires portal access or licensed source. UHC's policy
+    // text defers duration thresholds to InterQual® (licensed, not accessible);
+    // no amount of further searching will surface those numbers from this policy.
     payer_id: "uhc",
     payer_name: "UnitedHealthcare",
     cpt_code: "27447",
@@ -246,6 +254,14 @@ export const PAYER_RULES: PayerRule[] = [
     ],
   },
   {
+    // Do not re-attempt web-search validation on this rule — confirmed blocked
+    // as of 2026-06-30, requires portal access or licensed source. Same
+    // InterQual®-deferral structure as UHC's knee policy (CPT 27447 above).
+    // NOTE: this rule's guideline_source explicitly says the hip policy's
+    // InterQual-deferral was not independently re-fetched — it's presumed to
+    // match the knee policy's structure, not confirmed. Keep that caveat
+    // intact if this rule is ever touched; don't let "presumed" harden into
+    // "confirmed" in a future summary.
     payer_id: "uhc",
     payer_name: "UnitedHealthcare",
     cpt_code: "27130",
@@ -292,6 +308,11 @@ export const PAYER_RULES: PayerRule[] = [
     ],
   },
   {
+    // Do not re-attempt web-search validation on this rule — confirmed blocked
+    // as of 2026-06-30, requires portal access or licensed source. Same
+    // InterQual®-deferral structure as UHC's knee/hip policies above. Also
+    // not independently re-fetched this pass — figures are carried forward
+    // unchanged, same "presumed, not confirmed" caveat as the hip rule.
     payer_id: "uhc",
     payer_name: "UnitedHealthcare",
     cpt_code: "29827",
