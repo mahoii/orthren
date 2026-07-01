@@ -313,7 +313,7 @@ export default async function LandingPage() {
             <Link href="/terms" className="hover:text-slate-800 transition-colors">
               Terms of Service
             </Link>
-            <a href="mailto:kamarishabazz@gmail.com" className="hover:text-slate-800 transition-colors">
+            <a href="mailto:kamari@orthren.com" className="hover:text-slate-800 transition-colors">
               Email Us
             </a>
             <a
