@@ -17,6 +17,13 @@ export interface ConservativeTxRequirement {
   notes?: string;
 }
 
+// Provenance tier for a rule's data. Only "direct_fetch_quoted" — meaning the
+// specific figures in this rule were confirmed against the primary source's own
+// text, not inferred from a secondary source or left as an untraced legacy value
+// — may be paired with validation_status: "validated". See the module-load
+// invariant check below, which enforces this pairing at import time.
+export type VerificationMethod = "direct_fetch_quoted" | "search_snippet" | "unverified";
+
 export interface PayerRule {
   payer_id: string;
   payer_name: string;
@@ -32,6 +39,14 @@ export interface PayerRule {
   additional_documentation: string[];
   denial_risk_flags: string[];
   auto_approval_exceptions: string[];
+  // Validation gate — distinguishes rules confirmed against a primary payer
+  // source from rules that are still research-sourced/unconfirmed. Scoring and
+  // letter-gen must only treat "validated" rules as authoritative.
+  validation_status: "unvalidated" | "validated";
+  source_type: "research" | "official_portal";
+  source_url: string | null;
+  last_verified_date: string | null; // ISO date, null unless validated
+  verification_method: VerificationMethod;
 }
 
 export const PAYER_RULES: PayerRule[] = [
@@ -41,16 +56,20 @@ export const PAYER_RULES: PayerRule[] = [
     cpt_code: "27447",
     procedure_name: "Total Knee Arthroplasty",
     pa_required: true,
-    guideline_source: "Aetna CPB 0660 + CMS LCD L33456/L36575",
+    guideline_source: "Aetna CPB 0660 — Knee Arthroplasty",
     guideline_last_updated: "2026",
+    validation_status: "validated",
+    source_type: "official_portal",
+    source_url: "https://www.aetna.com/cpb/medical/data/600_699/0660.html",
+    last_verified_date: "2026-06-30",
+    verification_method: "direct_fetch_quoted",
     required_imaging: [
-      { modality: "X-ray (weight-bearing bilateral)", required: true, minimum_findings: "Moderate-to-severe OA; KL Grade 2+ required (Grade 3–4 strongly preferred)" },
+      { modality: "X-ray (weight-bearing bilateral)", required: true, minimum_findings: "KL Grade 3 or 4 required (\"moderate/severe osteoarthritis... Kellgren-Lawrence Grade 3 or 4\"). Grade 2 alone is insufficient — corrected from a prior 'Grade 2+' reading of this policy." },
       { modality: "MRI", required: false, notes: "Not routinely required; may be requested if X-ray insufficient" },
     ],
     conservative_treatment_requirements: [
-      { treatment: "NSAIDs or acetaminophen", minimum_duration: "≥3 weeks", notes: "OR ≥1 intra-articular corticosteroid injection" },
-      { treatment: "Physical therapy or home exercise program", minimum_duration: "≥6 weeks", notes: "Documented supervised PT preferred; note dates and outcomes" },
-      { treatment: "Activity modification", minimum_duration: "≥6 weeks" },
+      { treatment: "Physical therapy or supervised exercise", minimum_duration: "12 or 24 weeks depending on age/BMI", notes: "At least half of the required course must be formal in-person PT with a licensed physical therapist — home/virtual PT alone does not satisfy this. Corrected from a prior '≥6 weeks' reading, which understated the actual policy threshold." },
+      { treatment: "NSAIDs or acetaminophen", minimum_duration: "Documented trial", notes: "OR intra-articular corticosteroid injection" },
       { treatment: "Weight management (if BMI ≥30)", minimum_duration: "Documented attempt", notes: "Not hard-blocking but strengthens case" },
     ],
     functional_criteria: [
@@ -69,11 +88,12 @@ export const PAYER_RULES: PayerRule[] = [
       "Radiology report from interpreting radiologist (not surgeon read-off)",
     ],
     denial_risk_flags: [
-      "Conservative treatment < 6 weeks",
+      "Conservative treatment course < required 12/24-week threshold (age/BMI-dependent) — corrected from a prior '< 6 weeks' flag, which understated Aetna's actual threshold",
+      "Less than half the PT course was formal in-person therapy (home exercise program alone does not satisfy Aetna's requirement)",
+      "KL Grade 2 or lower documented — Grade 3 or 4 required",
       "No formal radiology report (surgeon-read X-ray only)",
       "Missing functional limitation documentation (pain score without ADL impact)",
       "BMI ≥40 without surgical optimization counseling documented",
-      "No intra-articular injection trialed when NSAIDs are contraindicated",
     ],
     auto_approval_exceptions: [
       "Acute fracture requiring immediate reconstruction",
@@ -86,16 +106,20 @@ export const PAYER_RULES: PayerRule[] = [
     cpt_code: "27130",
     procedure_name: "Total Hip Arthroplasty",
     pa_required: true,
-    guideline_source: "Aetna CPB 0660 + CMS LCD L33456/L36007",
+    guideline_source: "Aetna CPB 0287 — Hip Arthroplasty", // corrected citation — was wrongly cited as CPB 0660 (the knee policy)
     guideline_last_updated: "2026",
+    validation_status: "validated",
+    source_type: "official_portal",
+    source_url: "https://www.aetna.com/cpb/medical/data/200_299/0287.html",
+    last_verified_date: "2026-06-30",
+    verification_method: "direct_fetch_quoted",
     required_imaging: [
-      { modality: "X-ray (AP pelvis + lateral hip)", required: true, minimum_findings: "Advanced degenerative joint disease; formal radiology report required" },
+      { modality: "X-ray (AP pelvis + lateral hip)", required: true, minimum_findings: "Tönnis Grade 2 or 3 required (\"moderate/severe osteoarthritis... Tonnis grade 2 or 3\"). This is a DIFFERENT grading scale than knee (KL) — do not accept a KL grade entered for a hip case; corrected from a prior reading that implied KL applied here." },
       { modality: "MRI", required: false, notes: "May be required if X-ray does not definitively confirm advanced OA" },
     ],
     conservative_treatment_requirements: [
-      { treatment: "NSAIDs or acetaminophen", minimum_duration: "≥3 weeks" },
-      { treatment: "Physical therapy or supervised exercise", minimum_duration: "≥6 weeks" },
-      { treatment: "Activity modification", minimum_duration: "≥6 weeks" },
+      { treatment: "Physical therapy or supervised exercise", minimum_duration: "12 or 24 weeks depending on age/BMI", notes: "Same structure as Aetna's knee policy: at least half the course must be formal in-person PT. Individuals with morbid obesity or age under 50 require the longer 24-week course. Corrected from a prior '≥6 weeks' reading." },
+      { treatment: "NSAIDs or acetaminophen", minimum_duration: "Documented trial" },
       { treatment: "Assistive devices (cane/walker)", minimum_duration: "Documented use", notes: "Not required but strengthens case" },
       { treatment: "Intra-articular corticosteroid injection", minimum_duration: "Trialed", notes: "Not mandatory but omission is a soft flag" },
     ],
@@ -105,20 +129,19 @@ export const PAYER_RULES: PayerRule[] = [
       "Pain at rest and with activity",
     ],
     radiographic_criteria: [
-      "Advanced OA confirmed by X-ray with formal radiologist interpretation",
+      "Tönnis Grade 2–3 with formal radiologist interpretation — corrected from a prior 'KL Grade 3-4 preferred' entry, which used the wrong grading scale for hip",
       "Joint space narrowing, osteophytes, subchondral changes",
-      "KL Grade 3–4 preferred but not always explicitly stated — 'advanced degenerative change' sufficient",
     ],
     additional_documentation: [
       "H&P with exam findings (ROM, leg length, gait)",
       "Conservative treatment records with dates and outcomes",
-      "Formal radiology report",
+      "Formal radiology report using Tönnis grading",
     ],
     denial_risk_flags: [
       "Symptom duration < 3 months (very high denial risk — Vance fixture is exactly this problem)",
+      "Radiology report uses KL grade instead of Tönnis grade — wrong scale for hip, will read as incomplete/incorrect",
       "No formal imaging completed at time of submission (imaging 'ordered but pending' = hard block)",
-      "No PT attempted",
-      "Only acetaminophen trialed with no additional conservative modalities",
+      "Conservative course short of the 12/24-week threshold, or less than half delivered as formal in-person PT",
     ],
     auto_approval_exceptions: [
       "Femoral neck fracture",
@@ -132,10 +155,15 @@ export const PAYER_RULES: PayerRule[] = [
     cpt_code: "29827",
     procedure_name: "Arthroscopic Rotator Cuff Repair",
     pa_required: true,
-    guideline_source: "Aetna CPB 0842 + Carelon Joint Surgery 2025-11-15",
-    guideline_last_updated: "2025-11-15",
+    guideline_source: "No dedicated Aetna CPB covers arthroscopic rotator cuff repair. Prior code cited 'Aetna CPB 0842' — direct fetch (2026-06-30) confirms CPB 0842 is actually about ziv-aflibercept (an oncology/ophthalmology drug), unrelated to orthopedics. That citation was wrong and has been removed; no replacement primary source has been found.",
+    guideline_last_updated: "unknown",
+    validation_status: "unvalidated",
+    source_type: "research",
+    source_url: null,
+    last_verified_date: null,
+    verification_method: "unverified",
     required_imaging: [
-      { modality: "MRI shoulder (without contrast)", required: true, minimum_findings: "Full-thickness rotator cuff tear confirmed; partial-thickness tear must be high-grade (>50% thickness)" },
+      { modality: "MRI shoulder (without contrast)", required: true, minimum_findings: "Full-thickness rotator cuff tear confirmed; partial-thickness tear must be high-grade (>50% thickness) — no Aetna-specific source for this threshold, carried forward from prior unverified content" },
       { modality: "X-ray shoulder", required: false, notes: "Often obtained but not gating requirement; rules out other pathology" },
     ],
     conservative_treatment_requirements: [
@@ -176,15 +204,20 @@ export const PAYER_RULES: PayerRule[] = [
     cpt_code: "27447",
     procedure_name: "Total Knee Arthroplasty",
     pa_required: true,
-    guideline_source: "UHC Surgery of the Knee — Commercial Medical Policy (updated Sept 2025)",
+    guideline_source: "UHC Surgery of the Knee — Commercial Medical Policy (updated Sept 2025). Direct fetch (2026-06-30) confirms this policy defers duration thresholds to InterQual® criteria — a licensed proprietary product not accessible to us — rather than stating specific week counts in its own text.",
     guideline_last_updated: "2025-09-04",
+    validation_status: "unvalidated",
+    source_type: "research",
+    source_url: "https://www.uhcprovider.com/content/dam/provider/docs/public/policies/comm-medical-drug/surgery-knee.pdf",
+    last_verified_date: null,
+    verification_method: "unverified",
     required_imaging: [
-      { modality: "X-ray (weight-bearing)", required: true, minimum_findings: "Formal report must include: relevant clinical info, detailed findings, impression, AND specialty of interpreting provider. Must document: skeletal plate closure if <18yo, presence/absence of focal full-thickness cartilage defect, size/location, Outerbridge grade, joint space/alignment, ligament tear location/grade." },
+      { modality: "X-ray (weight-bearing)", required: true, minimum_findings: "CONFIRMED requirement (direct fetch): formal report must include relevant clinical info, detailed findings, impression, AND specialty of interpreting provider. Must document skeletal plate closure if <18yo, presence/absence of focal full-thickness cartilage defect, size/location, Outerbridge grade, joint space/alignment, ligament tear location/grade." },
     ],
     conservative_treatment_requirements: [
-      { treatment: "NSAIDs or acetaminophen", minimum_duration: "≥3 weeks", notes: "OR ≥1 intra-articular corticosteroid injection (either satisfies NSAID requirement for TKR)" },
-      { treatment: "Physical therapy or home exercise program", minimum_duration: "≥12 weeks", notes: "UHC is stricter than most — 12 weeks minimum. Document dates, sessions, therapist, outcomes." },
-      { treatment: "Activity modification", minimum_duration: "≥12 weeks" },
+      { treatment: "NSAIDs or acetaminophen", minimum_duration: "≥3 weeks (UNVERIFIED — InterQual-sourced, not stated in UHC's own policy text)", notes: "OR ≥1 intra-articular corticosteroid injection (either satisfies NSAID requirement for TKR)" },
+      { treatment: "Physical therapy or home exercise program", minimum_duration: "≥12 weeks (UNVERIFIED — InterQual-sourced)", notes: "UHC's own policy text defers duration specifics to InterQual and does not state a week count directly. Document dates, sessions, therapist, outcomes regardless." },
+      { treatment: "Activity modification", minimum_duration: "≥12 weeks (UNVERIFIED — InterQual-sourced)" },
     ],
     functional_criteria: [
       "Disabling pain interfering with ADLs",
@@ -202,11 +235,10 @@ export const PAYER_RULES: PayerRule[] = [
       "Imaging report meeting UHC's specific documentation format (clinical info + findings + impression + specialty)",
     ],
     denial_risk_flags: [
-      "PT < 12 weeks (most common UHC denial reason — stricter than other payers)",
+      "Imaging report missing interpreting physician specialty (CONFIRMED — this specific requirement is verified accurate)",
       "Imaging report missing Outerbridge/KL grade",
-      "Imaging report missing interpreting physician specialty",
+      "PT duration claims (3wk/12wk) are UNVERIFIED against InterQual — do not present these thresholds to a design partner as confirmed",
       "Conservative treatment dates not documented (generic 'tried PT' without specifics)",
-      "No intra-articular injection AND NSAIDs < 3 weeks",
     ],
     auto_approval_exceptions: [
       "Acute fracture",
@@ -219,15 +251,20 @@ export const PAYER_RULES: PayerRule[] = [
     cpt_code: "27130",
     procedure_name: "Total Hip Arthroplasty",
     pa_required: true,
-    guideline_source: "UHC Surgery of the Hip — Commercial Medical Policy (updated Sept 2025)",
+    guideline_source: "UHC Surgery of the Hip — Commercial Medical Policy (updated Sept 2025). Not independently fetched this pass — UHC's parallel knee policy defers duration thresholds to InterQual®, and the hip policy is presumed to follow the same structure, but that presumption has not been confirmed against this specific document.",
     guideline_last_updated: "2025-09-04",
+    validation_status: "unvalidated",
+    source_type: "research",
+    source_url: null,
+    last_verified_date: null,
+    verification_method: "unverified",
     required_imaging: [
       { modality: "X-ray (AP pelvis + lateral hip)", required: true, minimum_findings: "Formal report required with: relevant clinical info, detailed findings, impression, AND specialty of interpreting provider. UHC may additionally request the actual images for review." },
     ],
     conservative_treatment_requirements: [
-      { treatment: "NSAIDs or acetaminophen", minimum_duration: "≥3 weeks" },
-      { treatment: "Physical therapy or home exercise", minimum_duration: "≥12 weeks" },
-      { treatment: "Activity modification", minimum_duration: "≥12 weeks" },
+      { treatment: "NSAIDs or acetaminophen", minimum_duration: "≥3 weeks (UNVERIFIED — InterQual-sourced, carried forward unchanged; not independently re-checked this pass)" },
+      { treatment: "Physical therapy or home exercise", minimum_duration: "≥12 weeks (UNVERIFIED — InterQual-sourced, carried forward unchanged)" },
+      { treatment: "Activity modification", minimum_duration: "≥12 weeks (UNVERIFIED — InterQual-sourced, carried forward unchanged)" },
     ],
     functional_criteria: [
       "Pain and functional disability documented with ADL impact",
@@ -245,8 +282,8 @@ export const PAYER_RULES: PayerRule[] = [
     ],
     denial_risk_flags: [
       "Imaging completed but formal report not available at time of PA submission",
-      "PT < 12 weeks",
       "Imaging report lacking interpreting specialty",
+      "PT duration claim (12 weeks) is UNVERIFIED against InterQual — do not present as confirmed",
       "Symptom duration < 3 months without acute precipitant",
     ],
     auto_approval_exceptions: [
@@ -260,13 +297,18 @@ export const PAYER_RULES: PayerRule[] = [
     cpt_code: "29827",
     procedure_name: "Arthroscopic Rotator Cuff Repair",
     pa_required: true,
-    guideline_source: "UHC Arthroscopy Shoulder Policy (updated Feb 2025)",
+    guideline_source: "UHC Arthroscopy Shoulder Policy (updated Feb 2025). Not independently fetched this pass — duration figures below are carried forward unchanged from prior research-sourced content and have not been confirmed against InterQual or a primary UHC document.",
     guideline_last_updated: "2025-02-01",
+    validation_status: "unvalidated",
+    source_type: "research",
+    source_url: null,
+    last_verified_date: null,
+    verification_method: "unverified",
     required_imaging: [
       { modality: "MRI shoulder", required: true, minimum_findings: "Confirmed rotator cuff tear. Document: tendon(s) involved, full vs partial thickness, retraction distance if applicable" },
     ],
     conservative_treatment_requirements: [
-      { treatment: "Physical therapy", minimum_duration: "≥6 weeks", notes: "Waived for acute traumatic full-thickness tear" },
+      { treatment: "Physical therapy", minimum_duration: "≥6 weeks (UNVERIFIED — InterQual-sourced, carried forward unchanged)", notes: "Waived for acute traumatic full-thickness tear" },
       { treatment: "NSAIDs or analgesics", minimum_duration: "Documented trial" },
       { treatment: "Activity modification", minimum_duration: "Documented" },
     ],
@@ -287,7 +329,7 @@ export const PAYER_RULES: PayerRule[] = [
     denial_risk_flags: [
       "MRI pending at time of submission",
       "Partial thickness tear without high-grade documentation",
-      "No PT trial for non-acute presentation",
+      "PT duration claim (6 weeks) is UNVERIFIED against InterQual — do not present as confirmed",
       "Functional limitation not documented (pain only)",
     ],
     auto_approval_exceptions: [
@@ -300,40 +342,42 @@ export const PAYER_RULES: PayerRule[] = [
     cpt_code: "27447",
     procedure_name: "Total Knee Arthroplasty",
     pa_required: true,
-    guideline_source: "EviCore CMM-311 v2.0.2025 (eff. March 7, 2026)",
+    guideline_source: "EviCore CMM-311: Knee Replacement/Arthroplasty, V2.0.2025 (eff. March 7, 2026, pub. Nov 21, 2025). Direct fetch (2026-06-30) — the previously-cited URL pattern (matching CMM-315's naming) 404'd; the correct URL uses \"Knee Replacement Arthroplasty\" not \"Knee Replace Arthro\" in the filename. Full document read and quoted below.",
     guideline_last_updated: "2025-11-21",
+    validation_status: "validated",
+    source_type: "official_portal",
+    source_url: "https://www.evicore.com/sites/default/files/clinical-guidelines/2025-11/Cigna_CMM-311%20Knee%20Replacement%20Arthroplasty_V2.0.2025_Eff03.07.2026_Pub11.21.2025.pdf",
+    last_verified_date: "2026-06-30",
+    verification_method: "direct_fetch_quoted",
     required_imaging: [
-      { modality: "X-ray (weight-bearing)", required: true, minimum_findings: "KL Grade 3–4 preferred. Document: grade, joint space narrowing severity, osteophyte formation, bone contour changes" },
+      { modality: "X-ray (weight-bearing) or MRI/arthroscopy", required: true,
+        minimum_findings: "Quoted: severe unicompartmental, bicompartmental, or tricompartmental osteoarthritis evidenced by ANY of: Kellgren-Lawrence Grade III or IV radiographic findings; OR Outerbridge Classification Grade IV arthroscopic findings AND not a candidate for joint-sparing procedure; OR Modified Outerbridge Classification Grade IV MRI findings AND not a candidate for joint-sparing procedure. OR avascular necrosis (AVN) of the femoral condyles and/or proximal tibia. Corrected from a prior 'KL Grade 3-4 preferred' reading — KL III/IV is one of three alternate qualifying pathways, not the only one, and it is not merely 'preferred.'" },
     ],
     conservative_treatment_requirements: [
-      { treatment: "NSAIDs or analgesics", minimum_duration: "≥3 months", notes: "Cigna CMM-311 requires ≥3 months of documented pain — longer than UHC/Aetna 3-week NSAID requirement. The 3-month threshold applies to pain duration, not treatment duration." },
-      { treatment: "Physical therapy", minimum_duration: "Documented attempt", notes: "Duration not specified in same way as UHC but documented PT failure required" },
-      { treatment: "Weight management", minimum_duration: "Documented", notes: "BMI ≥45 kg/m2 is associated with dramatically higher complication risk — Cigna may flag for surgical optimization" },
+      { treatment: "Provider-directed non-surgical management", minimum_duration: "3 months",
+        notes: "Quoted: \"Failure of provider-directed non-surgical management for at least three (3) months duration.\" This is a single combined requirement (not split by NSAID vs. PT with different durations as previously coded). Criteria exception: non-surgical management may be skipped if the medical record clearly documents why it is not appropriate." },
     ],
     functional_criteria: [
-      "Functional disabling pain ≥3 months interfering with ADLs",
-      "Pain not controlled with non-operative management",
-      "Radiographic evidence supporting clinical presentation",
+      "Quoted: function-limiting pain at short distances (e.g., walking less than one-quarter mile, limiting activity to two city blocks, the equivalent of walking the length of a shopping mall) for at least three (3) months duration",
+      "Quoted: loss of knee function which interferes with the ability to carry out age-appropriate activities of daily living and/or demands of employment",
     ],
     radiographic_criteria: [
-      "KL Grade 3 or 4 on weight-bearing X-ray",
+      "Kellgren-Lawrence Grade III or IV (quoted) — corrected from 'Grade 3 or 4' framed as a single fixed cutoff; the guideline treats it as one of three alternate qualifying findings alongside Outerbridge/Modified Outerbridge Grade IV",
       "Formal report with grading",
-      "Moderate-to-severe joint space narrowing",
     ],
     additional_documentation: [
-      "Clinical notes spanning ≥3 months showing persistent disabling pain",
-      "Documentation of prior conservative modalities and failure",
-      "For morbidly obese patients (BMI ≥40): document surgical optimization/weight management discussion",
+      "Clinical notes spanning ≥3 months showing persistent function-limiting pain",
+      "Documentation of failed provider-directed non-surgical management, or explicit documented rationale for why it was not appropriate",
+      "Quoted: \"It is incumbent on the surgeon to preoperatively optimize reasonably modifiable medical and behavioral health comorbidities\" — no specific BMI cutoff (e.g., 45) appears in the indications criteria itself; a prior version of this rule cited a specific BMI≥45 threshold as if it were a hard Cigna criterion, which is not supported by the indications text and has been removed",
     ],
     denial_risk_flags: [
-      "Pain history < 3 months (shorter than Cigna's minimum)",
-      "BMI ≥45 without surgical optimization documentation",
-      "KL Grade < 2 on X-ray",
+      "Pain history < 3 months without a documented reason non-surgical management was skipped",
+      "KL Grade < III with no Outerbridge/Modified Outerbridge Grade IV or AVN finding as an alternate qualifying pathway",
       "Missing formal radiologist report",
+      "No documentation of comorbidity optimization discussion (surgeon-level requirement per guideline, not tied to a specific BMI number)",
     ],
     auto_approval_exceptions: [
-      "Failed prior knee arthroplasty requiring revision",
-      "Post-traumatic arthritis with functional deficit",
+      "Fracture of distal femur (trochlea, condyles) where conservative management or surgical fixation is not a reasonable option — separate indication pathway from OA/AVN",
     ],
   },
   {
@@ -342,37 +386,42 @@ export const PAYER_RULES: PayerRule[] = [
     cpt_code: "27130",
     procedure_name: "Total Hip Arthroplasty",
     pa_required: true,
-    guideline_source: "EviCore CMM-313 (eff. March 7, 2026)",
+    guideline_source: "EviCore CMM-313: Hip Replacement/Arthroplasty, V2.0.2025 (eff. March 7, 2026, pub. Nov 21, 2025) — currently in effect as of last verification (2026-06-30). SUPERSEDED by V1.0.2026 (eff. Aug 4, 2026, pub. Apr 20, 2026) — direct fetch (2026-06-30) confirms V1.0.2026's Total Hip Replacement Indications section is substantively identical to V2.0.2025 (same Tönnis Grade 2-3 criterion, same 3-month duration, same exception language), so no re-verification of content should be needed after the Aug 4, 2026 transition, but re-confirm the citation/URL at that time. Original citation used filename 'Hip Replace Arthro' which 404's — correct filename is 'Hip Replacement Arthro'.",
     guideline_last_updated: "2025-11-21",
+    validation_status: "validated",
+    source_type: "official_portal",
+    source_url: "https://www.evicore.com/sites/default/files/clinical-guidelines/2025-11/Cigna_CMM-313%20Hip%20Replacement%20Arthro_V2.0.2025_Eff03.07.2026_Pub11.21.2025.pdf",
+    last_verified_date: "2026-06-30",
+    verification_method: "direct_fetch_quoted",
     required_imaging: [
-      { modality: "X-ray (AP pelvis + lateral hip)", required: true, minimum_findings: "Advanced degenerative joint disease; formal radiologist report" },
+      { modality: "X-ray (AP pelvis + lateral hip)", required: true,
+        minimum_findings: "Quoted: imaging shows ANY of: Tönnis Grade 2-3 osteoarthritis; OR avascular necrosis with collapse of the femoral head; OR inflammatory arthritis affecting BOTH the femoral head and the acetabulum with joint space narrowing. Corrected from a prior 'Advanced degenerative joint disease' / 'KL Grade 3-4 preferred' framing — this is the wrong grading scale (KL is for knee); the hip document uses Tönnis exclusively, with two additional non-grade-based qualifying findings (AVN with collapse, inflammatory arthritis)." },
     ],
     conservative_treatment_requirements: [
-      { treatment: "Analgesics/NSAIDs", minimum_duration: "Documented" },
-      { treatment: "Physical therapy", minimum_duration: "Documented" },
-      { treatment: "Activity modification", minimum_duration: "Documented" },
+      { treatment: "Provider-directed non-surgical management", minimum_duration: "3 months",
+        notes: "Quoted: \"Failure of provider-directed non-surgical management for at least three (3) months' duration.\" Criteria exception: not required when the medical record clearly documents why it is inappropriate — this is a documentation-based exception only, NOT tied to a specific Tönnis grade or AVN/inflammatory-arthritis finding (unlike Anthem/Carelon's grade-triggered waiver for the same procedure — do not conflate the two payers' waiver structures)." },
     ],
     functional_criteria: [
-      "Disabling pain ≥3 months interfering with ADLs",
-      "Failed conservative management documented",
+      "Quoted: function-limiting pain at short distances (e.g., walking less than one-quarter mile, limiting activity to two city blocks, the equivalent of walking the length of a shopping mall) for at least three (3) months duration",
+      "Quoted: loss of hip function which interferes with the ability to carry out age-appropriate activities of daily living and/or demands of employment",
     ],
     radiographic_criteria: [
-      "Advanced OA on AP pelvis and lateral hip X-ray",
-      "KL Grade 3–4 preferred",
+      "Tönnis Grade 2-3 (quoted) — corrected from 'KL Grade 3-4 preferred', which was the wrong grading scale for hip",
       "Formal radiology report required",
     ],
     additional_documentation: [
-      "3+ months of clinical notes documenting persistent symptoms",
-      "Conservative treatment records",
+      "Clinical notes spanning ≥3 months showing persistent function-limiting pain",
+      "Documentation of failed provider-directed non-surgical management, or explicit documented rationale for why it was not appropriate",
+      "Quoted: \"It is incumbent on the surgeon to preoperatively optimize reasonably modifiable medical and behavioral health comorbidities\" — no specific BMI cutoff appears in the indications text itself",
     ],
     denial_risk_flags: [
-      "Symptom duration < 3 months",
+      "Symptom duration < 3 months without a documented reason non-surgical management was skipped",
+      "Radiology report uses KL grade instead of Tönnis grade — wrong scale for hip",
       "Imaging not completed at submission",
-      "No documented PT attempt",
+      "No documented non-surgical management attempt, or no documented rationale for skipping it",
     ],
     auto_approval_exceptions: [
-      "Femoral neck fracture",
-      "Avascular necrosis",
+      "Femoral Head/Neck Fracture where conservative management or surgical fixation is not a reasonable option — separate indication pathway with no 3-month duration requirement at all",
     ],
   },
   {
@@ -381,35 +430,44 @@ export const PAYER_RULES: PayerRule[] = [
     cpt_code: "29827",
     procedure_name: "Arthroscopic Rotator Cuff Repair",
     pa_required: true,
-    guideline_source: "EviCore CMM-315 (eff. March 7, 2026)",
+    guideline_source: "EviCore CMM-315: Shoulder Surgery - Arthroscopic and Open Procedures, V2.0.2025 (eff. March 7, 2026, pub. Nov 21, 2025). Direct fetch (2026-06-30) — full document read; Rotator Cuff Repair Indications section is on pages 26-27 of 65, quoted below.",
     guideline_last_updated: "2025-11-21",
+    validation_status: "validated",
+    source_type: "official_portal",
+    source_url: "https://www.evicore.com/sites/default/files/clinical-guidelines/2025-11/Cigna_CMM-315%20Shoulder%20Surg%20Arthro%20Open%20Proc_V2.0.2025_Eff03.07.2026_Pub11.21.2025.pdf",
+    last_verified_date: "2026-06-30",
+    verification_method: "direct_fetch_quoted",
     required_imaging: [
-      { modality: "MRI shoulder", required: true, minimum_findings: "Confirmed rotator cuff tear (full-thickness or high-grade partial-thickness)" },
+      { modality: "MRI or CT shoulder", required: true,
+        minimum_findings: "Quoted: MRI or CT shows EITHER of the following: Grade 2 or 3 partial-thickness rotator cuff tear (Ellman classification) OR full-thickness rotator cuff tear (Cofield classification). Ellman Grade 1 (<25% thickness) does not qualify." },
     ],
     conservative_treatment_requirements: [
-      { treatment: "Physical therapy", minimum_duration: "≥6 weeks", notes: "Waived for acute traumatic full-thickness tears" },
-      { treatment: "Analgesics or NSAIDs", minimum_duration: "Documented" },
+      { treatment: "Provider-directed non-surgical management", minimum_duration: "3 months",
+        notes: "Quoted: \"Failure of provider-directed non-surgical management for at least three (3) months duration.\" Criteria exception: not required for a discrete traumatic event resulting in an acute full-thickness tear WITHOUT evidence of a pre-existing chronic tear. Quoted: \"The presence of fatty infiltration and/or muscle atrophy on MRI or CT is considered evidence of pre-existing chronic rotator cuff tear... Therefore, when fatty infiltration and/or muscle atrophy is also present on MRI or CT, three (3) months of provider-directed non-surgical management is required, regardless of whether a discrete traumatic event occurred.\" Corrected from a prior '≥6 weeks' reading and from a prior claim that high-grade partial-thickness tears are also exempt — the exemption is acute-trauma-specific, not tear-grade-specific." },
     ],
     functional_criteria: [
-      "Shoulder pain with functional impairment",
-      "Weakness or ROM limitation on physical exam",
-      "ADL impairment documented",
+      "Quoted: EITHER functionally-limited range of motion OR measurable loss of strength of the rotator cuff musculature (vs. non-involved side) — no VAS pain score threshold appears anywhere in this section; do not cross-apply Anthem/Carelon's VAS≥3 criterion here, they are different payers with different documents",
+      "Quoted: ANY one positive orthopedic test/sign — Drop Arm Test, painful Arc Test, Jobe Test or Empty Can Test, External Rotation Lag Sign (Dropping Sign), Internal Rotation Lag Sign, Lift-Off Test, Bear Hug test, Belly Press Test (Napoleon), Belly-Off Test, Neer Impingement Test, Hawkins-Kennedy Impingement Test, or Hornblower Test (Patte)",
+      "Function-limiting pain interfering with age-appropriate ADLs or occupational demands",
     ],
     radiographic_criteria: [
-      "MRI-confirmed rotator cuff tear with tear type and tendon specified",
+      "MRI or CT confirming Ellman Grade 2/3 partial-thickness OR Cofield full-thickness tear",
+      "Note presence/absence of fatty infiltration or muscle atrophy on MRI/CT — this determines whether the 3-month conservative-care exception can apply",
     ],
     additional_documentation: [
-      "MRI report from radiologist",
-      "Physical exam findings",
-      "Conservative treatment notes",
+      "MRI/CT report from interpreting radiologist",
+      "Physical exam documenting the specific positive orthopedic test performed",
+      "Quoted exclusion list: other pathological conditions excluded, including but not limited to fracture, thoracic outlet syndrome, brachial plexus disorders, referred neck pain, cervical radiculopathy, and advanced glenohumeral osteoarthritis",
     ],
     denial_risk_flags: [
-      "MRI not completed",
-      "PT < 6 weeks without acute injury exception",
-      "Partial thickness tear without high-grade classification",
+      "MRI/CT not completed prior to submission",
+      "Partial-thickness tear below Ellman Grade 2 (i.e., Grade 1, <25% thickness) — does not meet Cigna's threshold",
+      "No documented positive orthopedic test from the accepted list",
+      "Traumatic tear claimed as exempt from conservative care but fatty infiltration/atrophy present on imaging — the 3-month requirement still applies in this case per the guideline's explicit language",
+      "VAS pain score referenced in the letter — Cigna's CMM-315 does not use a VAS threshold; that is an Anthem/Carelon-specific criterion",
     ],
     auto_approval_exceptions: [
-      "Acute traumatic full-thickness tear",
+      "Acute traumatic full-thickness tear with a discrete traumatic event, WITHOUT fatty infiltration or muscle atrophy on MRI/CT",
     ],
   },
   {
@@ -420,12 +478,17 @@ export const PAYER_RULES: PayerRule[] = [
     pa_required: true,
     guideline_source: "Carelon Joint Surgery 2025-11-15",
     guideline_last_updated: "2025-11-15",
+    validation_status: "validated",
+    source_type: "official_portal",
+    source_url: "https://guidelines.carelonmedicalbenefitsmanagement.com/joint-surgery-2025-11-15/",
+    last_verified_date: "2026-06-30",
+    verification_method: "direct_fetch_quoted",
     required_imaging: [
-      { modality: "X-ray (weight-bearing)", required: true, minimum_findings: "KL Grade 2+ with formal report. KL Grade 4 may waive some conservative treatment requirements." },
+      { modality: "X-ray (weight-bearing)", required: true, minimum_findings: "KL Grade 2+ with formal report. Corrected waiver detail below." },
     ],
     conservative_treatment_requirements: [
       { treatment: "NSAIDs or analgesics", minimum_duration: "Documented trial" },
-      { treatment: "Physical therapy", minimum_duration: "≥6 weeks typically; ≥12 weeks per InterQual for commercial", notes: "Uses InterQual criteria for commercial members. Conservative management waived if KL Grade 4." },
+      { treatment: "Physical therapy", minimum_duration: "12 weeks", notes: "Direct fetch (2026-06-30): \"Failure of at least 12 weeks of non-surgical conservative management (unless radiographs show Kellgren-Lawrence grade 4, modified Outerbridge grade 4, or Tonnis grade 3).\" Corrected from a prior '6 weeks typically' reading — 12 weeks is the standard, not an upper-bound InterQual figure." },
       { treatment: "Activity modification", minimum_duration: "Documented" },
       { treatment: "Intra-articular corticosteroid injection", minimum_duration: "Documented attempt", notes: "Hyaluronic acid injections are acceptable alternative" },
     ],
@@ -436,16 +499,16 @@ export const PAYER_RULES: PayerRule[] = [
     ],
     radiographic_criteria: [
       "KL Grade 2+ with formal report",
-      "KL Grade 4 = auto-qualify for surgery without full conservative treatment",
+      "Waiver of the 12-week conservative-care requirement triggers on ANY of: KL Grade 4, modified Outerbridge Grade 4, or Tönnis Grade 3 — corrected from a prior 'KL Grade 4 only' reading",
     ],
     additional_documentation: [
       "Clinical notes with ADL impact",
-      "Conservative treatment records",
+      "Conservative treatment records spanning the full 12-week course (unless a waiver grade applies)",
       "Radiology report with KL grade",
     ],
     denial_risk_flags: [
       "KL Grade < 2",
-      "Missing PT documentation",
+      "PT course < 12 weeks without a qualifying waiver grade (KL4 / Outerbridge4 / Tönnis3) documented",
       "No formal radiology report with KL grading",
     ],
     auto_approval_exceptions: [
@@ -462,11 +525,16 @@ export const PAYER_RULES: PayerRule[] = [
     pa_required: true,
     guideline_source: "Carelon Joint Surgery 2025-11-15",
     guideline_last_updated: "2025-11-15",
+    validation_status: "validated",
+    source_type: "official_portal",
+    source_url: "https://guidelines.carelonmedicalbenefitsmanagement.com/joint-surgery-2025-11-15/",
+    last_verified_date: "2026-06-30",
+    verification_method: "direct_fetch_quoted",
     required_imaging: [
-      { modality: "X-ray (AP pelvis + lateral hip)", required: true, minimum_findings: "Advanced OA; KL Grade 4 waives conservative care requirement" },
+      { modality: "X-ray (AP pelvis + lateral hip)", required: true, minimum_findings: "Advanced OA. Waiver detail corrected below — three grading scales can each independently trigger the waiver, not just KL." },
     ],
     conservative_treatment_requirements: [
-      { treatment: "Conservative management", minimum_duration: "≥6 weeks", notes: "Waived if KL Grade 4 confirmed on imaging" },
+      { treatment: "Conservative management", minimum_duration: "12 weeks", notes: "Direct fetch (2026-06-30): \"Failure of at least 12 weeks of non-surgical conservative management (unless radiographs show Kellgren-Lawrence grade 4, modified Outerbridge grade 4, or Tonnis grade 3).\" Corrected from a prior '6 weeks' reading." },
       { treatment: "Physical therapy or analgesics", minimum_duration: "Documented" },
     ],
     functional_criteria: [
@@ -475,16 +543,16 @@ export const PAYER_RULES: PayerRule[] = [
     ],
     radiographic_criteria: [
       "Advanced OA with formal radiologist interpretation",
-      "KL Grade 3–4 for faster approval",
+      "Waiver of the 12-week conservative-care requirement triggers on ANY of: KL Grade 4, modified Outerbridge Grade 4, or Tönnis Grade 3 — corrected from a prior 'KL Grade 4 only' reading",
     ],
     additional_documentation: [
-      "Conservative treatment records",
+      "Conservative treatment records spanning the full 12-week course (unless a waiver grade applies)",
       "Radiology report with OA grading",
     ],
     denial_risk_flags: [
       "Symptom duration < 6 months without acute precipitant",
       "No completed imaging at submission",
-      "No conservative management attempted",
+      "Conservative course < 12 weeks without a qualifying waiver grade (KL4 / Outerbridge4 / Tönnis3) documented",
     ],
     auto_approval_exceptions: [
       "KL Grade 4",
@@ -500,41 +568,69 @@ export const PAYER_RULES: PayerRule[] = [
     pa_required: true,
     guideline_source: "Carelon Joint Surgery 2025-11-15",
     guideline_last_updated: "2025-11-15",
+    validation_status: "validated",
+    source_type: "official_portal",
+    source_url: "https://guidelines.carelonmedicalbenefitsmanagement.com/joint-surgery-2025-11-15/",
+    last_verified_date: "2026-06-30",
+    verification_method: "direct_fetch_quoted",
     required_imaging: [
-      { modality: "MRI shoulder", required: true, minimum_findings: "Full-thickness RTC tear confirmed OR high-grade partial-thickness (>50%). Tendon retraction distance should be documented." },
+      { modality: "MRI shoulder", required: true, minimum_findings: "Full-thickness RTC tear confirmed OR partial-thickness. Tendon retraction distance should be documented." },
     ],
     conservative_treatment_requirements: [
-      { treatment: "Physical therapy or supervised conservative management", minimum_duration: "≥6 weeks for full-thickness tears; WAIVED for acute traumatic tears; WAIVED for high-grade partial-thickness tears (2023 Carelon update)", notes: "KEY CHANGE: High-grade partial thickness tears no longer require conservative management trial. Acute full-thickness traumatic tears also exempt." },
+      { treatment: "Physical therapy or supervised conservative management", minimum_duration: "≥6 weeks for chronic/degenerative full-thickness tears AND for partial-thickness tears; NOT required for acute full-thickness tears (injury within the preceding 3 months)", notes: "CORRECTION (direct fetch, 2026-06-30): the prior version of this rule claimed partial-thickness tears were also waived from the conservative-therapy requirement. The actual guideline text does not support that — partial-thickness tears carry the same ≥6-week/VAS≥3 requirement as chronic full-thickness tears. Only an acute traumatic full-thickness tear (documented onset within 3 months) skips conservative management." },
       { treatment: "NSAIDs or analgesics", minimum_duration: "Documented trial" },
       { treatment: "Subacromial injection", minimum_duration: "Considered", notes: "Not mandatory but absence is a soft flag for chronic non-traumatic presentation" },
     ],
     functional_criteria: [
-      "VAS pain score ≥3 (lowered from 4 per Nov 2025 Carelon update)",
+      "VAS pain score ≥3 — confirmed via direct fetch (\"Pain ≥ 3 on the VAS scale which interferes with age-appropriate activities of daily living\" for chronic/degenerative and partial-thickness tears; \"Shoulder pain ≥ 3 on the VAS scale exacerbated by movement\" for acute tears)",
       "Functional impairment: shoulder weakness, ROM limitation, ADL impact",
       "Physical exam consistent with RTC pathology (positive provocative tests)",
     ],
     radiographic_criteria: [
       "MRI-confirmed rotator cuff tear",
-      "Full-thickness or high-grade partial-thickness documentation required",
+      "Full-thickness or partial-thickness documentation required — high-grade classification is NOT a documented exception trigger per direct-fetch review; corrected from a prior claim that it was",
       "Retraction distance if present",
     ],
     additional_documentation: [
       "MRI report from radiologist",
       "Physical exam with provocative test findings",
-      "Conservative treatment records if required by tear type",
+      "Conservative treatment records — required for all tear types except acute traumatic full-thickness within 3 months of injury",
     ],
     denial_risk_flags: [
       "MRI not completed prior to PA submission",
-      "Partial thickness without high-grade classification",
+      "Partial-thickness tear submitted without conservative treatment records, on the mistaken assumption that partial-thickness is exempt — it is not",
       "VAS pain score not documented",
       "No physical exam with provocative tests",
     ],
     auto_approval_exceptions: [
-      "Acute traumatic full-thickness tear",
-      "High-grade partial-thickness tear (>50%) — per 2023 Carelon guideline update",
+      "Acute traumatic full-thickness tear with documented onset within 3 months — conservative management not required",
     ],
   },
 ];
+
+// Enforce the validation gate invariant at module load: a rule can only be
+// "validated" if it was confirmed by directly fetching and quoting the primary
+// source. This can't be expressed in the type system (TS can't cross-check one
+// field's value against another's), so it's checked here instead — this way a
+// future edit that flips validation_status without doing the underlying
+// verification work fails loudly on import rather than silently shipping.
+for (const rule of PAYER_RULES) {
+  if (rule.validation_status === "validated" && rule.verification_method !== "direct_fetch_quoted") {
+    throw new Error(
+      `payer-rules invariant violation: ${rule.payer_name} ${rule.cpt_code} is marked "validated" but verification_method is "${rule.verification_method}", not "direct_fetch_quoted". Only rules with directly fetched/quoted primary-source confirmation may be validated.`
+    );
+  }
+  if (rule.validation_status === "validated" && !rule.last_verified_date) {
+    throw new Error(
+      `payer-rules invariant violation: ${rule.payer_name} ${rule.cpt_code} is marked "validated" but has no last_verified_date.`
+    );
+  }
+  if (rule.validation_status === "unvalidated" && rule.last_verified_date) {
+    throw new Error(
+      `payer-rules invariant violation: ${rule.payer_name} ${rule.cpt_code} is "unvalidated" but has a last_verified_date set. Clear the date or flip the status.`
+    );
+  }
+}
 
 // ── Payer name normalization ─────────────────────────────────────────────────
 //

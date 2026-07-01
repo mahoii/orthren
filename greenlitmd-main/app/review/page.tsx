@@ -1007,6 +1007,14 @@ function PayerCriteriaPanel({ payerRule }: { payerRule: PayerRule | null }) {
               {payerRule.payer_name}
             </span>
           ) : null}
+          {payerRule && payerRule.validation_status === "unvalidated" ? (
+            <span
+              title="This payer's criteria are research-sourced and have not been confirmed against the payer's own portal or clinical policy document. Treat durations and thresholds below as unconfirmed."
+              style={{ background: '#fef3c7', color: '#92400e', borderRadius: 999, padding: '2px 8px', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' }}
+            >
+              Research-sourced — not yet verified
+            </span>
+          ) : null}
         </span>
         <span style={{ color: '#94a3b8', fontSize: 11, flexShrink: 0, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s ease' }}>▶</span>
       </button>

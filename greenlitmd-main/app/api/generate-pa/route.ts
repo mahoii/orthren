@@ -78,7 +78,13 @@ export async function POST(request: Request) {
 
     const normalizedPayer = normalizePayerName(payerName);
     const payerRule = normalizedPayer ? getPayerRule(normalizedPayer, cptCode) : null;
-    const payerInjectionBlock = payerRule ? buildPayerInjectionBlock(payerRule) : null;
+    // Unvalidated rules are informational only — the Claude call must never see
+    // research-sourced payer criteria that haven't been confirmed against a
+    // primary source, and generic (non-payer-specific) letter language is used
+    // instead. See lib/payer-rules.ts validation gate.
+    const usedUnvalidatedPayerRule = payerRule !== null && payerRule.validation_status !== "validated";
+    const payerInjectionBlock =
+      payerRule && payerRule.validation_status === "validated" ? buildPayerInjectionBlock(payerRule) : null;
 
     const { _phiMap, ...extracted } = await extractChartDataFromText(chartText, requestDetails);
 
@@ -90,7 +96,9 @@ export async function POST(request: Request) {
 
     // Payer-specific PA Strength adjustment: penalize conservative-care duration
     // when documented PT falls short of the payer's minimum weeks threshold.
-    if (payerRule && extractedWithWarnings.pa_strength) {
+    // Gated on validation_status — an unvalidated (research-sourced, unconfirmed)
+    // rule must not move the score away from what generic criteria would produce.
+    if (payerRule && payerRule.validation_status === "validated" && extractedWithWarnings.pa_strength) {
       const ptReq = payerRule.conservative_treatment_requirements.find((r) =>
         r.treatment.toLowerCase().includes("physical therapy")
       );
@@ -124,7 +132,7 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({ extracted: extractedWithWarnings, letter, payerRule });
+    return NextResponse.json({ extracted: extractedWithWarnings, letter, payerRule, usedUnvalidatedPayerRule });
   } catch (error) {
     console.error("[generate-pa] POST handler error:", error);
     serverPosthog.capture({
