@@ -5,9 +5,10 @@ import { joinWaitlistAction } from "@/app/actions/waitlist";
 
 interface WaitlistFormProps {
   variant: "hero" | "standalone";
+  outlineButton?: boolean;
 }
 
-export default function WaitlistForm({ variant }: WaitlistFormProps) {
+export default function WaitlistForm({ variant, outlineButton }: WaitlistFormProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
   const [success, setSuccess] = useState(false);
@@ -91,7 +92,9 @@ export default function WaitlistForm({ variant }: WaitlistFormProps) {
           <button
             type="submit"
             disabled={isPending}
-            className="rounded-lg bg-clinical-navy px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-clinical-blue hover:shadow-md disabled:bg-slate-300 disabled:cursor-not-allowed"
+            className={outlineButton
+              ? "rounded-lg border border-slate-900 px-6 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:border-slate-300 disabled:text-slate-300 disabled:cursor-not-allowed"
+              : "rounded-lg bg-clinical-navy px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-clinical-blue hover:shadow-md disabled:bg-slate-300 disabled:cursor-not-allowed"}
           >
             {isPending ? "Requesting..." : "Request Early Access →"}
           </button>

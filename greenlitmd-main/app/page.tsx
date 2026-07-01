@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Logo from "@/components/Logo";
-import WaitlistForm from "@/components/WaitlistForm";
 import ScrollButton from "@/components/ScrollButton";
+import EarlyAccessAccordion from "@/components/EarlyAccessAccordion";
 import PricingSection from "@/components/pricing/PricingSection";
 export default async function LandingPage() {
   return (
@@ -40,20 +40,21 @@ export default async function LandingPage() {
             <strong className="font-semibold text-slate-800">Less staff time.</strong>
           </p>
 
-          {/* CTA Form */}
-          <div id="waitlist-form" className="mx-auto mt-10 max-w-md">
-            <WaitlistForm variant="hero" />
-          </div>
-
-          {/* Sandbox CTA */}
-          <div className="mt-4 flex justify-center">
+          {/* Primary CTA — Sandbox */}
+          <div className="mt-10 flex flex-col items-center gap-3">
             <Link
               href="/builder?demo=true"
               id="hero-sandbox-cta"
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-clinical-blue hover:border-clinical-blue focus:outline-none focus:ring-2 focus:ring-clinical-blue focus:ring-offset-2"
+              className="inline-flex items-center gap-2 rounded-full bg-clinical-navy px-8 py-4 text-base font-semibold text-white shadow-lg transition hover:scale-[1.02] hover:bg-clinical-blue focus:outline-none focus:ring-2 focus:ring-clinical-navy focus:ring-offset-2"
             >
               Try Interactive Sandbox Demo →
             </Link>
+            <p className="text-sm text-slate-500">No signup required · See a real PA packet in 60 seconds</p>
+          </div>
+
+          {/* Secondary CTA — Early Access */}
+          <div id="waitlist-form" className="mt-6">
+            <EarlyAccessAccordion />
           </div>
         </div>
       </section>
