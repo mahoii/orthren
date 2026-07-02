@@ -35,6 +35,12 @@ FUNCTIONAL LIMITATIONS: List only limitations explicitly stated in the source. D
 
 IMAGING: Only extract imaging explicitly documented as completed with a result. If MRI is "pending" or "scheduled", set mri completed to false and mri to null fields. Use the exact date stated in the source for imaging date.
 
+IMAGING STATUS: Extract imaging_status as exactly one of three values, based solely on explicit language in the chart:
+- "completed": At least one imaging study is documented as completed with results present, AND no other imaging study is explicitly described as still outstanding (ordered/scheduled/awaiting results).
+- "pending": Any imaging study is explicitly described as ordered, scheduled, in-progress, or awaiting results not yet received — even if a different study has already completed (e.g. X-ray done, MRI pending → "pending").
+- "not_ordered": No imaging study of any kind is documented as performed, ordered, or scheduled anywhere in the chart.
+Never infer imaging_status from the diagnosis, procedure type, or typical clinical workflow — base it strictly on what the chart states.
+
 SURGICAL TECHNIQUE: Extract only what is explicitly stated (e.g., "arthroscopic", "anterior approach"). Do not add implant types, fixation methods, or approach details not present in the source.
 
 CONSERVATIVE TREATMENTS: Each entry in conservative_treatments_attempted must have its own independent duration, dates, and outcome. Never copy a value from one treatment row to another.
@@ -47,7 +53,7 @@ PATIENT NAME RULE: Extract patient_name as exactly [LastName, FirstName] with no
 
 BMI RULE: Only include bmi if explicitly recorded in vitals or note. If not recorded, return null. Never infer or estimate BMI.
 
-Include these chart data keys: patient_name, date_of_birth, diagnosis_codes (array), primary_complaint, symptom_duration (exact verbatim from source), functional_limitations (array — source-only, no inferences), objective_measurements (array), pain_score (string or null), conservative_treatments_attempted (array — see schema below), imaging_findings (object — see schema below), requested_procedure, surgical_approach_if_mentioned (verbatim from source only), bmi, asa_classification, payer_name, denial_risk_flags (array of structured objects — see schema below). If information is not found, use null for strings and empty arrays for arrays, except conservative_treatments_attempted must follow the instruction below. After extracting all fields, also return a 'validation' object with hard_blocks and soft_warnings arrays. For hard_blocks, include any of these fields that are missing or null: patient_name, diagnosis_codes (if empty), requested_procedure. For soft_warnings, include any of these fields that are missing or null: surgical_approach_if_mentioned, imaging_findings, conservative_treatments_attempted (if empty), functional_limitations (if empty). Each block/warning object must have: {field, label, message}. Return the complete JSON including chart data and validation object.
+Include these chart data keys: patient_name, date_of_birth, diagnosis_codes (array), primary_complaint, symptom_duration (exact verbatim from source), functional_limitations (array — source-only, no inferences), objective_measurements (array), pain_score (string or null), conservative_treatments_attempted (array — see schema below), imaging_findings (object — see schema below), imaging_status ("pending" | "not_ordered" | "completed" — see IMAGING STATUS rule below), requested_procedure, surgical_approach_if_mentioned (verbatim from source only), bmi, asa_classification, payer_name, denial_risk_flags (array of structured objects — see schema below). If information is not found, use null for strings and empty arrays for arrays, except conservative_treatments_attempted must follow the instruction below. After extracting all fields, also return a 'validation' object with hard_blocks and soft_warnings arrays. For hard_blocks, include any of these fields that are missing or null: patient_name, diagnosis_codes (if empty), requested_procedure. For soft_warnings, include any of these fields that are missing or null: surgical_approach_if_mentioned, imaging_findings, conservative_treatments_attempted (if empty), functional_limitations (if empty). Each block/warning object must have: {field, label, message}. Return the complete JSON including chart data and validation object.
 
 For objective_measurements, extract ALL quantified clinical measurements documented in the chart. This includes: range of motion values (e.g. "Knee flexion limited to 85 degrees"), functional outcome scores (e.g. "KOOS score 32/100", "Oxford Knee Score 18/48", "VAS 7.5"), strength measurements, walking distance or tolerance, and any other numeric clinical findings. Do NOT include pain scale scores here — those go in pain_score. Return each as a plain English string. Return an empty array if no quantified measurements are documented.
 
@@ -79,6 +85,13 @@ CONSERVATIVE CARE COMPLETENESS CHECK: After extracting all treatments, evaluate 
 PENDING IMAGING FLAG: If imaging_findings contains imaging that is scheduled, pending, or not yet completed, add a denial_risk_flag object: { "id": "flag-pending-imaging", "label": "Imaging Not Yet Complete", "severity": "high", "explanation": "Payers require completed imaging results before authorizing surgical procedures.", "recommendation": "Do not submit until imaging results are available and documented.", "anchorText": "Radiographic" }.
 
 After extracting all fields, evaluate the chart against these 8 factors and return a score object called pa_strength inside the JSON. For each factor, return a score of 0 or 1 (0 = missing or insufficient, 1 = present and adequate), a one-sentence plain English note explaining the score, and for factors with score=0, an anchorText field (10-50 char verbatim phrase from the letter indicating where the gap is, or the most relevant section heading). The pa_strength object must include: diagnosis_codes, conservative_treatments_named, conservative_treatment_duration, imaging_findings, functional_limitations, surgical_approach, cpt_code_valid, and symptom_duration. Each must be an object with score (0 or 1), note (string), and optionally anchorText (string, only when score=0).
+
+CONSERVATIVE_TREATMENT_DURATION SCORING RULE: This is a mechanical count, not a clinical judgment. Follow these steps in order, and show the resulting fraction and percentage explicitly in the note field (e.g. "1 of 2 = 50%, meets threshold, score = 1").
+Step 1 — Build the denominator (N): count only duration-eligible conservative treatments — physical therapy, NSAID/medication courses, bracing, activity modification, home exercise programs, and similar treatments administered over a course. EXCLUDE single-administration treatments entirely from N (cortisone injections, Synvisc/hyaluronic acid injections, and any other one-time procedure) — they never count toward N or the numerator, since duration is not a coherent concept for a single administration.
+Step 2 — If N < 2, score 0 immediately and stop. Do not proceed to Step 3.
+Step 3 — Build the numerator (D): count how many of the N treatments have an explicitly documented duration. A duration counts ONLY if it states a specific number plus a time or count unit (e.g. "6 weeks", "3 months", "8 weeks (September–October 2024)", "10 sessions"). Vague terms with no specific number — "ongoing", "chronic", "long-term", "for weeks now", "for a while", "long-standing" — do NOT count as a documented duration, even though the treatment itself still counts toward N.
+Step 4 — Compute D/N as a percentage, rounded to the nearest whole point. If the result is 50% or higher, score 1; otherwise score 0. 1 of 2 (50%) always scores 1. 1 of 3 (33%) always scores 0. The score field is a direct, literal function of this computed percentage — it is not a separate impression of overall care adequacy.
+OUTPUT ORDER FOR THIS FACTOR ONLY: within the conservative_treatment_duration object, emit the "note" key (containing the full Steps 1-4 walkthrough) BEFORE the "score" key, then "anchorText" if applicable — i.e. {"note": "...", "score": 0 or 1, "anchorText": "..."} — so the score digit is written only after the arithmetic is already on the page, never before it. Do not decide the score digit first and rationalize the note afterward.
 
 Weight the overall score on the frontend as: diagnosis_codes 10%, conservative_treatments_named 20%, conservative_treatment_duration 10%, imaging_findings 15%, functional_limitations 15%, surgical_approach 10%, cpt_code_valid 10%, symptom_duration 10%.
 
@@ -228,6 +241,7 @@ export function normalizeChartData(
 
   const conservativeTreatments = normalizeConservativeTreatments(data.conservative_treatments_attempted);
   const imagingFindings = normalizeImagingFindings(data.imaging_findings);
+  const imagingStatus = safeImagingStatus(data.imaging_status);
 
   const hard_blocks: any[] = [];
   const soft_warnings: any[] = [];
@@ -317,6 +331,7 @@ export function normalizeChartData(
     objective_measurements: objectiveMeasurements,
     conservative_treatments_attempted: conservativeTreatments,
     imaging_findings: imagingFindings,
+    imaging_status: imagingStatus,
     requested_procedure: requestedProcedure,
     surgical_approach_if_mentioned: surgicalApproach,
     denial_risk_flags: denialRiskFlags,
@@ -488,6 +503,12 @@ function safeNumeric(value: unknown): number | null {
     }
   }
   return null;
+}
+
+function safeImagingStatus(value: unknown): "pending" | "not_ordered" | "completed" {
+  return value === "pending" || value === "not_ordered" || value === "completed"
+    ? value
+    : "not_ordered";
 }
 
 function safeAsaClassification(value: unknown): string | null {

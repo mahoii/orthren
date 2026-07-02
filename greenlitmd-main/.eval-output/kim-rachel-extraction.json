@@ -24,7 +24,7 @@
   "conservative_treatments_attempted": [
     {
       "treatment": "Physical Therapy",
-      "duration": "8 weeks",
+      "duration": "8 weeks (September–October 2024)",
       "outcome": "minimal improvement, pain persisted with overhead activity",
       "dates": "September–October 2024",
       "relief_duration": null
@@ -38,7 +38,7 @@
     },
     {
       "treatment": "NSAIDs — Meloxicam 15mg daily",
-      "duration": "3 months",
+      "duration": "3 months (July–October 2024)",
       "outcome": "inadequate pain control, GI intolerance developed",
       "dates": "July–October 2024",
       "relief_duration": null
@@ -53,61 +53,61 @@
   "denial_risk_flags": [
     {
       "id": "flag-1",
-      "label": "Physical Therapy Duration Below Typical Threshold",
-      "severity": "medium",
-      "explanation": "Physical therapy was documented for only 8 weeks. Many BCBS policies for CPT 29827 require a minimum of 6–12 weeks of formal PT, but some regional plans require documentation of 12 weeks or a formal discharge summary confirming failure.",
-      "recommendation": "Add a PT discharge summary or attending note confirming that 8 weeks of structured PT was completed and resulted in documented failure, and clarify whether any additional home exercise program was continued beyond formal PT.",
-      "anchorText": "Physical Therapy: 8 weeks"
+      "label": "Attending Provider Name Placeholder",
+      "severity": "high",
+      "explanation": "The attending surgeon is listed as Dr. Michael Torres, a placeholder token, rather than a verified provider name. Payers require a credentialed, identifiable requesting provider for prior authorization submission.",
+      "recommendation": "Confirm and populate the attending surgeon's full name and NPI before submitting. The requesting provider listed in the request details (Dr. Michael Torres) should be verified against the chart's attending surgeon field.",
+      "anchorText": "Attending Surgeon: Dr. Michael Torres"
     },
     {
       "id": "flag-2",
-      "label": "Corticosteroid Injection Duration Not Documented",
+      "label": "Requesting Provider Mismatch",
       "severity": "medium",
-      "explanation": "The corticosteroid injection entry does not include a treatment duration or a follow-up interval, only an administration date of 11/05/2024. Payers may flag incomplete injection records as insufficient evidence of conservative care failure.",
-      "recommendation": "Add a follow-up note dated after 11/05/2024 documenting the patient's return to baseline symptoms and confirming the injection trial is considered failed conservative management.",
-      "anchorText": "administered 11/05/2024"
+      "explanation": "The requesting provider listed in the submission details is Dr. Michael Torres, but the chart lists Dr. Michael Torres as the attending surgeon. Payers may deny if the submitting provider does not match the treating/operating surgeon on record.",
+      "recommendation": "Reconcile the requesting provider name between the submission form and the chart. Ensure Dr. Michael Torres and Dr. Michael Torres refer to the same individual, or clarify the role of each provider.",
+      "anchorText": "Attending Surgeon: Dr. Michael Torres"
     },
     {
       "id": "flag-3",
-      "label": "Attending Surgeon Name Is a Placeholder",
-      "severity": "high",
-      "explanation": "The attending surgeon is listed as Dr. Michael Torres, which is a placeholder token. Payers require a clearly identified requesting and operating provider for prior authorization of CPT 29827.",
-      "recommendation": "Confirm and populate the attending surgeon's full name and NPI before submission to avoid automatic denial due to missing provider identification.",
-      "anchorText": "Dr. Michael Torres, MD"
+      "label": "Facility Name Placeholder Present",
+      "severity": "medium",
+      "explanation": "The practice is listed as Summit Orthopedic Group, a placeholder token. Payers require a verified facility name and address for prior authorization processing.",
+      "recommendation": "Replace Summit Orthopedic with the actual practice or facility name before submission to avoid administrative denial.",
+      "anchorText": "Practice: Summit Orthopedic Group"
     },
     {
       "id": "flag-4",
-      "label": "Injury Date Is a Placeholder",
+      "label": "Corticosteroid Injection Duration Not Documented",
       "severity": "medium",
-      "explanation": "The work-related injury onset date is listed as June 2024, a placeholder token. Payers may require a specific injury date to validate medical necessity timelines and workers' compensation coordination.",
-      "recommendation": "Populate the exact injury date in place of June 2024 to establish a clear clinical timeline from injury onset through conservative care failure to surgical request.",
-      "anchorText": "lifting injury in June 2024"
+      "explanation": "The Kenalog 40mg corticosteroid injection is documented as a single administration on 11/05/2024 with only 2 weeks of partial relief. While single injections do not require a duration, some BCBS policies require documentation of at least one repeat injection or a minimum observation period post-injection before approving surgical intervention.",
+      "recommendation": "Add a chart note clarifying whether a second injection was considered or attempted, and document the clinical rationale for proceeding to surgery after a single injection with only 2 weeks of relief.",
+      "anchorText": "Corticosteroid Injection — Kenalog 40mg"
     },
     {
       "id": "flag-5",
-      "label": "Facility Name Is a Placeholder",
+      "label": "Injury Date Placeholder Unresolved",
       "severity": "low",
-      "explanation": "The practice is listed as Summit Orthopedic Group, a placeholder token. Payers may require a verified facility name and address for prior authorization processing.",
-      "recommendation": "Replace Summit Orthopedic with the full legal practice name and include the facility NPI and address in the submission.",
-      "anchorText": "Summit Orthopedic Group"
+      "explanation": "The onset of injury is referenced as June 2024, a placeholder token. Payers may require a specific injury date to verify work-related injury status and timeline of conservative care.",
+      "recommendation": "Populate June 2024 with the actual date of the work-related lifting injury to establish a clear clinical timeline and support medical necessity.",
+      "anchorText": "lifting injury in June 2024"
     }
   ],
   "pa_strength": {
     "diagnosis_codes": {
       "score": 1,
-      "note": "Two ICD-10 codes are documented (M75.121 and M75.111), clearly supporting the diagnosis of full-thickness rotator cuff tear and shoulder impingement."
+      "note": "Two ICD-10 codes are documented (M75.121 and M75.111), clearly identifying full-thickness rotator cuff tear and shoulder impingement syndrome."
     },
     "conservative_treatments_named": {
       "score": 1,
-      "note": "Three distinct conservative treatments are named: physical therapy, corticosteroid injection (Kenalog 40mg), and NSAIDs (Meloxicam 15mg daily)."
+      "note": "Three distinct conservative treatments are named: Physical Therapy, Corticosteroid Injection (Kenalog 40mg), and NSAIDs (Meloxicam 15mg daily), all with documented outcomes."
     },
     "conservative_treatment_duration": {
       "score": 1,
-      "note": "Physical therapy duration (8 weeks) and NSAID duration (3 months) are explicitly stated; the corticosteroid injection lacks a duration but the other two entries provide adequate duration documentation."
+      "note": "Step 1 — Build denominator N: Duration-eligible treatments are Physical Therapy and NSAIDs (Meloxicam). The Corticosteroid Injection is a single-administration procedure and is excluded from N. N = 2. Step 2 — N = 2, which is ≥ 2, so proceed to Step 3. Step 3 — Build numerator D: Physical Therapy has '8 weeks (September–October 2024)' — specific number plus time unit, counts. NSAIDs have '3 months (July–October 2024)' — specific number plus time unit, counts. D = 2. Step 4 — D/N = 2/2 = 100%, which is ≥ 50%, score = 1."
     },
     "imaging_findings": {
       "score": 1,
-      "note": "Both MRI and X-ray are documented as completed with specific findings including a 2.1 cm full-thickness supraspinatus tear confirmed on MRI dated 01/22/2025."
+      "note": "Both MRI and X-ray of the right shoulder are documented as completed on 01/22/2025 with specific, detailed findings confirming the diagnosis and surgical candidacy."
     },
     "functional_limitations": {
       "score": 1,
@@ -115,15 +115,15 @@
     },
     "surgical_approach": {
       "score": 1,
-      "note": "Surgical approach is explicitly stated as arthroscopic with mini-open rotator cuff repair."
+      "note": "Surgical approach is explicitly documented as 'Arthroscopic with mini-open rotator cuff repair', providing clear technique detail."
     },
     "cpt_code_valid": {
       "score": 1,
-      "note": "CPT 29827 (arthroscopic rotator cuff repair) is a valid and appropriate code for the documented diagnosis of full-thickness rotator cuff tear."
+      "note": "CPT 29827 (arthroscopic rotator cuff repair) is explicitly stated in the requested procedure and is consistent with the documented diagnosis of full-thickness rotator cuff tear."
     },
     "symptom_duration": {
       "score": 1,
-      "note": "Symptom duration is explicitly stated as 8 months of conservative management failure in the medical necessity statement."
+      "note": "Symptom duration is explicitly stated as '8 months' in the medical necessity statement, providing a clear timeline of conservative management failure."
     }
   },
   "pain_score": "7/10 at rest, 9/10 with overhead activity",

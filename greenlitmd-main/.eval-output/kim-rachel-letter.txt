@@ -1,4 +1,4 @@
-June 30, 2026
+July 1, 2026
 Blue Cross Blue Shield
 Prior Authorization Department
 
@@ -13,7 +13,7 @@ Dear Prior Authorization Reviewer,
 
 **CLINICAL HISTORY AND PRESENTING COMPLAINT**
 
-Rachel Kim presents with right shoulder pain and weakness following a work-related lifting injury, with symptoms persisting over an eight-month course. She reports pain rated 7/10 at rest and 9/10 with overhead activity, reflecting a significant and persistent pain burden that has failed to resolve with conservative management. Her functional deficits have substantially impaired her ability to perform activities of daily living and have precluded her return to occupational duties requiring arm elevation.
+Rachel Kim is a patient presenting with right shoulder pain and weakness following a work-related lifting injury, with symptoms persisting over eight months. She reports pain rated 7/10 at rest and 9/10 with overhead activity, reflecting a significant and sustained pain burden that has failed to resolve with conservative management. Her functional deficits are severe, precluding return to occupational duties and substantially limiting her ability to perform activities of daily living.
 
 **DIAGNOSIS**
 
@@ -29,27 +29,25 @@ M75.111 — Incomplete rotator cuff tear, right shoulder
 
 **CONSERVATIVE TREATMENT HISTORY**
 
-1. **Physical Therapy** (September–October 2024, 8 weeks): Ms. Kim completed a structured course of physical therapy over eight weeks. The patient experienced minimal improvement, with pain persisting with overhead activity. Functional improvement was insufficient to restore meaningful mobility, and therapy was ultimately discontinued without achieving treatment goals.
+1. **Physical Therapy** (September–October 2024, 8 weeks): Ms. Kim completed an eight-week course of physical therapy. The patient experienced minimal improvement, with pain persisting with overhead activity. Functional goals were not achieved.
 
-2. **Corticosteroid Injection — Kenalog 40mg** (administered 11/05/2024): A subacromial corticosteroid injection was administered. The patient experienced two weeks of partial relief, after which symptoms returned to baseline. The injection trial is considered a failed conservative intervention.
+2. **Corticosteroid Injection — Kenalog 40mg** (11/05/2024): A single corticosteroid injection was administered. The patient experienced two weeks of partial relief, after which symptoms returned to baseline.
 
-3. **NSAIDs — Meloxicam 15mg daily** (July–October 2024, 3 months): The patient was maintained on Meloxicam 15mg daily for three months. This course provided inadequate pain control, and GI intolerance developed, necessitating discontinuation.
+3. **NSAIDs — Meloxicam 15mg daily** (July–October 2024, 3 months): The patient was maintained on meloxicam 15mg daily for three months. This regimen provided inadequate pain control, and GI intolerance developed, necessitating discontinuation.
 
 **REQUESTED PROCEDURE**
 
-Arthroscopic with mini-open rotator cuff repair, right shoulder (CPT 29827).
+Arthroscopic rotator cuff repair with mini-open rotator cuff repair, right shoulder (CPT 29827).
 
 The patient's BMI of 27.4 and ASA II classification have been factored into the perioperative surgical plan. The patient carries an ASA II classification, reflecting the anesthetic risk profile accounted for in the perioperative surgical plan.
 
+Imaging obtained on 01/22/2025 provides objective structural confirmation of the surgical indication. Plain radiographs demonstrate Grade II AC joint arthrosis with no calcific deposits and no significant glenohumeral arthrosis. MRI of the right shoulder reveals a full-thickness supraspinatus tear measuring 2.1 cm with retraction to the musculotendinous junction, accompanied by moderate subacromial bursitis. The subscapularis is intact. These findings are consistent with the severity of the patient's clinical presentation and confirm a structural lesion that is not amenable to further conservative management.
+
+Physical examination corroborates the imaging findings. Active forward flexion is limited to 95 degrees by pain, and active abduction is restricted to 80 degrees. Internal rotation measures 40 degrees and external rotation 55 degrees. Strength testing demonstrates 3/5 supraspinatus strength on the empty can test, indicating significant rotator cuff dysfunction. The patient's American Shoulder and Elbow Surgeons (ASES) score of 35.2 out of 100 reflects severe functional impairment and is well below the threshold associated with acceptable shoulder function.
+
 **MEDICAL NECESSITY SUMMARY**
 
-Objective clinical assessment confirms the severity of Ms. Kim's right shoulder pathology. Range of motion evaluation demonstrates active forward flexion limited to 95 degrees secondary to pain, active abduction of 80 degrees, internal rotation of 40 degrees, and external rotation of 55 degrees. Strength testing reveals 3/5 supraspinatus strength on the empty can test, consistent with significant rotator cuff dysfunction. The American Shoulder and Elbow Surgeons (ASES) Score of 35.2 out of 100 further quantifies the degree of functional impairment.
-
-Imaging obtained confirms the structural basis for these deficits. Radiographs demonstrate Grade II acromioclavicular joint arthrosis with no calcific deposits and no significant glenohumeral arthrosis. MRI demonstrates a full-thickness supraspinatus tear measuring 2.1 cm with retraction to the musculotendinous junction, accompanied by moderate subacromial bursitis, with an intact subscapularis tendon. The size and retraction of the tear are consistent with a lesion that carries a risk of further propagation without surgical intervention, and the structural findings correlate directly with the patient's clinical presentation.
-
-Conservative management to date has included eight weeks of formal physical therapy, a corticosteroid injection with only transient partial relief, and a three-month course of NSAIDs that was discontinued due to inadequate efficacy and GI intolerance. Despite this multimodal conservative course, Ms. Kim continues to experience severe pain, marked range of motion deficits, and functional limitations that prevent her from performing overhead activities of daily living and from fulfilling her occupational responsibilities. Arthroscopic rotator cuff repair represents the appropriate and necessary next step to restore shoulder function, relieve pain, and enable Ms. Kim's return to baseline activity and employment.
-
-We respectfully request timely authorization for CPT 29827 — Arthroscopic Rotator Cuff Repair, Right Shoulder — and are available to provide any additional clinical documentation required to support this request.
+Rachel Kim presents with a confirmed full-thickness supraspinatus tear measuring 2.1 cm with musculotendinous junction retraction, substantiated by MRI and corroborated by objective physical examination findings including markedly restricted range of motion, 3/5 supraspinatus strength, and an ASES score of 35.2/100. Conservative management to date has included eight weeks of physical therapy with minimal improvement, a corticosteroid injection yielding only two weeks of partial relief, and three months of NSAID therapy that was discontinued due to inadequate efficacy and GI intolerance. Despite this course of treatment, Ms. Kim remains unable to perform overhead reaching, lift objects above shoulder height, sleep without pain-related disruption, or return to her occupational duties. The natural history of full-thickness rotator cuff tears of this size and degree of retraction is one of progressive enlargement and irreversible muscle atrophy without surgical intervention. Arthroscopic rotator cuff repair with mini-open technique represents the medically necessary and appropriate next step to restore shoulder function, prevent further structural deterioration, and enable this patient to return to her activities of daily living and occupational responsibilities. Authorization for CPT 29827 is respectfully requested.
 
 Sincerely,
 Michael Torres, MD

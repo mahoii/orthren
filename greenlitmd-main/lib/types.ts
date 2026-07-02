@@ -49,6 +49,7 @@ export type ExtractedChartData = {
   objective_measurements: string[];
   conservative_treatments_attempted: ConservativeTreatment[];
   imaging_findings: ImagingFindings | null;
+  imaging_status: "pending" | "not_ordered" | "completed";
   requested_procedure: string | null;
   surgical_approach_if_mentioned: string | null;
   pain_score?: string | null;

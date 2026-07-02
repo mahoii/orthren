@@ -26,83 +26,67 @@
   "denial_risk_flags": [
     {
       "id": "flag-1",
-      "label": "No Completed Imaging Prior to Submission",
+      "label": "No Physical Therapy Documented",
       "severity": "high",
-      "explanation": "Both X-ray and MRI results are absent — the X-ray ordered at 01/30/2025 is pending and MRI has not been ordered. United Healthcare requires completed imaging with documented findings before authorizing CPT 27130.",
-      "recommendation": "Do not submit the prior authorization until the X-ray results are available and documented in the chart. Consider ordering and completing an MRI as well to strengthen the clinical record.",
-      "anchorText": "results pending"
+      "explanation": "No formal physical therapy is documented in the referral. United Healthcare and most major payers require documented failure of supervised physical therapy (minimum 6–8 weeks) prior to authorizing CPT 27130 total hip arthroplasty.",
+      "recommendation": "Document initiation and completion of a formal physical therapy program of at least 6 weeks duration, including therapist notes and outcome measures, before submitting the prior authorization.",
+      "anchorText": "No formal physical therapy documented"
+    },
+    {
+      "id": "flag-2",
+      "label": "OTC Medication — No Duration or Outcome",
+      "severity": "high",
+      "explanation": "The only conservative treatment documented is over-the-counter pain medication with no duration, specific agent, dosage, or outcome recorded. Payers require specific NSAID or analgesic trials with documented duration and failure before approving surgical intervention.",
+      "recommendation": "Addend the chart to specify the medication name (e.g., ibuprofen, naproxen), dosage, duration of use, and the reason it was discontinued or deemed insufficient.",
+      "anchorText": "over-the-counter pain medication"
     },
     {
       "id": "flag-pending-imaging",
       "label": "Imaging Not Yet Complete",
       "severity": "high",
-      "explanation": "Payers require completed imaging results before authorizing surgical procedures. The chart explicitly states the X-ray is pending and MRI has not been ordered.",
-      "recommendation": "Do not submit until imaging results are available and documented.",
+      "explanation": "Both the left hip X-ray and MRI are either pending or not yet ordered. Payers require completed imaging results before authorizing surgical procedures such as CPT 27130.",
+      "recommendation": "Do not submit until imaging results are available and documented in the chart.",
       "anchorText": "Radiographic"
     },
     {
       "id": "flag-conservative-care",
       "label": "Insufficient Conservative Care",
       "severity": "high",
-      "explanation": "Only 1 treatment documented (OTC pain medication with no duration). Payers for CPT 27130 typically require documented failure of physical therapy (minimum 6 weeks), NSAIDs, and at least one injection before approving surgical intervention.",
+      "explanation": "Only 1 treatment documented. Payers for CPT 27130 typically require documented failure of physical therapy (minimum 6 weeks), NSAIDs, and at least one injection before approving surgical intervention.",
       "recommendation": "Obtain records documenting additional conservative treatments or initiate and document further conservative care before submission.",
       "anchorText": "CONSERVATIVE TREATMENT"
     },
     {
-      "id": "flag-2",
-      "label": "No Physical Therapy Documented",
-      "severity": "high",
-      "explanation": "The referral explicitly notes 'No formal physical therapy documented.' United Healthcare typically requires a minimum of 6 weeks of supervised physical therapy as a prerequisite for CPT 27130 approval.",
-      "recommendation": "Initiate and document a formal physical therapy program of at least 6 weeks duration, or obtain prior PT records if therapy was completed elsewhere, before submitting the prior authorization.",
-      "anchorText": "No formal physical therapy documented"
-    },
-    {
       "id": "flag-3",
-      "label": "OTC Medication — No Duration or Outcome Documented",
-      "severity": "high",
-      "explanation": "The only conservative treatment documented is OTC pain medication with no duration, specific medication name, dosage, or outcome recorded. Payers require specific documentation of treatment trials including duration and response.",
-      "recommendation": "Addend the chart to specify the medication name (e.g., ibuprofen, naproxen), dosage, duration of use, and the patient's response or reason for failure.",
-      "anchorText": "over-the-counter pain medication"
-    },
-    {
-      "id": "flag-4",
       "label": "No Injection Therapy Documented",
       "severity": "medium",
-      "explanation": "No corticosteroid or hyaluronic acid injections are documented. United Healthcare guidelines for CPT 27130 commonly require at least one documented injection trial prior to surgical approval.",
-      "recommendation": "Document whether injection therapy was attempted, refused, or contraindicated. If not yet attempted, consider a corticosteroid injection trial and document the outcome before submission.",
+      "explanation": "No corticosteroid or hyaluronic acid injections are documented. United Healthcare typically requires at least one injection trial for hip osteoarthritis prior to authorizing total hip arthroplasty.",
+      "recommendation": "Document whether intra-articular corticosteroid or hyaluronic acid injection was attempted, including date, agent, and patient response.",
       "anchorText": "Conservative Care"
     },
     {
-      "id": "flag-5",
+      "id": "flag-4",
       "label": "Vague Symptom Duration — No Specific Timeframe",
       "severity": "medium",
-      "explanation": "Symptom duration is documented only as 'over the past several months,' which does not establish a specific timeline. Payers may require a minimum documented symptom duration to justify surgical intervention.",
-      "recommendation": "Addend the chart to specify the exact onset date or number of months the patient has experienced left hip pain to establish a clear clinical timeline.",
+      "explanation": "Symptom duration is documented only as 'over the past several months,' which is insufficiently specific for payer review. United Healthcare may require a defined duration to assess medical necessity timelines.",
+      "recommendation": "Addend the chart to specify the exact onset date or number of months the patient has experienced left hip pain.",
       "anchorText": "over the past several months"
     },
     {
-      "id": "flag-6",
+      "id": "flag-5",
       "label": "Preliminary Chart — Pre-op Workup Incomplete",
       "severity": "medium",
-      "explanation": "The chart explicitly states this is 'preliminary referral documentation' with 'full pre-op workup pending.' Submitting a prior authorization on an incomplete chart increases the risk of denial due to insufficient medical necessity documentation.",
-      "recommendation": "Complete the pre-operative workup including imaging, ASA classification, pain scoring, and objective measurements before submitting the prior authorization to United Healthcare.",
+      "explanation": "The chart explicitly states this is preliminary referral documentation with a full pre-op workup pending. Submitting a prior authorization on incomplete documentation significantly increases denial risk.",
+      "recommendation": "Delay PA submission until the full pre-operative workup, imaging results, and complete conservative care documentation are available.",
       "anchorText": "Chart is preliminary referral documentation"
     },
     {
-      "id": "flag-7",
-      "label": "No Surgical Approach Documented",
+      "id": "flag-6",
+      "label": "No ASA Classification or Surgical Risk Assessment",
       "severity": "low",
-      "explanation": "No surgical approach (e.g., anterior, posterior, lateral) is specified in the chart. While not always required for authorization, some payers request this detail to confirm appropriateness of the planned procedure.",
-      "recommendation": "Addend the operative plan to specify the intended surgical approach for the left total hip arthroplasty.",
-      "anchorText": "Left total hip arthroplasty"
-    },
-    {
-      "id": "flag-8",
-      "label": "No Pain Score Documented",
-      "severity": "low",
-      "explanation": "No numeric pain scale rating (VAS, NRS) is documented in the chart. Pain scores are commonly required by payers to substantiate functional impairment and medical necessity.",
-      "recommendation": "Document a baseline pain score using a standardized scale (e.g., NRS 0–10) at rest and with activity at the next clinical encounter.",
-      "anchorText": "Presenting Complaint"
+      "explanation": "No ASA physical status classification is documented. Payers reviewing CPT 27130 often require evidence of surgical fitness and anesthesia risk stratification.",
+      "recommendation": "Add ASA classification and a brief surgical risk assessment to the pre-operative documentation.",
+      "anchorText": "Patient is a surgical candidate"
     }
   ],
   "pa_strength": {
@@ -112,35 +96,35 @@
     },
     "conservative_treatments_named": {
       "score": 0,
-      "note": "Only one vague conservative treatment (OTC pain medication) is named with no specifics; physical therapy and injections are absent.",
+      "note": "Only one vaguely described conservative treatment is documented (over-the-counter pain medication). No physical therapy, injections, or other named modalities are present. Payers require at least 3 distinct named treatments.",
       "anchorText": "over-the-counter pain medication"
     },
     "conservative_treatment_duration": {
       "score": 0,
-      "note": "No duration is documented for any conservative treatment attempted.",
-      "anchorText": "Conservative Care"
+      "note": "Step 1 — Build denominator N: Duration-eligible treatments are OTC pain medication (a medication course). Injections are excluded. N = 1. Step 2 — N < 2, therefore score 0 immediately. No further steps required. 0 of 1 = 0%, below 50% threshold, score = 0.",
+      "anchorText": "over-the-counter pain medication"
     },
     "imaging_findings": {
       "score": 0,
-      "note": "No imaging results are available; X-ray is pending and MRI has not been ordered.",
-      "anchorText": "results pending"
+      "note": "No imaging has been completed with results. The X-ray was ordered at today's visit with results pending, and MRI has not been ordered.",
+      "anchorText": "X-ray left hip was ordered"
     },
     "functional_limitations": {
       "score": 1,
-      "note": "Two specific functional limitations are documented: ambulation limited to 200 feet and inability to perform prolonged standing."
+      "note": "Two specific functional limitations are documented: inability to ambulate distances greater than 200 feet and inability to perform prolonged standing."
     },
     "surgical_approach": {
       "score": 0,
-      "note": "No surgical approach is documented for the planned left total hip arthroplasty.",
+      "note": "No surgical approach is documented for the left total hip arthroplasty. Anterior, posterior, or lateral approach is not mentioned.",
       "anchorText": "Left total hip arthroplasty"
     },
     "cpt_code_valid": {
       "score": 1,
-      "note": "CPT 27130 (total hip arthroplasty) is explicitly stated and aligns with the diagnosis of left hip osteoarthritis (M16.12)."
+      "note": "CPT 27130 (total hip arthroplasty) is explicitly stated in the chart and is consistent with the diagnosis of left hip osteoarthritis (M16.12)."
     },
     "symptom_duration": {
       "score": 0,
-      "note": "Symptom duration is vague ('over the past several months') with no specific onset date or number of months documented.",
+      "note": "Symptom duration is documented only as 'over the past several months' with no specific number of months or onset date provided.",
       "anchorText": "over the past several months"
     }
   },

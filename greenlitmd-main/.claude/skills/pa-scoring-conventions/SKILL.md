@@ -12,7 +12,7 @@ Weights are applied client-side; the API returns raw 0/1 scores per factor:
 |---|---|---|
 | `diagnosis_codes` | 10% | No ICD-10 codes present |
 | `conservative_treatments_named` | 20% | No specific treatment names extracted |
-| `conservative_treatment_duration` | 10% | No duration documented for any treatment |
+| `conservative_treatment_duration` | 10% | Fewer than 50% of named duration-eligible treatments (PT, NSAID/med courses, bracing, HEP — single-administration injections excluded) have an explicit duration, or fewer than 2 duration-eligible treatments are named at all |
 | `imaging_findings` | 15% | No completed imaging (pending = 0) |
 | `functional_limitations` | 15% | No specific functional limitations stated |
 | `surgical_approach` | 10% | No surgical approach described |

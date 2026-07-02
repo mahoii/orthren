@@ -1,4 +1,41 @@
-Cannot generate authorization letter: imaging_findings is null or absent. Major joint procedures require documented imaging (X-ray, MRI, or CT) to establish surgical indication and severity. Please obtain imaging and resubmit.
+July 1, 2026
+United Healthcare
+Prior Authorization Department
+
+Re: Sandra M. Vance | DOB: 07/28/1962 | Left Total Hip Arthroplasty (CPT 27130) | M16.12
+
+Member ID: See attached insurance card
+Patient: Sandra M. Vance
+Date of Birth: 07/28/1962
+Procedure: Left Total Hip Arthroplasty
+CPT Code: 27130
+
+Dear Prior Authorization Reviewer,
+
+**CLINICAL HISTORY AND PRESENTING COMPLAINT**
+
+Sandra M. Vance presents with worsening left hip pain that has developed over the past several months, resulting in progressive functional decline that significantly impairs her ability to perform basic activities of daily living. Her symptoms have reached a severity that conservative management has been unable to adequately address, limiting her mobility and independence in a clinically meaningful way.
+
+**DIAGNOSIS**
+
+Primary Diagnosis: Primary osteoarthritis, left hip (M16.12)
+
+**FUNCTIONAL LIMITATIONS**
+
+1. Difficulty ambulating distances greater than 200 feet
+2. Unable to perform prolonged standing
+
+**CONSERVATIVE TREATMENT HISTORY**
+
+1. Over-the-counter pain medication: The patient was treated with over-the-counter pain medication. This treatment failed to provide adequate relief, and the patient continued to experience progressive left hip pain and functional decline despite its use.
+
+**REQUESTED PROCEDURE**
+
+The requested procedure is left total hip arthroplasty (CPT 27130). Advanced imaging has been ordered and results are pending. Authorization is requested in advance of imaging completion to prevent unnecessary delays in patient care once results are available.
+
+**MEDICAL NECESSITY SUMMARY**
+
+Sandra M. Vance presents with primary osteoarthritis of the left hip (M16.12) resulting in significant and progressive functional impairment. Her inability to ambulate distances greater than 200 feet and her inability to perform prolonged standing represent a substantial compromise of her capacity to carry out essential activities of daily living. Conservative management to date has included over-the-counter pain medication, which has failed to provide meaningful or sustained relief. On the basis of the patient's diagnosis, documented functional limitations, and failure of conservative management, left total hip arthroplasty is medically necessary and represents the appropriate next step in her care. We respectfully request timely authorization of CPT 27130 to restore this patient's functional independence and quality of life.
 
 Sincerely,
 James Holloway, MD

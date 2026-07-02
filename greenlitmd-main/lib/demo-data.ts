@@ -138,6 +138,7 @@ Westbrook Orthopedic Surgery Center`,
       key_findings:
         "Kellgren-Lawrence Grade 3 bilateral; moderate joint space narrowing; marginal osteophytes"
     },
+    imaging_status: "completed",
     requested_procedure: "Bilateral Total Knee Arthroplasty",
     surgical_approach_if_mentioned: "Cemented implant, bilateral",
     bmi: 41.2,
@@ -350,6 +351,7 @@ Brooklyn Sports Medicine`,
       key_findings:
         "Full-thickness supraspinatus tear, 2.1 cm AP, mild retraction; mild AC joint degenerative change"
     },
+    imaging_status: "completed",
     requested_procedure: "Arthroscopic Rotator Cuff Repair",
     surgical_approach_if_mentioned: "Arthroscopic technique",
     denial_risk_flags: [
@@ -525,6 +527,7 @@ Spine & Joint Institute`,
       key_findings:
         "L4-L5 disc space narrowing; moderate degenerative changes; foraminal stenosis suspected clinically"
     },
+    imaging_status: "completed",
     requested_procedure: "Lumbar Interbody Fusion",
     surgical_approach_if_mentioned: "Posterior lumbar interbody fusion (PLIF) at L4-L5",
     denial_risk_flags: [

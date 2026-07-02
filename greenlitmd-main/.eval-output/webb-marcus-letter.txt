@@ -1,9 +1,8 @@
-June 30, 2026
+July 1, 2026
 Aetna PPO
 Prior Authorization Department
 
 Re: Webb, Marcus | DOB: 11/03/1958 | Right Total Knee Arthroplasty (CPT 27447) | M17.11, M17.12
-
 Member ID: See attached insurance card
 Patient: Webb, Marcus
 Date of Birth: 11/03/1958
@@ -14,39 +13,39 @@ Dear Prior Authorization Reviewer,
 
 **CLINICAL HISTORY AND PRESENTING COMPLAINT**
 
-Mr. Marcus Webb presents with bilateral knee pain, right greater than left, persisting for more than three years, with progressive functional decline that has rendered him unable to perform basic activities of daily living. Marcus Webb has a documented BMI of 34.2, Class I obesity, which represents a significant contributor to articular cartilage loading and disease progression. Mr. Webb reports pain rated 8/10 with activity and 4/10 at rest, reflecting a degree of chronic pain burden that has failed to respond adequately to multiple conservative interventions. His functional compromise is severe, limiting ambulation to less than one city block and precluding stair use without assistive support, and has additionally eliminated his ability to participate as a volunteer coach, a role that requires the physical capacity to demonstrate athletic drills.
+Mr. Marcus Webb presents with bilateral knee pain, right greater than left, with symptoms ongoing for more than three years, resulting in severe functional compromise that has rendered him unable to perform basic activities of daily living. Marcus Webb has a documented BMI of 34.2, Class I obesity, which represents a significant contributor to articular cartilage loading and disease progression. The severity of his right knee degeneration, combined with progressive functional decline, has exhausted non-operative management and now necessitates surgical intervention.
 
 **DIAGNOSIS**
 
-Mr. Webb carries confirmed diagnoses of primary osteoarthritis of the right knee (M17.11) and primary osteoarthritis of the left knee (M17.12). The right knee represents the primary surgical target, with radiographic and clinical findings consistent with end-stage degenerative joint disease.
+Mr. Webb carries a diagnosis of primary osteoarthritis of the right knee (M17.11) and primary osteoarthritis of the left knee (M17.12). The right knee represents the primary surgical target, demonstrating end-stage tricompartmental disease with radiographically confirmed bone-on-bone changes and significant coronal plane deformity.
 
 **FUNCTIONAL LIMITATIONS**
 
-1. Mr. Webb cannot walk more than one city block due to bilateral knee pain, with the right knee as the predominant limiting joint.
-2. Mr. Webb cannot use stairs without the assistance of a handrail, reflecting significant loss of lower extremity strength and joint stability.
-3. Pain limits Mr. Webb's ability to demonstrate drills in his capacity as a volunteer coach, eliminating a meaningful component of his daily activity and community engagement.
+1. Mr. Webb is unable to walk more than one city block before pain forces him to stop.
+2. He is unable to use stairs without the assistance of a handrail due to right knee pain and instability.
+3. Pain in the right knee limits his ability to demonstrate drills in his capacity as a volunteer coach, significantly impacting his ability to participate in this meaningful community role.
 
 **CONSERVATIVE TREATMENT HISTORY**
 
-1. **Physical Therapy** — Mr. Webb completed a six-week course of physical therapy. The treating course did not provide meaningful benefit to the right knee, and functional improvement was insufficient to restore mobility or reduce pain to a tolerable level.
+1. **Physical Therapy** — Mr. Webb completed a six-week course of physical therapy. Functional improvement was insufficient to restore meaningful mobility, and therapy was ultimately discontinued without achieving treatment goals, with no benefit reported for the right knee.
 
-2. **Corticosteroid Injection (Cortisone)** — Mr. Webb received corticosteroid injections, administered approximately in 2023. Each injection provided only transient relief lasting approximately two to three weeks, after which symptoms returned to baseline. The brevity of symptomatic relief confirms the inadequacy of this intervention as a durable treatment strategy.
+2. **Corticosteroid Injection (Cortisone)** — Mr. Webb received corticosteroid injections approximately in 2023. Each injection provided only two to three weeks of symptomatic relief, after which pain returned to baseline, demonstrating an inadequate and unsustained clinical response.
 
-3. **Hyaluronic Acid Injection (Synvisc-One)** — Mr. Webb received a Synvisc-One hyaluronic acid injection in June 2024. The clinical response was minimal, with no sustained reduction in pain or improvement in function documented following this intervention.
+3. **Hyaluronic Acid Injection (Synvisc-One)** — Administered in June 2024, this viscosupplementation injection yielded minimal benefit, failing to produce a clinically meaningful or durable reduction in pain or improvement in function.
 
-4. **Over-the-Counter Analgesics and NSAIDs (Tylenol and Ibuprofen)** — Mr. Webb has been using acetaminophen and ibuprofen on an ongoing basis. These medications have not been effective for a sustained period and no longer provide meaningful pain control.
+4. **Over-the-Counter Analgesics and NSAIDs (Acetaminophen and Ibuprofen)** — Mr. Webb has used over-the-counter acetaminophen and ibuprofen on an ongoing basis. These medications are no longer providing effective pain relief and have failed to restore functional capacity.
 
 **REQUESTED PROCEDURE**
 
 Right Total Knee Arthroplasty (CPT 27447), anterior approach, standard primary TKA.
 
-Radiographs of the bilateral knees obtained on 02/15/2025 demonstrate severe tricompartmental osteoarthritis of the right knee with bone-on-bone medial compartment involvement, Kellgren-Lawrence Grade IV changes, and a varus deformity of 8 degrees. The left knee demonstrates moderate osteoarthritis with Kellgren-Lawrence Grade III changes, less severe than the right. Objective range of motion assessment of the right knee reveals flexion limited to 95 degrees with a flexion contracture of 5 degrees (extension deficit of -5 degrees). Varus deformity measures 8 degrees at the right knee. The patient's KOOS score for the right knee is 28 out of 100, reflecting severe functional impairment. These findings collectively confirm end-stage degenerative joint disease of the right knee with structural deformity and profound functional compromise.
-
 The patient carries an ASA III classification, reflecting the anesthetic risk profile accounted for in the perioperative surgical plan.
 
 **MEDICAL NECESSITY SUMMARY**
 
-Mr. Marcus Webb presents with end-stage primary osteoarthritis of the right knee, confirmed by Kellgren-Lawrence Grade IV radiographic findings, bone-on-bone medial compartment involvement, an 8-degree varus deformity, a KOOS score of 28/100, and a measured flexion contracture. Conservative management to date has included a six-week course of physical therapy without meaningful benefit to the right knee, corticosteroid injections providing only two to three weeks of transient relief, a hyaluronic acid injection with minimal benefit, and ongoing use of over-the-counter analgesics and NSAIDs that are no longer effective. Mr. Webb is unable to walk more than one block, cannot navigate stairs without a handrail, and has lost the ability to participate in physical activities central to his daily life. Right total knee arthroplasty represents the appropriate and necessary next step to restore functional mobility, alleviate chronic pain, and allow Mr. Webb to resume activities of daily living. We respectfully request timely authorization of CPT 27447 to prevent further functional deterioration and to allow this patient to proceed with definitive surgical care.
+Radiographs of the right knee obtained on 02/15/2025 demonstrate severe tricompartmental osteoarthritis with bone-on-bone medial compartment involvement, Kellgren-Lawrence Grade IV changes, and a varus deformity of 8 degrees. Radiographs of the left knee demonstrate moderate osteoarthritis with Kellgren-Lawrence Grade III changes, less severe than the right. Objective range of motion assessment of the right knee reveals flexion limited to 95 degrees with a flexion contracture of 5 degrees (extension deficit of -5 degrees). A KOOS score of 28 out of 100 for the right knee confirms severe functional impairment. Mr. Webb reports pain rated 8/10 with activity and 4/10 at rest.
+
+The totality of clinical, radiographic, and functional evidence establishes that Mr. Webb's right knee osteoarthritis has progressed to end-stage disease refractory to all attempted conservative measures. He is unable to ambulate more than one block, cannot navigate stairs independently, and is precluded from meaningful participation in activities he values as a volunteer coach. Right total knee arthroplasty represents the medically necessary and appropriate next step to restore functional independence, relieve intractable pain, and prevent further deterioration in this patient's quality of life. Authorization for CPT 27447 is respectfully requested.
 
 Sincerely,
 Sandra Reyes, MD
