@@ -140,7 +140,10 @@ export default function ReviewPage() {
     [paStrength]
   );
 
-  const denialFlags: DenialRiskFlag[] = data?.extracted.denial_risk_flags ?? [];
+  const denialFlags: DenialRiskFlag[] = useMemo(
+    () => data?.extracted.denial_risk_flags ?? [],
+    [data?.extracted.denial_risk_flags]
+  );
 
   const attentionItems: AttentionItem[] = useMemo(() => {
     const items: AttentionItem[] = [];
@@ -628,7 +631,7 @@ export default function ReviewPage() {
             {sourceLockWarning && sourceLockWarning.length > 0 && (
               <div style={{ marginBottom: 16, borderRadius: 8, border: '1px solid #fecaca', background: '#fef2f2', padding: '12px 14px', fontSize: 13, color: '#dc2626' }}>
                 <div style={{ fontWeight: 600, marginBottom: 6 }}>
-                  This letter contains unverified content and cannot be exported until it's regenerated or corrected.
+                  This letter contains unverified content and cannot be exported until it&apos;s regenerated or corrected.
                 </div>
                 <ul style={{ margin: 0, paddingLeft: 18 }}>
                   {sourceLockWarning.map((violation, i) => (

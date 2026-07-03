@@ -125,6 +125,7 @@ export default function PayerCombobox({ value, onChange, error, cptCode, disable
           disabled={disabled}
           role="combobox"
           aria-expanded={open}
+          aria-controls="payer-listbox"
           aria-autocomplete="list"
           autoComplete="off"
           className="mt-2 w-full rounded-md border border-clinical-line px-3 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-clinical-blue focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
@@ -133,6 +134,7 @@ export default function PayerCombobox({ value, onChange, error, cptCode, disable
         {open && !isOtherMode && filtered.length > 0 ? (
           <ul
             role="listbox"
+            id="payer-listbox"
             className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-md border border-clinical-line bg-white py-1 shadow-lg"
           >
             {filtered.map((option, index) => {
