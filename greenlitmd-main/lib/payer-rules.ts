@@ -747,7 +747,7 @@ ${bullets(rule.denial_risk_flags)}
 AUTO-APPROVAL EXCEPTIONS — check if applicable:
 ${bullets(rule.auto_approval_exceptions)}
 
-INSTRUCTION: The letter MUST explicitly satisfy each conservative care minimum and address each denial risk flag. If a flag condition exists in the extracted chart data, address it head-on in the letter. If a required element is absent from the chart, flag it with [REQUIRES PHYSICIAN REVIEW] — do not fabricate or omit silently.`;
+INSTRUCTION: Address each criterion using only facts present in the extraction JSON; where a criterion is unmet, remain silent — gaps are surfaced upstream.`;
 }
 
 // ── Review-page checklist ────────────────────────────────────────────────────

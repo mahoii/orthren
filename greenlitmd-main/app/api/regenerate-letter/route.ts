@@ -56,10 +56,7 @@ export async function POST(request: Request) {
       day: "numeric"
     });
 
-    const imagingFindingsJson = JSON.stringify(body.extracted.imaging_findings || null);
-    const baseSystemPrompt = letterSystemPrompt
-      .replace("[LETTER_DATE]", today)
-      .replace("[IMAGING_FINDINGS_JSON]", imagingFindingsJson);
+    const baseSystemPrompt = letterSystemPrompt.replace("[LETTER_DATE]", today);
     const systemPromptWithContext = body.resolutionContext
       ? `${baseSystemPrompt}\n\n${body.resolutionContext}`
       : baseSystemPrompt;

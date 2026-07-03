@@ -136,7 +136,7 @@ export async function generateLetterFromExtraction(
   phiMap: Record<string, string> = {},
   payerInjectionBlock?: string | null
 ): Promise<string> {
-  const { validation, pa_strength, ...chartDataOnly } = extracted as any;
+  const { validation, pa_strength, denial_risk_flags, ...chartDataOnly } = extracted as any;
 
   const today = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -144,10 +144,7 @@ export async function generateLetterFromExtraction(
     day: "numeric",
   });
 
-  const imagingFindingsJson = JSON.stringify(extracted.imaging_findings || null);
-  const basePrompt = letterSystemPrompt
-    .replace("[LETTER_DATE]", today)
-    .replace("[IMAGING_FINDINGS_JSON]", imagingFindingsJson);
+  const basePrompt = letterSystemPrompt.replace("[LETTER_DATE]", today);
   // Payer rules inject only into the letter-gen (second) call — never extraction.
   const systemPromptWithContext = payerInjectionBlock
     ? `${basePrompt}\n\n${payerInjectionBlock}`

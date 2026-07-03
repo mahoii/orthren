@@ -48,7 +48,38 @@ export function sanitizeLetterPlaceholders(letter: string, context: LetterPlaceh
     return value ?? match;
   });
 
-  return ensureSignatureBlock(removeRemainingBracketLines(sanitized), providerName, practiceName);
+  const { text: markersProtected, placeholderMap } = extractSafetyMarkers(sanitized);
+  const stripped = restoreSafetyMarkers(removeRemainingBracketLines(markersProtected), placeholderMap);
+
+  return ensureSignatureBlock(stripped, providerName, practiceName);
+}
+
+// Bracket-strip pass below deletes any line containing "[...]" as a leftover
+// unfilled placeholder. The imaging-pending safety marker is a mandated
+// exception (RULE 1 in letter-system-prompt.ts) and must survive that pass —
+// swap it for a plain-text token before stripping, then restore it after.
+const SAFETY_MARKERS = ["[REQUIRES PHYSICIAN REVIEW — IMAGING PENDING]"];
+
+function extractSafetyMarkers(text: string) {
+  let result = text;
+  const placeholderMap: Record<string, string> = {};
+
+  SAFETY_MARKERS.forEach((marker, index) => {
+    if (result.includes(marker)) {
+      const token = `__SAFETY_MARKER_${index}__`;
+      placeholderMap[token] = marker;
+      result = result.split(marker).join(token);
+    }
+  });
+
+  return { text: result, placeholderMap };
+}
+
+function restoreSafetyMarkers(text: string, placeholderMap: Record<string, string>) {
+  return Object.entries(placeholderMap).reduce(
+    (result, [token, marker]) => result.split(token).join(marker),
+    text
+  );
 }
 
 export function formatLetterDate(date: Date) {
