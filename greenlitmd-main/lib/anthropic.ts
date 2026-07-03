@@ -3,6 +3,34 @@ function isAnthropicOverloadedError(message: string) {
   return normalized.includes("overloaded_error") || normalized.includes("overloaded");
 }
 
+class AnthropicHttpError extends Error {
+  status: number;
+  constructor(status: number, body: string) {
+    super(`Anthropic API request failed. ${body}`);
+    this.status = status;
+  }
+}
+
+// Widens retry coverage beyond the "overloaded" text match: transient network
+// errors (Node error codes, fetch-level failures) and retryable HTTP status
+// codes (429 rate limit, 529 overloaded, 5xx server errors) all warrant the
+// same backoff-and-retry treatment as an overloaded_error response.
+function isRetryableAnthropicError(err: unknown, message: string): boolean {
+  if (isAnthropicOverloadedError(message)) return true;
+
+  const code = (err as { code?: string } | undefined)?.code;
+  if (code === "ECONNRESET" || code === "ETIMEDOUT" || code === "EPIPE") return true;
+
+  if (err instanceof TypeError && /fetch failed/i.test(message)) return true;
+
+  if (err instanceof AnthropicHttpError) {
+    const { status } = err;
+    if (status === 429 || status === 529 || (status >= 500 && status < 600)) return true;
+  }
+
+  return false;
+}
+
 export async function callAnthropic({
   system,
   prompt,
@@ -50,7 +78,7 @@ export async function callAnthropic({
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Anthropic API request failed. ${text}`);
+    throw new AnthropicHttpError(response.status, text);
   }
 
   const data = await response.json();
@@ -73,8 +101,8 @@ export async function callAnthropicWithRetry(
     } catch (err) {
       console.error("[anthropic] callAnthropicWithRetry error (attempt " + attempt + "):", err);
       const message = err instanceof Error ? err.message : "";
-      const isOverloaded = isAnthropicOverloadedError(message);
-      if (isOverloaded && attempt < retries) {
+      const isRetryable = isRetryableAnthropicError(err, message);
+      if (isRetryable && attempt < retries) {
         await new Promise((res) => setTimeout(res, 5000 * (attempt + 1)));
         continue;
       }
