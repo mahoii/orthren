@@ -5,7 +5,7 @@
     "M17.11",
     "M17.12"
   ],
-  "primary_complaint": "Bilateral knee pain, right worse than left, x 3+ years",
+  "primary_complaint": "Bilateral knee pain, right greater than left",
   "symptom_duration": "3+ years",
   "functional_limitations": [
     "Cannot walk more than 1 block",
@@ -36,14 +36,14 @@
       "relief_duration": "2-3 weeks each time"
     },
     {
-      "treatment": "Hyaluronic Acid Injection — Synvisc-One",
+      "treatment": "Hyaluronic Acid Injection (Synvisc-One)",
       "duration": "Unknown",
       "outcome": "minimal benefit",
       "dates": "06/2024",
       "relief_duration": null
     },
     {
-      "treatment": "Tylenol + Ibuprofen (OTC analgesics/NSAID)",
+      "treatment": "Tylenol + Ibuprofen (OTC analgesics/NSAIDs)",
       "duration": "ongoing",
       "outcome": "not effective for weeks now",
       "dates": "Not documented",
@@ -60,85 +60,85 @@
   "denial_risk_flags": [
     {
       "id": "flag-1",
-      "label": "Cortisone Injection Dates Undocumented",
+      "label": "Corticosteroid Injection Dates Undocumented",
       "severity": "medium",
-      "explanation": "The two corticosteroid injections are dated only as 'approx 2023, exact date unclear,' which does not meet payer documentation standards requiring specific dates for all prior treatments.",
-      "recommendation": "Obtain and document exact dates for the cortisone injections from the administering provider's records or patient recall, and add a chart addendum specifying the dates.",
+      "explanation": "The two cortisone injections are dated only as 'approx 2023, exact date unclear,' which does not meet payer documentation standards requiring specific dates for each injection to verify conservative care timeline.",
+      "recommendation": "Obtain and document exact dates for both corticosteroid injections from pharmacy records, injection logs, or prior visit notes to establish a verifiable conservative care timeline.",
       "anchorText": "approx 2023, exact date unclear"
     },
     {
       "id": "flag-2",
       "label": "Physical Therapy Duration at Minimum Threshold",
       "severity": "medium",
-      "explanation": "Only 6 weeks of physical therapy is documented for a TKA request. Aetna PPO typically requires a minimum of 6–8 weeks of formal PT with documented failure; 6 weeks is at the lower boundary and may be challenged.",
-      "recommendation": "Add documentation confirming the PT program was structured and supervised, including visit frequency and specific functional outcomes measured, to strengthen the failure-of-conservative-care argument.",
+      "explanation": "Physical therapy is documented at exactly 6 weeks, which meets some payer minimums but falls at the lower boundary; Aetna PPO may require documentation of specific session counts, functional goals, and a formal discharge summary to confirm adequate trial.",
+      "recommendation": "Obtain PT discharge summary from Lakeside Rehab documenting session frequency, functional goals attempted, and objective measures at discharge to substantiate failure of conservative care.",
       "anchorText": "PT at Lakeside Rehab for 6 weeks"
     },
     {
       "id": "flag-3",
-      "label": "NSAID Duration Vague — No Specific Timeframe",
-      "severity": "medium",
-      "explanation": "Tylenol and ibuprofen use is documented as 'ongoing' with no specific start date or duration in weeks or months, which may not satisfy payer requirements for a documented NSAID trial period.",
-      "recommendation": "Add a chart addendum specifying the approximate start date and duration of OTC NSAID/analgesic use (e.g., 'patient has used ibuprofen and acetaminophen daily for approximately X months').",
-      "anchorText": "Tylenol + ibuprofen OTC, ongoing"
+      "label": "Hyaluronic Acid Injection Duration Not Documented",
+      "severity": "low",
+      "explanation": "The Synvisc-One injection in 06/2024 has no documented follow-up interval or duration of observation before declaring minimal benefit, which payers may use to question whether adequate time was allowed to assess response.",
+      "recommendation": "Add a chart note specifying the follow-up date after the 06/2024 Synvisc-One injection and the duration over which minimal benefit was assessed.",
+      "anchorText": "Synvisc-One hyaluronic acid injection right knee 06/2024"
     },
     {
       "id": "flag-4",
-      "label": "No MRI Documented for Surgical Planning",
-      "severity": "low",
-      "explanation": "Only X-ray imaging is documented. While KL Grade IV on X-ray is strong evidence, some Aetna PPO policies for TKA may request MRI to rule out other pathology or confirm surgical candidacy.",
-      "recommendation": "Confirm whether Aetna PPO's current TKA policy requires MRI; if not required, note in the chart that X-ray findings are sufficient for diagnosis and surgical planning per clinical guidelines.",
-      "anchorText": "X-Ray Right Knee 02/15/2025"
-    },
-    {
-      "id": "flag-5",
-      "label": "Elevated BMI May Trigger Medical Review",
-      "severity": "low",
-      "explanation": "BMI of 34.2 combined with ASA III status (HTN, DM, OSA) may trigger additional medical necessity review or require documentation of pre-operative optimization by Aetna PPO.",
-      "recommendation": "Document that the patient's comorbidities are medically optimized (A1c 7.1, CPAP compliance, BP control) and that surgical risk has been assessed and accepted by the anesthesia team.",
+      "label": "Elevated BMI May Require Additional Clearance",
+      "severity": "medium",
+      "explanation": "BMI of 34.2 combined with ASA III comorbidities (HTN, T2DM, OSA) may trigger Aetna PPO's requirement for pre-operative medical optimization documentation or a weight management program attempt prior to elective TKA authorization.",
+      "recommendation": "Document that the patient has been counseled on BMI-related surgical risk and that medical optimization (A1c, blood pressure, CPAP compliance) has been reviewed and cleared by the appropriate specialist.",
       "anchorText": "BMI: 34.2"
     },
     {
-      "id": "flag-conservative-care",
-      "label": "Insufficient Conservative Care Duration Data",
+      "id": "flag-5",
+      "label": "No MRI Documented for Soft Tissue Assessment",
+      "severity": "low",
+      "explanation": "While X-ray findings are robust (KL Grade IV, bone-on-bone), some Aetna PPO policies for CPT 27447 may request MRI to rule out alternative diagnoses or confirm soft tissue integrity, particularly when bilateral disease is present.",
+      "recommendation": "Confirm with Aetna PPO whether MRI is required for CPT 27447 authorization; if so, order and complete MRI of the right knee prior to submission.",
+      "anchorText": "X-Ray Right Knee 02/15/2025"
+    },
+    {
+      "id": "flag-6",
+      "label": "Operating Surgeon Identity Placeholder Present",
       "severity": "high",
-      "explanation": "Only 1 of 2 duration-eligible treatments (PT, NSAID) has a documented specific duration. The NSAID course is listed as 'ongoing' with no specific number of weeks or months, which does not meet the documented-duration standard. Payers for CPT 27447 typically require documented failure of physical therapy (minimum 6 weeks), NSAIDs, and at least one injection before approving surgical intervention.",
-      "recommendation": "Obtain records documenting additional conservative treatments or initiate and document further conservative care before submission. Specifically, add a precise duration for the NSAID/analgesic trial.",
-      "anchorText": "CONSERVATIVE TREATMENT"
+      "explanation": "The operating surgeon is listed as Dr. Sandra Reyes MD in the chart, which is a placeholder and does not match the requesting provider Dr. Sandra Reyes listed in the request details; payers require a clearly identified, credentialed operating surgeon on all prior authorization submissions.",
+      "recommendation": "Confirm and document the full name and NPI of the operating surgeon in the chart and ensure it matches the provider listed on the prior authorization request before submission.",
+      "anchorText": "OR: Dr. Sandra Reyes MD"
     }
   ],
   "pa_strength": {
     "diagnosis_codes": {
       "score": 1,
-      "note": "ICD-10 codes M17.11 and M17.12 are explicitly documented and directly support the requested procedure CPT 27447."
+      "note": "M17.11 (primary OA right knee) is a clinically appropriate and specific ICD-10 code that directly supports medical necessity for CPT 27447 right total knee arthroplasty."
     },
     "conservative_treatments_named": {
       "score": 1,
-      "note": "Four distinct conservative treatments are named: physical therapy, corticosteroid injections, hyaluronic acid injection (Synvisc-One), and OTC analgesics/NSAIDs."
+      "note": "4 distinct conservative treatment modalities documented."
     },
     "conservative_treatment_duration": {
       "score": 1,
-      "note": "Step 1 — Duration-eligible treatments (excluding single-administration injections): Physical Therapy (6 weeks documented), Tylenol + Ibuprofen OTC ('ongoing' — no specific number). Corticosteroid injections and Synvisc-One are single-administration procedures and are excluded from N. N = 2. Step 2 — N = 2, meets minimum threshold, proceed to Step 3. Step 3 — Numerator: PT has explicit duration '6 weeks' = counts. NSAID/analgesic has 'ongoing' with no specific number = does NOT count. D = 1. Step 4 — D/N = 1/2 = 50%. 50% meets the threshold. Score = 1."
+      "note": "1 of 2 duration-eligible treatments have an explicit numeric duration (50%). Meets the 50% threshold."
     },
     "imaging_findings": {
       "score": 1,
-      "note": "X-ray imaging is completed with detailed findings documented: KL Grade IV right knee with bone-on-bone medial compartment involvement and 8-degree varus deformity, directly supporting surgical necessity."
+      "note": "Completed imaging with documented findings."
     },
     "functional_limitations": {
       "score": 1,
-      "note": "Three specific functional limitations are explicitly documented: inability to walk more than 1 block, inability to use stairs without a handrail, and inability to demonstrate drills as a volunteer coach."
+      "note": "3 specific functional limitations documented."
     },
     "surgical_approach": {
       "score": 1,
-      "note": "Surgical approach is explicitly documented as 'Anterior approach. Will perform standard primary TKA.'"
+      "note": "The chart explicitly documents 'Anterior approach. Will perform standard primary TKA,' which is a specific, procedure-appropriate technique for CPT 27447."
     },
     "cpt_code_valid": {
       "score": 1,
-      "note": "CPT 27447 (total knee arthroplasty) is explicitly documented in the chart and matches the diagnosis of primary OA right knee (M17.11)."
+      "note": "CPT 27447 is a recognized orthopedic surgical code."
     },
     "symptom_duration": {
       "score": 1,
-      "note": "Symptom duration is explicitly documented as '3+ years' of bilateral knee pain."
+      "note": "Symptom duration (\"3+ years\") is ≥ 12 weeks."
     }
   },
   "pain_score": "8/10 with activity, 4/10 at rest",

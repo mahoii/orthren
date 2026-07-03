@@ -3,6 +3,7 @@
 // IMPORTANT: this module must stay free of server-only imports (no `server-only`,
 // no Supabase, no Node built-ins) so it can be imported by both server routes and
 // client components (e.g. components/PayerCombobox.tsx).
+import type { PaStrength, ConservativeTreatment } from "@/lib/types";
 
 export interface ImageRequirement {
   modality: string;
@@ -793,4 +794,78 @@ export function getPayerChecklist(rule: PayerRule): PayerChecklistItem[] {
   }
 
   return items;
+}
+
+// ── Validated-payer PA Strength adjustment ───────────────────────────────────
+// Relocated from app/api/generate-pa/route.ts so app/api/regenerate-denial-fix/route.ts
+// can reapply the same penalty after a denial-fix regeneration, instead of losing it
+// to a client-side force-set (see review/page.tsx handleRegenerate).
+
+// Parse a payer minimum-duration string ("≥6 weeks", "3 months", "≥12 weeks per
+// InterQual") into an integer number of weeks. Returns 0 when no week/month
+// quantity is present (e.g. "Documented attempt"), which safely skips the score
+// penalty.
+//
+// NOTE: on ranges like "12 or 24 weeks depending on age/BMI" this regex matches
+// the first (lenient) number in the string, so the resulting requiredWeeks is
+// always the 12-week bound. For Aetna specifically, the 24-week cohort (age <50
+// or morbid obesity) is therefore scored against the more lenient 12-week bar
+// rather than its own stricter threshold — a known simplification, not a bug.
+export function parseMinimumWeeks(duration: string): number {
+  if (!duration) return 0;
+  const match = duration.match(/(\d+(?:\.\d+)?)\s*(week|month)/i);
+  if (!match) return 0;
+  const qty = parseFloat(match[1]);
+  if (!isFinite(qty)) return 0;
+  const weeks = match[2].toLowerCase().startsWith("month") ? qty * 4.33 : qty;
+  return Math.round(weeks);
+}
+
+// Find documented physical-therapy treatments in the extracted chart data and
+// return the largest parsed week count (most favorable to the provider).
+// Returns 0 when no PT is documented or its duration cannot be parsed into weeks.
+export function parsePtWeeksFromExtracted(treatments: ConservativeTreatment[]): number {
+  if (!Array.isArray(treatments)) return 0;
+  let maxWeeks = 0;
+  for (const t of treatments) {
+    const name = (t?.treatment ?? "").toLowerCase();
+    const isPt = name.includes("physical therapy") || /\bpt\b/.test(name);
+    if (!isPt) continue;
+    const weeks = parseMinimumWeeks(t?.duration ?? "");
+    if (weeks > maxWeeks) maxWeeks = weeks;
+  }
+  return maxWeeks;
+}
+
+// Payer-specific PA Strength adjustment: penalizes conservative-care duration
+// when documented PT falls short of the payer's minimum weeks threshold.
+// Self-gated on validation_status — an unvalidated (research-sourced,
+// unconfirmed) rule must never move the score away from what the deterministic
+// rubric already produced. Only ever demotes conservative_treatment_duration to
+// 0 — never promotes a factor the rubric scored 0.
+export function applyValidatedPayerDurationPenalty(
+  pa_strength: PaStrength,
+  payerRule: PayerRule | null,
+  conservativeTreatments: ConservativeTreatment[]
+): PaStrength {
+  if (!payerRule || payerRule.validation_status !== "validated") return pa_strength;
+
+  const ptReq = payerRule.conservative_treatment_requirements.find((r) =>
+    r.treatment.toLowerCase().includes("physical therapy")
+  );
+  if (!ptReq) return pa_strength;
+
+  const requiredWeeks = parseMinimumWeeks(ptReq.minimum_duration);
+  const actualWeeks = parsePtWeeksFromExtracted(conservativeTreatments);
+  if (requiredWeeks > 0 && actualWeeks > 0 && actualWeeks < requiredWeeks) {
+    return {
+      ...pa_strength,
+      conservative_treatment_duration: {
+        score: 0,
+        note: `${payerRule.payer_name} requires ≥${requiredWeeks} weeks PT. Chart shows ${actualWeeks} week${actualWeeks === 1 ? "" : "s"}.`,
+      },
+    };
+  }
+
+  return pa_strength;
 }

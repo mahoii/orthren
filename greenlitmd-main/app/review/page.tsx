@@ -8,6 +8,7 @@ import AnnotatedLetterComponent, { type AnnotationItem } from "@/components/Anno
 import type { DenialRiskFlag, ExtractedChartData, GeneratePaResponse } from "@/lib/types";
 import { getSuggestFixGuidance } from "@/lib/suggest-fix-templates";
 import { getPayerChecklist, type PayerRule } from "@/lib/payer-rules";
+import { PA_STRENGTH_WEIGHTS } from "@/lib/pa-strength-weights";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,17 +44,6 @@ interface AttentionItem {
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-
-const paStrengthWeights: Record<PaStrengthFactorKey, number> = {
-  diagnosis_codes: 10,
-  conservative_treatments_named: 20,
-  conservative_treatment_duration: 10,
-  imaging_findings: 15,
-  functional_limitations: 15,
-  surgical_approach: 10,
-  cpt_code_valid: 10,
-  symptom_duration: 10,
-};
 
 const paStrengthFactors: Array<{
   key: PaStrengthFactorKey;
@@ -133,7 +123,7 @@ export default function ReviewPage() {
       placeholder: f.placeholder,
       score: paStrength?.[f.key]?.score ?? 0,
       maxScore: 1 as const,
-      weight: paStrengthWeights[f.key],
+      weight: PA_STRENGTH_WEIGHTS[f.key],
       note: paStrength?.[f.key]?.note ?? '',
       anchorText: paStrength?.[f.key]?.anchorText,
     })),
@@ -362,28 +352,13 @@ export default function ReviewPage() {
         setEditedLetter(json.letter);
         setSourceLockWarning(json.sourceLockWarning ?? null);
 
-        // Update pa_strength scores for supplemented factors so the score reflects the fix,
-        // and merge the server-returned extractionJson so review-page state / export stop
+        // Merge the server-returned extractionJson — it already includes pa_strength
+        // freshly recomputed server-side from the merged/supplemented fields (see
+        // app/api/regenerate-denial-fix/route.ts), so review-page state / export stop
         // diverging from what the regenerated letter actually says.
         const supplementedKeys = Object.keys(activeSupplements);
-        if (supplementedKeys.length > 0 || json.extractionJson) {
-          setData(prev => {
-            if (!prev) return prev;
-            const updatedPaStrength = { ...prev.extracted.pa_strength } as Record<string, { score: number; note: string; anchorText?: string }>;
-            for (const key of supplementedKeys) {
-              if (updatedPaStrength[key]) {
-                updatedPaStrength[key] = { ...updatedPaStrength[key], score: 1 };
-              }
-            }
-            return {
-              ...prev,
-              extracted: {
-                ...prev.extracted,
-                ...json.extractionJson,
-                pa_strength: updatedPaStrength as typeof prev.extracted.pa_strength,
-              },
-            };
-          });
+        if (json.extractionJson) {
+          setData(prev => prev ? { ...prev, extracted: { ...prev.extracted, ...json.extractionJson } } : prev);
         }
 
         posthog?.capture("letter_regenerated_denial_fix", {

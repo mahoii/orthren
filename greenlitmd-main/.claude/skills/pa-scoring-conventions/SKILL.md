@@ -6,20 +6,29 @@ description: Reference skill for the 8-factor PA Strength Score weighting, facto
 # PA Strength Score — Conventions Reference
 
 ## 8-Factor Weight Matrix
-Weights are applied client-side; the API returns raw 0/1 scores per factor:
+Weights live in one shared module, `lib/pa-strength-weights.ts` (`PA_STRENGTH_WEIGHTS` +
+`computeEarnedWeight`), imported by both the client review page and any server code that needs
+the weighted 0-10 score. 6 of the 8 factors are scored deterministically in code
+(`computeDeterministicPaStrength` in `lib/pa-pipeline.ts`) directly from the normalized extracted
+fields — reproducible run-to-run. The remaining 2 (`diagnosis_codes`, `surgical_approach`) are
+scored by the extraction LLM because they require clinical judgment.
 
-| Factor | Weight | Score=0 Means |
-|---|---|---|
-| `diagnosis_codes` | 10% | No ICD-10 codes present |
-| `conservative_treatments_named` | 20% | No specific treatment names extracted |
-| `conservative_treatment_duration` | 10% | Fewer than 50% of named duration-eligible treatments (PT, NSAID/med courses, bracing, HEP — single-administration injections excluded) have an explicit duration, or fewer than 2 duration-eligible treatments are named at all |
-| `imaging_findings` | 15% | No completed imaging (pending = 0) |
-| `functional_limitations` | 15% | No specific functional limitations stated |
-| `surgical_approach` | 10% | No surgical approach described |
-| `cpt_code_valid` | 10% | CPT code missing or implausible |
-| `symptom_duration` | 10% | No symptom timeline stated |
+| Factor | Weight | Scored By | Score=0 Means |
+|---|---|---|---|
+| `diagnosis_codes` | 10% | LLM | No ICD-10 code present, or none clinically support the requested procedure |
+| `conservative_treatments_named` | 20% | Deterministic | Fewer than 2 distinct named treatment modalities documented |
+| `conservative_treatment_duration` | 10% | Deterministic | Fewer than 50% of duration-eligible treatments (PT, NSAID/med courses, bracing, HEP — single-administration injections excluded) have an explicit numeric duration, or fewer than 2 duration-eligible treatments are named at all |
+| `imaging_findings` | 15% | Deterministic | No completed imaging with non-null findings text (pending, not-ordered, or completed-with-no-findings-text all score 0) |
+| `functional_limitations` | 15% | Deterministic | Fewer than 2 specific functional limitations documented |
+| `surgical_approach` | 10% | LLM | No specific, procedure-appropriate surgical approach described |
+| `cpt_code_valid` | 10% | Deterministic | CPT code not present in `lib/known-cpt-codes.ts`'s allowlist |
+| `symptom_duration` | 10% | Deterministic | Symptom duration doesn't parse to ≥12 weeks (day/week/month/year units) |
 
 **Total: 100%** — computed as `sum(factor.score * weight)` → expressed as 0–10.
+
+`conservative_treatments_named ≥2` and `functional_limitations ≥2` are house rules (product
+judgment, not derived from a specific payer citation) — unlike `symptom_duration ≥12wks`, which
+matches the ~3-month language in `payer-rules.ts`'s Aetna/Cigna entries.
 
 ## UI Threshold States
 - **Score < 5.0** → Red Alert — high denial risk, sidebar highlights deficiencies
@@ -32,15 +41,20 @@ Each factor in `pa_strength` (from `lib/types.ts`):
 type PaStrengthFactor = {
   score: 0 | 1;
   note: string;          // plain English explanation of the score
-  anchorText?: string;   // only when score=0: 10-50 char verbatim phrase from letter
+  anchorText?: string;   // only when score=0: 10-50 char verbatim phrase, or a stable
+                          // letter section heading (real letter text doesn't exist yet
+                          // at scoring time for the 6 deterministic factors)
 };
 ```
 
 ## Where This Lives in Code
 - **Type definitions:** `lib/types.ts` — `PaStrength`, `PaStrengthFactor`
-- **Scoring prompt:** bottom of the extraction system prompt in `app/api/generate-pa/route.ts` (search for "pa_strength")
+- **Extraction prompt (LLM-scored factors only):** `lib/pa-pipeline.ts`, `extractionSystemPrompt` (search for "pa_strength")
+- **Deterministic scoring:** `computeDeterministicPaStrength` in `lib/pa-pipeline.ts`
+- **Shared weights:** `lib/pa-strength-weights.ts`
+- **Known-CPT allowlist:** `lib/known-cpt-codes.ts`
+- **Validated-payer duration penalty:** `applyValidatedPayerDurationPenalty` in `lib/payer-rules.ts` — re-demotes `conservative_treatment_duration` to 0 when a validated payer rule's PT-week minimum exceeds what's documented; applied in both `app/api/generate-pa/route.ts` and `app/api/regenerate-denial-fix/route.ts`
 - **UI rendering:** sidebar PA score display reads `extracted.pa_strength` from the generation response
-- **Skill flat file (legacy):** `.claude/skills/pa-scoring.md` — superseded by this directory
 
 ## Denial Risk Flags
 Separate from pa_strength — `denial_risk_flags` is an array of `DenialRiskFlag` objects:

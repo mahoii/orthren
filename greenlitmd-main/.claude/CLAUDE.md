@@ -15,7 +15,7 @@
 
 ## Architecture Pointers
 - **File ingestion → PA packet:** `app/api/generate-pa/route.ts` — pdf-parse / mammoth extraction, then 2× Anthropic calls (extraction + letter). Must stay `export const runtime = "nodejs"` — Edge Runtime breaks pdf-parse/mammoth.
-- **PA Strength Score (8-factor):** Scoring weights are defined inline at the bottom of the extraction system prompt inside `app/api/generate-pa/route.ts`. Factor definitions and UI thresholds also live in `.claude/skills/pa-scoring.md`.
+- **PA Strength Score (8-factor):** Extraction prompt lives in `lib/pa-pipeline.ts`. Only 2 factors (`diagnosis_codes`, `surgical_approach`) are LLM-scored there; the other 6 are scored deterministically by `computeDeterministicPaStrength` in the same file. Shared weights live in `lib/pa-strength-weights.ts`. Factor definitions and UI thresholds live in `.claude/skills/pa-scoring-conventions/SKILL.md`.
 - **LOMN letter prompt:** `lib/letter-system-prompt.ts`
 - **Anthropic wrapper:** `lib/anthropic.ts` — use `callAnthropicWithRetry` for all generation calls
 - **DOCX export:** `app/api/export/route.ts`
@@ -35,8 +35,8 @@
 - **Sandbox isolation:** `/sandbox` and its handlers must only read from the static Delgado / Chen / Vance profiles in `lib/demo-data.ts`. Zero live Anthropic calls from sandbox, ever.
 
 ## Testing / Regression Workflow
-- The three synthetic charts — **Maria A. Delgado** (Clean TKA), **Robert Chen** (Messy Rotator Cuff), **Eleanor Vance** (Incomplete Lumbar Fusion) — are the standard regression set.
-- Any change to the extraction prompt or letter-generation prompt must be checked against all three before merging. Use the `/prompt-regression-check` skill or the `prompt-evaluator` subagent.
+- The standard regression set is the three **DOCX** fixture charts in `lib/sample-charts/`: **Kim, Rachel** (CPT 29827, Clean rotator cuff), **Webb, Marcus** (CPT 27447, Messy TKA), **Vance, Sandra** (CPT 27130, Incomplete THA) — run via `scripts/eval-pipeline.ts`. Note: `lib/demo-data.ts` (Maria Delgado / Robert Chen / Eleanor Vance) is a separate, frozen `/sandbox` UI fixture and must never be used for prompt evaluation.
+- Any change to the extraction prompt or letter-generation prompt must be checked against all three before merging. Use the `/prompt-regression-check` skill.
 - Run `npm run typecheck` before considering a change done. CI covers this, but catch it locally first.
 
 ## Clinical-Content Rules (Non-Negotiable)

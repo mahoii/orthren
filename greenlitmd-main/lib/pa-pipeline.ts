@@ -3,6 +3,7 @@ import { deidentify, reidentify, reidentifyDeep } from "@/lib/deidentify";
 import { letterSystemPrompt } from "@/lib/letter-system-prompt";
 import { buildBmiAsaPromptLines, postProcessLetter } from "@/lib/letter-postprocess";
 import { sanitizeLetterPlaceholders } from "@/lib/letter-placeholders";
+import { isKnownCptCode } from "@/lib/known-cpt-codes";
 import type { ExtractedChartData, DenialRiskFlag, PaStrength, PaStrengthFactor } from "@/lib/types";
 
 export type RequestDetails = {
@@ -84,16 +85,13 @@ CONSERVATIVE CARE COMPLETENESS CHECK: After extracting all treatments, evaluate 
 
 PENDING IMAGING FLAG: If imaging_findings contains imaging that is scheduled, pending, or not yet completed, add a denial_risk_flag object: { "id": "flag-pending-imaging", "label": "Imaging Not Yet Complete", "severity": "high", "explanation": "Payers require completed imaging results before authorizing surgical procedures.", "recommendation": "Do not submit until imaging results are available and documented.", "anchorText": "Radiographic" }.
 
-After extracting all fields, evaluate the chart against these 8 factors and return a score object called pa_strength inside the JSON. For each factor, return a score of 0 or 1 (0 = missing or insufficient, 1 = present and adequate), a one-sentence plain English note explaining the score, and for factors with score=0, an anchorText field (10-50 char verbatim phrase from the letter indicating where the gap is, or the most relevant section heading). The pa_strength object must include: diagnosis_codes, conservative_treatments_named, conservative_treatment_duration, imaging_findings, functional_limitations, surgical_approach, cpt_code_valid, and symptom_duration. Each must be an object with score (0 or 1), note (string), and optionally anchorText (string, only when score=0).
+After extracting all fields, evaluate the chart against these 2 factors and return a score object called pa_strength inside the JSON containing exactly these two keys: diagnosis_codes and surgical_approach. For each factor, return a score of 0 or 1 (0 = missing or insufficient, 1 = present and adequate), a one-sentence plain English note explaining the score, and for score=0 an anchorText field (10-50 char verbatim phrase from the letter indicating where the gap is, or the most relevant section heading).
 
-CONSERVATIVE_TREATMENT_DURATION SCORING RULE: This is a mechanical count, not a clinical judgment. Follow these steps in order, and show the resulting fraction and percentage explicitly in the note field (e.g. "1 of 2 = 50%, meets threshold, score = 1").
-Step 1 — Build the denominator (N): count only duration-eligible conservative treatments — physical therapy, NSAID/medication courses, bracing, activity modification, home exercise programs, and similar treatments administered over a course. EXCLUDE single-administration treatments entirely from N (cortisone injections, Synvisc/hyaluronic acid injections, and any other one-time procedure) — they never count toward N or the numerator, since duration is not a coherent concept for a single administration.
-Step 2 — If N < 2, score 0 immediately and stop. Do not proceed to Step 3.
-Step 3 — Build the numerator (D): count how many of the N treatments have an explicitly documented duration. A duration counts ONLY if it states a specific number plus a time or count unit (e.g. "6 weeks", "3 months", "8 weeks (September–October 2024)", "10 sessions"). Vague terms with no specific number — "ongoing", "chronic", "long-term", "for weeks now", "for a while", "long-standing" — do NOT count as a documented duration, even though the treatment itself still counts toward N.
-Step 4 — Compute D/N as a percentage, rounded to the nearest whole point. If the result is 50% or higher, score 1; otherwise score 0. 1 of 2 (50%) always scores 1. 1 of 3 (33%) always scores 0. The score field is a direct, literal function of this computed percentage — it is not a separate impression of overall care adequacy.
-OUTPUT ORDER FOR THIS FACTOR ONLY: within the conservative_treatment_duration object, emit the "note" key (containing the full Steps 1-4 walkthrough) BEFORE the "score" key, then "anchorText" if applicable — i.e. {"note": "...", "score": 0 or 1, "anchorText": "..."} — so the score digit is written only after the arithmetic is already on the page, never before it. Do not decide the score digit first and rationalize the note afterward.
+DIAGNOSIS_CODES SCORING: Score 1 only if diagnosis_codes contains at least one ICD-10 code that is a clinically appropriate, medical-necessity-supporting indication for requested_procedure (e.g. M17.x osteoarthritis codes support a knee arthroplasty request; a vague or mismatched code does not). Score 0 if diagnosis_codes is empty, non-specific, or does not clinically justify the requested procedure.
 
-Weight the overall score on the frontend as: diagnosis_codes 10%, conservative_treatments_named 20%, conservative_treatment_duration 10%, imaging_findings 15%, functional_limitations 15%, surgical_approach 10%, cpt_code_valid 10%, symptom_duration 10%.
+SURGICAL_APPROACH SCORING: Score 1 only if surgical_approach_if_mentioned documents a specific, procedure-appropriate technique (not a placeholder like "to be determined intraoperatively" or "based on intraoperative findings"). Score 0 if null, generic, or inconsistent with requested_procedure.
+
+The remaining 6 factors — conservative_treatments_named, conservative_treatment_duration, imaging_findings, functional_limitations, cpt_code_valid, and symptom_duration — are scored deterministically by the application directly from the extracted fields above. Do not include them in the pa_strength object.
 
 Return ONLY valid JSON. No markdown. No backticks. No preamble. No explanation. Start with { and end with }.`;
 
@@ -311,16 +309,105 @@ const HIGH_RISK_VOCABULARY = [
   "CT-guided",
 ];
 
+const MONTH_NAME_ALTERNATION =
+  "January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec";
+
+const MONTH_NAME_TO_NUM: Record<string, string> = {
+  january: "01", jan: "01",
+  february: "02", feb: "02",
+  march: "03", mar: "03",
+  april: "04", apr: "04",
+  may: "05",
+  june: "06", jun: "06",
+  july: "07", jul: "07",
+  august: "08", aug: "08",
+  september: "09", sep: "09", sept: "09",
+  october: "10", oct: "10",
+  november: "11", nov: "11",
+  december: "12", dec: "12",
+};
+
 const DATE_PATTERNS = [
   /\b\d{4}-\d{2}-\d{2}\b/g,
   /\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/g,
-  /\b(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+\d{1,2},?\s+\d{4}\b/gi,
-  /\b(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+\d{4}\b/gi,
+  new RegExp(`\\b(?:${MONTH_NAME_ALTERNATION})\\.?\\s+\\d{1,2},?\\s+\\d{4}\\b`, "gi"),
+  new RegExp(`\\b(?:${MONTH_NAME_ALTERNATION})\\.?\\s+\\d{4}\\b`, "gi"),
   /\b(?:late|early)\s+\d{4}\b/gi,
+];
+
+// Broader than DATE_PATTERNS (used to scan the letter): also matches "MM/YYYY",
+// since extraction dates commonly use that shape (e.g. "06/2024") while the
+// letter narrates the same date as "June 2024" — see isDateGroundedInHaystack.
+const HAYSTACK_DATE_PATTERNS = [
+  /\b\d{4}-\d{2}-\d{2}\b/g,
+  /\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/g,
+  /\b\d{1,2}\/\d{4}\b/g,
+  new RegExp(`\\b(?:${MONTH_NAME_ALTERNATION})\\.?\\s+\\d{1,2},?\\s+\\d{4}\\b`, "gi"),
+  new RegExp(`\\b(?:${MONTH_NAME_ALTERNATION})\\.?\\s+\\d{4}\\b`, "gi"),
 ];
 
 const DURATION_PATTERN = /\b\d+\s?(?:day|week|month|year)s?\b/gi;
 const DOSAGE_PATTERN = /\b\d+\s?mg\b/gi;
+
+/**
+ * Normalizes a date string to canonical YYYY-MM or YYYY-MM-DD form so SOURCE
+ * LOCK comparisons treat e.g. "June 2024" and "06/2024" as the same date
+ * instead of failing on a literal substring mismatch. Returns null for
+ * anything not in one of the handled shapes (ISO dates already compare fine
+ * via the caller's literal-substring check, ranges like "late 2024" are left
+ * to that same fallback).
+ */
+function parseDateFlexible(input: string): string | null {
+  const s = input.trim();
+
+  // "Month DD, YYYY" / "Month DD YYYY" (e.g. "June 15, 2024")
+  let m = s.match(/^([A-Za-z]+)\.?\s+(\d{1,2}),?\s+(\d{4})$/);
+  if (m) {
+    const month = MONTH_NAME_TO_NUM[m[1].toLowerCase()];
+    if (month) return `${m[3]}-${month}-${m[2].padStart(2, "0")}`;
+  }
+
+  // "Month YYYY" (e.g. "June 2024")
+  m = s.match(/^([A-Za-z]+)\.?\s+(\d{4})$/);
+  if (m) {
+    const month = MONTH_NAME_TO_NUM[m[1].toLowerCase()];
+    if (month) return `${m[2]}-${month}`;
+  }
+
+  // "MM/DD/YYYY" or "MM-DD-YYYY"
+  m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (m) {
+    const year = m[3].length === 2 ? `20${m[3]}` : m[3];
+    return `${year}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
+  }
+
+  // "MM/YYYY"
+  m = s.match(/^(\d{1,2})\/(\d{4})$/);
+  if (m) return `${m[2]}-${m[1].padStart(2, "0")}`;
+
+  return null;
+}
+
+/**
+ * Fallback for a letter date that failed the literal haystack.includes()
+ * check: re-parses both the letter's date and every date-shaped substring in
+ * the haystack to a canonical form and compares those instead. Returns false
+ * (ungrounded) if the letter value isn't a recognized date shape at all —
+ * this only rescues genuine date-format mismatches, not arbitrary strings.
+ */
+function isDateGroundedInHaystack(value: string, haystack: string): boolean {
+  const normalized = parseDateFlexible(value);
+  if (!normalized) return false;
+
+  for (const pattern of HAYSTACK_DATE_PATTERNS) {
+    pattern.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = pattern.exec(haystack)) !== null) {
+      if (parseDateFlexible(m[0]) === normalized) return true;
+    }
+  }
+  return false;
+}
 
 /**
  * Runtime backstop for the SOURCE LOCK prompt rule: verifies dates/durations,
@@ -359,9 +446,9 @@ export function verifySourceLock(letter: string, extracted: ExtractedChartData, 
     while ((match = pattern.exec(letter)) !== null) {
       const value = match[0];
       if (value === letterDate) continue;
-      if (!haystack.includes(value)) {
-        violations.push(`Ungrounded date/duration in letter: "${value}"`);
-      }
+      if (haystack.includes(value)) continue;
+      if (isDateGroundedInHaystack(value, haystack)) continue;
+      violations.push(`Ungrounded date/duration in letter: "${value}"`);
     }
   }
 
@@ -577,7 +664,18 @@ export function normalizeChartData(
     requested_procedure: requestedProcedure,
     surgical_approach_if_mentioned: surgicalApproach,
     denial_risk_flags: denialRiskFlags,
-    pa_strength: normalizePaStrength(data.pa_strength),
+    pa_strength: computeDeterministicPaStrength(
+      {
+        conservative_treatments_attempted: conservativeTreatments,
+        imaging_findings: imagingFindings,
+        functional_limitations: functionalLimitations,
+        symptom_duration: symptomDuration,
+        diagnosis_codes: diagnosisCodes,
+        surgical_approach_if_mentioned: surgicalApproach,
+      },
+      requestDetails.cptCode,
+      data.pa_strength
+    ),
     ...(painScore !== null ? { pain_score: painScore } : {}),
     ...(bmi !== null ? { bmi } : {}),
     ...(asa_classification !== null ? { asa_classification } : {}),
@@ -696,26 +794,216 @@ function normalizeDenialRiskFlags(raw: unknown): DenialRiskFlag[] {
   });
 }
 
-function normalizePaStrength(value: unknown): PaStrength {
-  const source = isObject(value) ? value : {};
+// ── Deterministic PA Strength scoring ───────────────────────────────────────
+// 6 of the 8 factors are pure functions of already-normalized extracted fields,
+// so they're bit-reproducible across identical runs. diagnosis_codes and
+// surgical_approach remain clinical-judgment calls scored by the extraction LLM
+// (passed in via llmRawPaStrength) — except on the regenerate-denial-fix path,
+// which re-scores a merged extraction with no fresh LLM call, where both fall
+// back to simple presence checks instead.
 
-  const readFactor = (key: string): PaStrengthFactor => {
-    const factor = isObject(source[key]) ? source[key] : {};
-    const score = typeof factor.score === "number" && factor.score === 1 ? 1 : 0;
-    const note = typeof factor.note === "string" ? factor.note.trim() : "";
-    const rawAnchor = typeof factor.anchorText === "string" ? factor.anchorText.trim() : "";
-    return rawAnchor ? { score, note, anchorText: rawAnchor } : { score, note };
+type DeterministicPaStrengthInput = {
+  conservative_treatments_attempted: ExtractedChartData["conservative_treatments_attempted"];
+  imaging_findings: ExtractedChartData["imaging_findings"];
+  functional_limitations: string[];
+  symptom_duration: string | null;
+  diagnosis_codes: string[];
+  surgical_approach_if_mentioned: string | null;
+};
+
+// Section headings from lib/letter-system-prompt.ts's RULE — STRUCTURE list, used as
+// anchorText fallbacks for deterministic factors since real letter text doesn't exist
+// yet at scoring time (extraction runs before letter generation).
+const SECTION_ANCHORS = {
+  clinicalHistory: "CLINICAL HISTORY AND PRESENTING COMPLAINT",
+  diagnosis: "DIAGNOSIS",
+  functionalLimitations: "FUNCTIONAL LIMITATIONS",
+  conservativeTreatment: "CONSERVATIVE TREATMENT HISTORY",
+  requestedProcedure: "REQUESTED PROCEDURE",
+};
+
+const SENTINEL_TREATMENT_NAMES = new Set([
+  "unknown treatment",
+  "conservative treatment history not documented",
+]);
+
+const SINGLE_ADMINISTRATION_TREATMENT_PATTERN = /injection/i;
+
+// Matches an explicit numeric duration ("6 weeks", "3 months", "10 sessions", "3+
+// years") on an extracted treatment record. The optional "+" handles open-ended
+// phrasing ("3+ years") that would otherwise silently fail to match. Distinct from
+// this file's DURATION_PATTERN (used by verifySourceLock to flag ungrounded
+// durations in *generated letter text*) — same shape of problem, different job, so
+// kept as separate constants.
+const TREATMENT_DURATION_VALUE_PATTERN = /\d+(?:\.\d+)?\+?\s*(day|week|month|year|session|visit)s?\b/i;
+
+function scoreConservativeTreatmentsNamed(
+  treatments: ExtractedChartData["conservative_treatments_attempted"]
+): PaStrengthFactor {
+  const distinctNames = new Set(
+    treatments
+      .map((t) => t.treatment?.trim().toLowerCase() ?? "")
+      .filter((name) => name && !SENTINEL_TREATMENT_NAMES.has(name))
+  );
+  const count = distinctNames.size;
+  // House rule (not derived from a specific payer citation) — a reasonable proxy for
+  // "more than one modality attempted."
+  if (count >= 2) {
+    return { score: 1, note: `${count} distinct conservative treatment modalities documented.` };
+  }
+  return {
+    score: 0,
+    note: `Only ${count} distinct conservative treatment modalit${count === 1 ? "y" : "ies"} documented (need ≥ 2).`,
+    anchorText: SECTION_ANCHORS.conservativeTreatment,
   };
+}
+
+function scoreConservativeTreatmentDuration(
+  treatments: ExtractedChartData["conservative_treatments_attempted"]
+): PaStrengthFactor {
+  // Deterministic port of the rubric formerly spelled out in the extraction prompt:
+  // Step 1 — exclude single-administration treatments from N (they never count).
+  // Step 2 — N < 2 scores 0 immediately.
+  // Step 3 — count how many of the N treatments have an explicit numeric duration (D).
+  // Step 4 — D/N >= 50% scores 1, otherwise 0.
+  const eligible = treatments.filter(
+    (t) => t.treatment && !SINGLE_ADMINISTRATION_TREATMENT_PATTERN.test(t.treatment)
+  );
+  const n = eligible.length;
+  if (n < 2) {
+    return {
+      score: 0,
+      note: `Only ${n} duration-eligible conservative treatment${n === 1 ? "" : "s"} documented (need ≥ 2 course-based treatments to evaluate duration; single-administration treatments like injections are excluded).`,
+      anchorText: SECTION_ANCHORS.conservativeTreatment,
+    };
+  }
+  const withDuration = eligible.filter((t) => t.duration && TREATMENT_DURATION_VALUE_PATTERN.test(t.duration));
+  const d = withDuration.length;
+  const pct = Math.round((d / n) * 100);
+  const score: 0 | 1 = pct >= 50 ? 1 : 0;
+  const note = `${d} of ${n} duration-eligible treatments have an explicit numeric duration (${pct}%). ${score ? "Meets" : "Below"} the 50% threshold.`;
+  return score === 1 ? { score, note } : { score, note, anchorText: SECTION_ANCHORS.conservativeTreatment };
+}
+
+function scoreImagingFindings(imagingFindings: ExtractedChartData["imaging_findings"]): PaStrengthFactor {
+  if (imagingFindings && imagingFindings.key_findings) {
+    return { score: 1, note: "Completed imaging with documented findings." };
+  }
+  return {
+    score: 0,
+    note: imagingFindings
+      ? "Imaging is documented as completed but no specific findings text is present."
+      : "No completed imaging with findings is documented.",
+    anchorText: SECTION_ANCHORS.diagnosis,
+  };
+}
+
+function scoreFunctionalLimitations(functionalLimitations: string[]): PaStrengthFactor {
+  const count = functionalLimitations.length;
+  // House rule (not derived from a specific payer citation).
+  if (count >= 2) {
+    return { score: 1, note: `${count} specific functional limitations documented.` };
+  }
+  return {
+    score: 0,
+    note: `Only ${count} functional limitation${count === 1 ? "" : "s"} documented (need ≥ 2).`,
+    anchorText: SECTION_ANCHORS.functionalLimitations,
+  };
+}
+
+// General duration-string -> weeks parser (day/week/month/year) for symptom_duration
+// scoring. Deliberately distinct from lib/payer-rules.ts's parseMinimumWeeks, which
+// only handles week/month units — symptom durations are routinely given in years
+// ("2-year history"), which parseMinimumWeeks would silently fail to parse.
+function parseSymptomDurationWeeks(text: string | null): number | null {
+  if (!text) return null;
+  // Optional "+" tolerates open-ended phrasing ("3+ years") that would otherwise
+  // silently fail to match.
+  const match = text.match(/(\d+(?:\.\d+)?)\+?\s*(day|week|month|year)/i);
+  if (!match) return null;
+  const qty = parseFloat(match[1]);
+  if (!isFinite(qty)) return null;
+  const unit = match[2].toLowerCase();
+  if (unit.startsWith("day")) return qty / 7;
+  if (unit.startsWith("week")) return qty;
+  if (unit.startsWith("month")) return qty * 4.33;
+  return qty * 52;
+}
+
+function scoreSymptomDuration(symptomDuration: string | null): PaStrengthFactor {
+  const weeks = parseSymptomDurationWeeks(symptomDuration);
+  if (weeks !== null && weeks >= 12) {
+    return { score: 1, note: `Symptom duration ("${symptomDuration}") is ≥ 12 weeks.` };
+  }
+  return {
+    score: 0,
+    note: symptomDuration
+      ? `Symptom duration ("${symptomDuration}") does not confirm ≥ 12 weeks.`
+      : "Symptom duration is not documented.",
+    anchorText: SECTION_ANCHORS.clinicalHistory,
+  };
+}
+
+function scoreCptCodeValid(cptCode: string): PaStrengthFactor {
+  if (isKnownCptCode(cptCode)) {
+    return { score: 1, note: `CPT ${cptCode} is a recognized orthopedic surgical code.` };
+  }
+  return {
+    score: 0,
+    note: `CPT ${cptCode || "(missing)"} is not in the recognized code list — verify against the plan section.`,
+    anchorText: SECTION_ANCHORS.requestedProcedure,
+  };
+}
+
+function fallbackDiagnosisCodesFactor(diagnosisCodes: string[]): PaStrengthFactor {
+  if (diagnosisCodes.length > 0) {
+    return {
+      score: 1,
+      note: `${diagnosisCodes.length} diagnosis code${diagnosisCodes.length === 1 ? "" : "s"} documented.`,
+    };
+  }
+  return { score: 0, note: "No diagnosis codes documented.", anchorText: SECTION_ANCHORS.diagnosis };
+}
+
+function fallbackSurgicalApproachFactor(surgicalApproach: string | null): PaStrengthFactor {
+  if (surgicalApproach) {
+    return { score: 1, note: "Surgical approach documented." };
+  }
+  return {
+    score: 0,
+    note: "Surgical approach not documented.",
+    anchorText: SECTION_ANCHORS.requestedProcedure,
+  };
+}
+
+function readLlmFactor(source: Record<string, unknown>, key: string): PaStrengthFactor {
+  const factor = isObject(source[key]) ? source[key] : {};
+  const score = typeof factor.score === "number" && factor.score === 1 ? 1 : 0;
+  const note = typeof factor.note === "string" ? factor.note.trim() : "";
+  const rawAnchor = typeof factor.anchorText === "string" ? factor.anchorText.trim() : "";
+  return rawAnchor ? { score, note, anchorText: rawAnchor } : { score, note };
+}
+
+export function computeDeterministicPaStrength(
+  extracted: DeterministicPaStrengthInput,
+  cptCode: string,
+  llmRawPaStrength?: unknown
+): PaStrength {
+  const llmSource = isObject(llmRawPaStrength) ? llmRawPaStrength : null;
 
   return {
-    diagnosis_codes: readFactor("diagnosis_codes"),
-    conservative_treatments_named: readFactor("conservative_treatments_named"),
-    conservative_treatment_duration: readFactor("conservative_treatment_duration"),
-    imaging_findings: readFactor("imaging_findings"),
-    functional_limitations: readFactor("functional_limitations"),
-    surgical_approach: readFactor("surgical_approach"),
-    cpt_code_valid: readFactor("cpt_code_valid"),
-    symptom_duration: readFactor("symptom_duration"),
+    diagnosis_codes: llmSource
+      ? readLlmFactor(llmSource, "diagnosis_codes")
+      : fallbackDiagnosisCodesFactor(extracted.diagnosis_codes),
+    conservative_treatments_named: scoreConservativeTreatmentsNamed(extracted.conservative_treatments_attempted),
+    conservative_treatment_duration: scoreConservativeTreatmentDuration(extracted.conservative_treatments_attempted),
+    imaging_findings: scoreImagingFindings(extracted.imaging_findings),
+    functional_limitations: scoreFunctionalLimitations(extracted.functional_limitations),
+    surgical_approach: llmSource
+      ? readLlmFactor(llmSource, "surgical_approach")
+      : fallbackSurgicalApproachFactor(extracted.surgical_approach_if_mentioned),
+    cpt_code_valid: scoreCptCodeValid(cptCode),
+    symptom_duration: scoreSymptomDuration(extracted.symptom_duration),
   };
 }
 

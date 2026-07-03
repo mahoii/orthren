@@ -10,8 +10,13 @@ import {
   generateLetterFromExtraction,
   type RequestDetails,
 } from "@/lib/pa-pipeline";
-import { getPayerRule, normalizePayerName, buildPayerInjectionBlock } from "@/lib/payer-rules";
-import type { ConservativeTreatment } from "@/lib/types";
+import {
+  getPayerRule,
+  normalizePayerName,
+  buildPayerInjectionBlock,
+  applyValidatedPayerDurationPenalty,
+} from "@/lib/payer-rules";
+import { computeEarnedWeight } from "@/lib/pa-strength-weights";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -96,23 +101,13 @@ export async function POST(request: Request) {
 
     // Payer-specific PA Strength adjustment: penalize conservative-care duration
     // when documented PT falls short of the payer's minimum weeks threshold.
-    // Gated on validation_status — an unvalidated (research-sourced, unconfirmed)
-    // rule must not move the score away from what generic criteria would produce.
-    if (payerRule && payerRule.validation_status === "validated" && extractedWithWarnings.pa_strength) {
-      const ptReq = payerRule.conservative_treatment_requirements.find((r) =>
-        r.treatment.toLowerCase().includes("physical therapy")
-      );
-      if (ptReq) {
-        const requiredWeeks = parseMinimumWeeks(ptReq.minimum_duration);
-        const actualWeeks = parsePtWeeksFromExtracted(extractedWithWarnings.conservative_treatments_attempted);
-        if (requiredWeeks > 0 && actualWeeks > 0 && actualWeeks < requiredWeeks) {
-          extractedWithWarnings.pa_strength.conservative_treatment_duration = {
-            score: 0,
-            note: `${payerRule.payer_name} requires ≥${requiredWeeks} weeks PT. Chart shows ${actualWeeks} week${actualWeeks === 1 ? "" : "s"}.`,
-          };
-        }
-      }
-    }
+    // Self-gated on validation_status inside the helper — an unvalidated
+    // (research-sourced, unconfirmed) rule never moves the score.
+    extractedWithWarnings.pa_strength = applyValidatedPayerDurationPenalty(
+      extractedWithWarnings.pa_strength,
+      payerRule,
+      extractedWithWarnings.conservative_treatments_attempted
+    );
 
     stage = "narrative";
     const { letter, sourceLockWarning } = await generateLetterFromExtraction(
@@ -122,9 +117,7 @@ export async function POST(request: Request) {
       payerInjectionBlock
     );
 
-    const paScore = extractedWithWarnings.pa_strength
-      ? Object.values(extractedWithWarnings.pa_strength).reduce((sum, f) => sum + ((f as any)?.score ?? 0), 0)
-      : null;
+    const paScore = computeEarnedWeight(extractedWithWarnings.pa_strength) / 10;
     serverPosthog.capture({
       distinctId: user.id,
       event: "pa_generation_succeeded",
@@ -238,33 +231,4 @@ async function extractChartText(chart: File) {
   }
 
   return text;
-}
-
-// Parse a payer minimum-duration string ("≥6 weeks", "3 months", "≥12 weeks per InterQual")
-// into an integer number of weeks. Returns 0 when no week/month quantity is present
-// (e.g. "Documented attempt"), which safely skips the score penalty.
-function parseMinimumWeeks(duration: string): number {
-  if (!duration) return 0;
-  const match = duration.match(/(\d+(?:\.\d+)?)\s*(week|month)/i);
-  if (!match) return 0;
-  const qty = parseFloat(match[1]);
-  if (!isFinite(qty)) return 0;
-  const weeks = match[2].toLowerCase().startsWith("month") ? qty * 4.33 : qty;
-  return Math.round(weeks);
-}
-
-// Find documented physical-therapy treatments in the extracted chart data and return
-// the largest parsed week count (most favorable to the provider). Returns 0 when no
-// PT is documented or its duration cannot be parsed into weeks.
-function parsePtWeeksFromExtracted(treatments: ConservativeTreatment[]): number {
-  if (!Array.isArray(treatments)) return 0;
-  let maxWeeks = 0;
-  for (const t of treatments) {
-    const name = (t?.treatment ?? "").toLowerCase();
-    const isPt = name.includes("physical therapy") || /\bpt\b/.test(name);
-    if (!isPt) continue;
-    const weeks = parseMinimumWeeks(t?.duration ?? "");
-    if (weeks > maxWeeks) maxWeeks = weeks;
-  }
-  return maxWeeks;
 }

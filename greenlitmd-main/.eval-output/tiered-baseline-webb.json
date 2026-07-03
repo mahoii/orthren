@@ -1,0 +1,146 @@
+{
+  "extraction": {
+    "patient_name": "Webb, Marcus D",
+    "date_of_birth": "11/03/1958",
+    "diagnosis_codes": [
+      "M17.11",
+      "M17.12"
+    ],
+    "primary_complaint": "Bilateral knee pain, right greater than left",
+    "symptom_duration": "3+ years",
+    "functional_limitations": [
+      "Cannot walk more than 1 block",
+      "Cannot use stairs without hand rail",
+      "Pain limits ability to demonstrate drills as volunteer coach"
+    ],
+    "objective_measurements": [
+      "Right knee flexion limited to 95 degrees",
+      "Right knee extension -5 degrees (flexion contracture)",
+      "KOOS Score Right: 28/100",
+      "Varus deformity 8 degrees right knee",
+      "Kellgren-Lawrence Grade IV right knee",
+      "Kellgren-Lawrence Grade III left knee"
+    ],
+    "conservative_treatments_attempted": [
+      {
+        "treatment": "Physical Therapy",
+        "duration": "6 weeks",
+        "outcome": "did not help right knee",
+        "dates": "Not documented",
+        "relief_duration": null
+      },
+      {
+        "treatment": "Corticosteroid Injection (Cortisone)",
+        "duration": "Unknown",
+        "outcome": "helped maybe 2-3 weeks each time",
+        "dates": "approx 2023, exact date unclear",
+        "relief_duration": "2-3 weeks each time"
+      },
+      {
+        "treatment": "Hyaluronic Acid Injection (Synvisc-One)",
+        "duration": "Unknown",
+        "outcome": "minimal benefit",
+        "dates": "06/2024",
+        "relief_duration": null
+      },
+      {
+        "treatment": "Tylenol + Ibuprofen (OTC analgesics/NSAIDs)",
+        "duration": "ongoing",
+        "outcome": "not effective for weeks now",
+        "dates": "Not documented",
+        "relief_duration": null
+      }
+    ],
+    "imaging_findings": {
+      "modality": "X-ray",
+      "key_findings": "X-ray (02/15/2025): Right knee: Severe tricompartmental osteoarthritis with bone-on-bone medial compartment involvement, Kellgren-Lawrence Grade IV, varus deformity 8 degrees. Left knee: Moderate OA, KL Grade III, less severe than right."
+    },
+    "imaging_status": "completed",
+    "requested_procedure": "Right total knee arthroplasty (CPT 27447)",
+    "surgical_approach_if_mentioned": "Anterior approach. Will perform standard primary TKA.",
+    "denial_risk_flags": [
+      {
+        "id": "flag-1",
+        "label": "Cortisone Injection Dates Undocumented",
+        "severity": "medium",
+        "explanation": "The two corticosteroid injections are dated only as 'approx 2023, exact date unclear,' which does not meet payer documentation standards requiring specific dates for prior treatments. Aetna PPO may flag this as insufficient evidence of a completed conservative care step.",
+        "recommendation": "Obtain injection records from the administering provider to document exact dates of the cortisone injections in 2023 and include them in the prior authorization submission.",
+        "anchorText": "approx 2023, exact date unclear"
+      },
+      {
+        "id": "flag-2",
+        "label": "Physical Therapy Duration at Minimum Threshold",
+        "severity": "medium",
+        "explanation": "Physical therapy is documented at exactly 6 weeks, which is the minimum threshold many payers require. Aetna PPO may require documentation that the 6-week course was supervised, structured, and formally evaluated for outcomes before approving CPT 27447.",
+        "recommendation": "Obtain PT discharge summary from Lakeside Rehab documenting the structured program, visit frequency, and objective outcome measures to confirm the course meets payer standards.",
+        "anchorText": "PT at Lakeside Rehab for 6 weeks"
+      },
+      {
+        "id": "flag-3",
+        "label": "No MRI Documented for Surgical Planning",
+        "severity": "low",
+        "explanation": "Only X-ray imaging is documented. While X-ray with KL Grade IV findings is often sufficient for TKA authorization, some Aetna PPO policies require or prefer MRI to rule out other pathology prior to surgical approval.",
+        "recommendation": "Confirm whether Aetna PPO's current TKA medical policy requires MRI; if not required, include a note in the submission that X-ray findings are consistent with end-stage OA and MRI is not clinically indicated.",
+        "anchorText": "X-Ray Right Knee 02/15/2025"
+      },
+      {
+        "id": "flag-4",
+        "label": "Elevated BMI May Trigger Medical Review",
+        "severity": "low",
+        "explanation": "BMI of 34.2 combined with ASA III status (HTN, T2DM, OSA) may trigger additional medical necessity review or require documentation of weight management counseling prior to elective TKA under some Aetna PPO policies.",
+        "recommendation": "Add a chart note documenting that the patient was counseled on BMI-related surgical risks and that the surgical team has determined the risk-benefit ratio supports proceeding with TKA at this time.",
+        "anchorText": "BMI: 34.2"
+      },
+      {
+        "id": "flag-5",
+        "label": "Requesting Provider Name Placeholder Present",
+        "severity": "high",
+        "explanation": "The operating surgeon listed in the chart is 'Dr. Sandra Reyes MD' — a placeholder token — while the requesting provider on file is Dr. Sandra Reyes. A mismatch or unresolved provider identity between the chart and the authorization request may result in denial or delay.",
+        "recommendation": "Confirm and reconcile the operating surgeon identity (Dr. Sandra Reyes) with the requesting provider (Dr. Sandra Reyes) before submission to ensure the authorization request reflects the correct attending surgeon.",
+        "anchorText": "OR: Dr. Sandra Reyes MD"
+      }
+    ],
+    "pa_strength": {
+      "diagnosis_codes": {
+        "score": 1,
+        "note": "M17.11 (primary OA right knee) is a clinically appropriate and specific ICD-10 code that directly supports medical necessity for CPT 27447 right total knee arthroplasty."
+      },
+      "conservative_treatments_named": {
+        "score": 1,
+        "note": "4 distinct conservative treatment modalities documented."
+      },
+      "conservative_treatment_duration": {
+        "score": 1,
+        "note": "1 of 2 duration-eligible treatments have an explicit numeric duration (50%). Meets the 50% threshold."
+      },
+      "imaging_findings": {
+        "score": 1,
+        "note": "Completed imaging with documented findings."
+      },
+      "functional_limitations": {
+        "score": 1,
+        "note": "3 specific functional limitations documented."
+      },
+      "surgical_approach": {
+        "score": 1,
+        "note": "Anterior approach with standard primary TKA is explicitly documented and is a procedure-appropriate technique for CPT 27447."
+      },
+      "cpt_code_valid": {
+        "score": 1,
+        "note": "CPT 27447 is a recognized orthopedic surgical code."
+      },
+      "symptom_duration": {
+        "score": 1,
+        "note": "Symptom duration (\"3+ years\") is ≥ 12 weeks."
+      }
+    },
+    "pain_score": "8/10 with activity, 4/10 at rest",
+    "bmi": 34.2,
+    "asa_classification": "ASA III",
+    "validation": {
+      "hard_blocks": [],
+      "soft_warnings": []
+    }
+  },
+  "letter": "July 3, 2026\nAetna PPO\nPrior Authorization Department\n\nRe: Webb, Marcus D | DOB: 11/03/1958 | Right Total Knee Arthroplasty (CPT 27447) | M17.11, M17.12\n\nMember ID: See attached insurance card\nPatient: Webb, Marcus D\nDate of Birth: 11/03/1958\nProcedure: Right Total Knee Arthroplasty\nCPT Code: 27447\n\nDear Prior Authorization Reviewer,\n\n**CLINICAL HISTORY AND PRESENTING COMPLAINT**\n\nThis patient presents with a greater than three-year history of bilateral knee pain, right greater than left, with pain rated 8/10 with activity and 4/10 at rest. Webb, Marcus D has a documented BMI of 34.2, Class I obesity, which represents a significant contributor to articular cartilage loading and disease progression. The patient cannot walk more than one block, cannot use stairs without a handrail, and experiences pain that limits the ability to demonstrate drills as a volunteer coach.\n\n**DIAGNOSIS**\n\nThe patient carries confirmed diagnoses of primary osteoarthritis of the right knee (M17.11) and primary osteoarthritis of the left knee (M17.12). The right knee presents with end-stage tricompartmental disease, and the left knee demonstrates moderate degenerative changes, as detailed in the imaging and objective findings below.\n\n**FUNCTIONAL LIMITATIONS**\n\n1. Cannot walk more than one block due to bilateral knee pain, with the right knee as the primary limiting extremity.\n2. Cannot use stairs without a handrail secondary to pain and mechanical instability.\n3. Pain limits the ability to demonstrate drills as a volunteer coach, representing a significant loss of occupational and community function.\n\n**CONSERVATIVE TREATMENT HISTORY**\n\n1. **Physical Therapy** — The patient completed a six-week course of physical therapy; however, functional improvement was insufficient to restore meaningful mobility in the right knee, and therapy was ultimately discontinued without achieving treatment goals.\n\n2. **Corticosteroid Injection (Cortisone)** — Cortisone injections were administered on approximately 2023. Each injection provided only two to three weeks of symptomatic relief, after which pain returned to baseline, rendering this intervention inadequate for sustained management.\n\n3. **Hyaluronic Acid Injection (Synvisc-One)** — A hyaluronic acid injection was administered in June 2024. The patient experienced minimal benefit from this intervention.\n\n4. **Tylenol and Ibuprofen (OTC Analgesics/NSAIDs)** — The patient has been using over-the-counter analgesics and NSAIDs on an ongoing basis; these medications have not been effective for a sustained period and no longer provide meaningful pain relief.\n\n**REQUESTED PROCEDURE**\n\nRight Total Knee Arthroplasty (CPT 27447) via anterior approach, standard primary TKA.\n\nThe patient carries an ASA III classification, reflecting the anesthetic risk profile accounted for in the perioperative surgical plan.\n\n**IMAGING**\n\nRadiographs obtained on 02/15/2025 demonstrate severe tricompartmental osteoarthritis of the right knee with bone-on-bone medial compartment involvement, Kellgren-Lawrence Grade IV changes, and a varus deformity of 8 degrees. The left knee demonstrates moderate osteoarthritis with Kellgren-Lawrence Grade III changes, confirmed to be less severe than the right.\n\nObjective clinical examination of the right knee reveals flexion limited to 95 degrees, a flexion contracture with extension deficit of 5 degrees, and a varus deformity of 8 degrees. The patient's KOOS score for the right knee is 28 out of 100, reflecting severe functional impairment consistent with the radiographic and clinical findings documented above.\n\n**MEDICAL NECESSITY SUMMARY**\n\nThe totality of clinical evidence — including greater than three years of progressive bilateral knee pain, end-stage Kellgren-Lawrence Grade IV tricompartmental osteoarthritis of the right knee with bone-on-bone medial compartment involvement and 8-degree varus deformity, a KOOS score of 28/100, a flexion contracture, and failure of multiple conservative treatment modalities including physical therapy, corticosteroid injections, hyaluronic acid injection, and ongoing analgesic use — establishes that right total knee arthroplasty is medically necessary and appropriate. Conservative management has been exhausted without achieving durable functional improvement, and the patient's condition has progressed to the point where activities of daily living can no longer be maintained. Surgical intervention is the only remaining option to restore meaningful function and relieve this patient's debilitating pain.\n\nSincerely,\nSandra Reyes, MD\nLakeside Orthopedic Surgery Center"
+}

@@ -4,7 +4,8 @@ import { callAnthropicWithRetry } from "@/lib/anthropic";
 import { createDeidentifyState, deidentify } from "@/lib/deidentify";
 import { letterSystemPrompt } from "@/lib/letter-system-prompt";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
-import { finalizeLetter, type RequestDetails } from "@/lib/pa-pipeline";
+import { finalizeLetter, computeDeterministicPaStrength, type RequestDetails } from "@/lib/pa-pipeline";
+import { getPayerRule, normalizePayerName, applyValidatedPayerDurationPenalty } from "@/lib/payer-rules";
 import type { ExtractedChartData, ConservativeTreatment } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -117,10 +118,26 @@ REVISION INSTRUCTIONS:
         }),
     });
 
-    const updatedExtractionJson = mergeSupplementsIntoExtraction(
+    const mergedExtraction = mergeSupplementsIntoExtraction(
       extractionJson as ExtractedChartData,
       supplements
     );
+
+    // Re-score deterministically against the merged (post-supplement) extraction
+    // instead of trusting a client-side force-set — see app/review/page.tsx
+    // handleRegenerate, which used to bump every supplemented factor to score 1
+    // regardless of the rubric or any validated-payer penalty. diagnosis_codes and
+    // surgical_approach fall back to presence checks here since there's no fresh
+    // extraction LLM call on this path (computeDeterministicPaStrength's 3rd arg
+    // is intentionally omitted).
+    const normalizedPayer = normalizePayerName(requestDetails.payerName);
+    const payerRule = normalizedPayer ? getPayerRule(normalizedPayer, requestDetails.cptCode) : null;
+    const pa_strength = applyValidatedPayerDurationPenalty(
+      computeDeterministicPaStrength(mergedExtraction, requestDetails.cptCode),
+      payerRule,
+      mergedExtraction.conservative_treatments_attempted
+    );
+    const updatedExtractionJson: ExtractedChartData = { ...mergedExtraction, pa_strength };
 
     if (process.env.NODE_ENV === "development") {
       console.log("[regenerate-denial-fix] processed letter start:", processedLetter.slice(0, 200));

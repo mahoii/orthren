@@ -317,17 +317,10 @@ function UploadPage() {
         throw new Error("error" in payload && payload.error ? payload.error : "Unable to generate PA packet.");
       }
 
+      // pa_generation_succeeded is captured server-side (app/api/generate-pa/route.ts),
+      // which already has duration_ms and a stable distinctId — capturing it again here
+      // would double-count the event.
       const reviewPayload = payload as GeneratePaResponse;
-      posthog?.capture("pa_generation_succeeded", {
-        cpt_code: cptCode.trim(),
-        payer: payerName.trim(),
-        hard_block_count: reviewPayload.extracted?.validation?.hard_blocks?.length ?? 0,
-        pa_score: reviewPayload.extracted?.pa_strength
-          ? Object.values(reviewPayload.extracted.pa_strength).reduce(
-              (sum, f) => sum + (f?.score ?? 0), 0
-            )
-          : null,
-      });
       sessionStorage.setItem(
         "pa-review-data",
         JSON.stringify({

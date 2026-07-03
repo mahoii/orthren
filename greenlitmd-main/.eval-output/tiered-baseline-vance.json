@@ -1,0 +1,159 @@
+{
+  "extraction": {
+    "patient_name": "Vance, Sandra M.",
+    "date_of_birth": "07/28/1962",
+    "diagnosis_codes": [
+      "M16.12"
+    ],
+    "primary_complaint": "Worsening left hip pain, evaluate for surgical intervention",
+    "symptom_duration": "over the past several months",
+    "functional_limitations": [
+      "Difficulty ambulating distances greater than 200 feet",
+      "Unable to perform prolonged standing"
+    ],
+    "objective_measurements": [],
+    "conservative_treatments_attempted": [
+      {
+        "treatment": "Over-the-counter pain medication",
+        "duration": "Unknown",
+        "outcome": "Failed",
+        "dates": "Not documented",
+        "relief_duration": null
+      }
+    ],
+    "imaging_findings": null,
+    "imaging_status": "pending",
+    "requested_procedure": "Left total hip arthroplasty — CPT 27130",
+    "surgical_approach_if_mentioned": null,
+    "denial_risk_flags": [
+      {
+        "id": "flag-pending-imaging",
+        "label": "Imaging Not Yet Complete",
+        "severity": "high",
+        "explanation": "X-ray left hip was ordered at today's visit with results pending, and MRI has not yet been ordered. Payers require completed imaging results before authorizing surgical procedures such as CPT 27130.",
+        "recommendation": "Do not submit until X-ray results are available and documented. Consider also obtaining an MRI to fully support medical necessity for left total hip arthroplasty.",
+        "anchorText": "Radiographic"
+      },
+      {
+        "id": "flag-conservative-care",
+        "label": "Insufficient Conservative Care",
+        "severity": "high",
+        "explanation": "Only 1 treatment documented (over-the-counter pain medication with no duration or outcome). Payers for CPT 27130 typically require documented failure of physical therapy (minimum 6 weeks), NSAIDs, and at least one injection before approving surgical intervention. No formal physical therapy is documented.",
+        "recommendation": "Obtain records documenting additional conservative treatments or initiate and document further conservative care before submission.",
+        "anchorText": "CONSERVATIVE TREATMENT"
+      },
+      {
+        "id": "flag-1",
+        "label": "No Physical Therapy Documented",
+        "severity": "high",
+        "explanation": "The chart explicitly states 'No formal physical therapy documented in referral.' United Healthcare typically requires documented failure of supervised physical therapy for a minimum of 6–8 weeks prior to approving total hip arthroplasty (CPT 27130).",
+        "recommendation": "Document initiation and completion of a formal physical therapy program with specific session counts, duration, and outcome before resubmitting the prior authorization.",
+        "anchorText": "No formal physical therapy documented"
+      },
+      {
+        "id": "flag-2",
+        "label": "OTC Medication — No Duration or Outcome",
+        "severity": "high",
+        "explanation": "The only conservative treatment documented is over-the-counter pain medication with no duration, specific medication name, dosage, or outcome recorded. Payers require detailed documentation of failed conservative pharmacologic management.",
+        "recommendation": "Addend the chart to specify the medication name (e.g., ibuprofen, naproxen), dosage, duration of use, and documented failure or intolerance before submission.",
+        "anchorText": "over-the-counter pain medication"
+      },
+      {
+        "id": "flag-3",
+        "label": "Preliminary Chart — Pre-op Workup Incomplete",
+        "severity": "high",
+        "explanation": "The chart explicitly notes 'Chart is preliminary referral documentation. Full pre-op workup pending. PA submission requested in advance of imaging completion.' Submitting a prior authorization without complete clinical documentation significantly increases denial risk.",
+        "recommendation": "Delay PA submission until imaging results, full pre-op workup, and complete conservative care documentation are available and included in the submission package.",
+        "anchorText": "PA submission requested in advance"
+      },
+      {
+        "id": "flag-4",
+        "label": "No ASA Classification Documented",
+        "severity": "medium",
+        "explanation": "No ASA physical status classification is documented. For a major surgical procedure such as total hip arthroplasty, payers and anesthesia reviewers expect ASA classification to be present in pre-operative documentation.",
+        "recommendation": "Add ASA classification to the pre-operative assessment prior to PA submission.",
+        "anchorText": "surgical candidate pending imaging"
+      },
+      {
+        "id": "flag-5",
+        "label": "Vague Symptom Duration",
+        "severity": "medium",
+        "explanation": "Symptom duration is documented only as 'over the past several months,' which is imprecise. Payers may require a specific duration to confirm chronicity and medical necessity for surgical intervention.",
+        "recommendation": "Addend the chart to specify the exact onset date or number of months the patient has experienced left hip pain to strengthen the medical necessity argument.",
+        "anchorText": "over the past several months"
+      },
+      {
+        "id": "flag-6",
+        "label": "No Injection Therapy Documented",
+        "severity": "medium",
+        "explanation": "No corticosteroid or hyaluronic acid injections are documented. United Healthcare typically requires at least one documented intra-articular injection attempt prior to approving total hip arthroplasty.",
+        "recommendation": "Document whether injection therapy was attempted, contraindicated, or declined, and include this in the prior authorization submission.",
+        "anchorText": "Conservative Care"
+      },
+      {
+        "id": "flag-7",
+        "label": "No Objective Functional Measurements",
+        "severity": "medium",
+        "explanation": "No quantified range of motion, functional outcome scores (e.g., Harris Hip Score, HOOS), or strength measurements are documented. Payers often require objective clinical measurements to substantiate functional impairment.",
+        "recommendation": "Add documented hip range of motion measurements and a validated functional outcome score (e.g., Harris Hip Score) to the chart prior to submission.",
+        "anchorText": "Functional Limitations"
+      }
+    ],
+    "pa_strength": {
+      "diagnosis_codes": {
+        "score": 1,
+        "note": "M16.12 (primary osteoarthritis, left hip) is a clinically appropriate and specific ICD-10 code that directly supports medical necessity for left total hip arthroplasty (CPT 27130)."
+      },
+      "conservative_treatments_named": {
+        "score": 0,
+        "note": "Only 1 distinct conservative treatment modality documented (need ≥ 2).",
+        "anchorText": "CONSERVATIVE TREATMENT HISTORY"
+      },
+      "conservative_treatment_duration": {
+        "score": 0,
+        "note": "Only 1 duration-eligible conservative treatment documented (need ≥ 2 course-based treatments to evaluate duration; single-administration treatments like injections are excluded).",
+        "anchorText": "CONSERVATIVE TREATMENT HISTORY"
+      },
+      "imaging_findings": {
+        "score": 0,
+        "note": "No completed imaging with findings is documented.",
+        "anchorText": "DIAGNOSIS"
+      },
+      "functional_limitations": {
+        "score": 1,
+        "note": "2 specific functional limitations documented."
+      },
+      "surgical_approach": {
+        "score": 0,
+        "note": "No surgical approach or technique is documented for the requested left total hip arthroplasty.",
+        "anchorText": "Left total hip arthroplasty"
+      },
+      "cpt_code_valid": {
+        "score": 1,
+        "note": "CPT 27130 is a recognized orthopedic surgical code."
+      },
+      "symptom_duration": {
+        "score": 0,
+        "note": "Symptom duration (\"over the past several months\") does not confirm ≥ 12 weeks.",
+        "anchorText": "CLINICAL HISTORY AND PRESENTING COMPLAINT"
+      }
+    },
+    "validation": {
+      "hard_blocks": [
+        {
+          "field": "imaging_findings",
+          "label": "Imaging Findings",
+          "message": "No imaging results are documented. Payers require objective imaging evidence to authorize surgical intervention."
+        }
+      ],
+      "soft_warnings": [
+        {
+          "field": "surgical_approach_if_mentioned",
+          "label": "Surgical Approach",
+          "message": "Anatomical approach details strengthen the surgical indication but can be inferred."
+        }
+      ]
+    }
+  },
+  "letter": "July 3, 2026\nUnited Healthcare\nPrior Authorization Department\n\nRe: Vance, Sandra M. | DOB: 07/28/1962 | Left Total Hip Arthroplasty (CPT 27130) | M16.12\n\nMember ID: See attached insurance card\nPatient: Vance, Sandra M.\nDate of Birth: 07/28/1962\nProcedure: Left Total Hip Arthroplasty\nCPT Code: 27130\n\nDear Prior Authorization Reviewer,\n\n**CLINICAL HISTORY AND PRESENTING COMPLAINT**\n\nVance, Sandra M. presents with worsening left hip pain over the past several months, for which surgical evaluation has been initiated. The patient has difficulty ambulating distances greater than 200 feet and is unable to perform prolonged standing.\n\n**DIAGNOSIS**\n\nThe patient carries a diagnosis of primary osteoarthritis of the left hip (ICD-10: M16.12), consistent with the clinical presentation of progressive hip joint deterioration and associated functional decline.\n\n**FUNCTIONAL LIMITATIONS**\n\n1. Difficulty ambulating distances greater than 200 feet\n2. Unable to perform prolonged standing\n\n**CONSERVATIVE TREATMENT HISTORY**\n\n1. Over-the-counter pain medication: The patient has utilized over-the-counter pain medication; however, this treatment failed to provide adequate relief.\n\n**REQUESTED PROCEDURE**\n\n[REQUIRES PHYSICIAN REVIEW — IMAGING PENDING]\n\nThe requested procedure is left total hip arthroplasty (CPT 27130). Advanced imaging has been ordered and results are pending. Authorization is requested in advance of imaging completion to prevent unnecessary delays in patient care once results are available.\n\n**MEDICAL NECESSITY SUMMARY**\n\nVance, Sandra M. presents with primary osteoarthritis of the left hip resulting in significant and progressive functional impairment. Conservative management to date has included over-the-counter pain medication, which has failed to provide meaningful relief. The patient's inability to ambulate distances greater than 200 feet and to perform prolonged standing reflects a level of functional compromise that substantially limits activities of daily living. Left total hip arthroplasty is medically necessary to restore functional mobility, alleviate pain, and allow this patient to resume an acceptable level of independent function. We respectfully request timely authorization of CPT 27130 to avoid further deterioration and delay in care.\n\nSincerely,\nJames Holloway, MD\nRiverside Orthopedic Associates"
+}

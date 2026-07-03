@@ -3,7 +3,6 @@ Aetna PPO
 Prior Authorization Department
 
 Re: Webb, Marcus D | DOB: 11/03/1958 | Right Total Knee Arthroplasty (CPT 27447) | M17.11, M17.12
-
 Member ID: See attached insurance card
 Patient: Webb, Marcus D
 Date of Birth: 11/03/1958
@@ -14,38 +13,40 @@ Dear Prior Authorization Reviewer,
 
 CLINICAL HISTORY AND PRESENTING COMPLAINT
 
-This patient presents with bilateral knee pain, right worse than left, with symptoms ongoing for more than three years. Webb, Marcus D has a documented BMI of 34.2, Class I obesity, which represents a significant contributor to articular cartilage loading and disease progression. The patient cannot walk more than one block, cannot use stairs without a handrail, and pain limits the ability to demonstrate drills as a volunteer coach.
+This patient presents with bilateral knee pain, right greater than left, persisting for more than three years, with progressive functional decline that has rendered the patient unable to walk more than one block, unable to use stairs without a handrail, and unable to demonstrate drills in the patient's role as a volunteer coach. Webb, Marcus D has a documented BMI of 34.2, Class I obesity, which represents a significant contributor to articular cartilage loading and disease progression. Pain is rated 8/10 with activity and 4/10 at rest.
 
 DIAGNOSIS
 
-Primary Diagnosis: Primary osteoarthritis, right knee (M17.11)
-Secondary Diagnosis: Primary osteoarthritis, left knee (M17.12)
+Primary Diagnosis: M17.11 — Primary osteoarthritis, right knee
+Secondary Diagnosis: M17.12 — Primary osteoarthritis, left knee
 
 FUNCTIONAL LIMITATIONS
 
-1. Cannot walk more than 1 block
-2. Cannot use stairs without handrail
-3. Pain limits ability to demonstrate drills as volunteer coach
+1. Cannot walk more than one block.
+2. Cannot use stairs without a handrail.
+3. Pain limits ability to demonstrate drills as a volunteer coach.
 
 CONSERVATIVE TREATMENT HISTORY
 
-1. Physical Therapy — The patient completed a six-week course of physical therapy. This treatment did not help the right knee, and therapy was discontinued without achieving treatment goals.
+1. Physical Therapy — The patient completed a six-week course of physical therapy. Functional improvement was insufficient to restore meaningful mobility, and therapy was ultimately discontinued without achieving treatment goals, with no benefit reported for the right knee.
 
-2. Corticosteroid Injection (Cortisone) — Corticosteroid injections were administered on approximately 2023. Each injection provided relief lasting only two to three weeks, after which symptoms returned to baseline.
+2. Corticosteroid Injection (Cortisone) — Cortisone injections were administered on approximately 2023. Each injection provided only two to three weeks of symptomatic relief, after which pain returned to baseline, rendering this intervention inadequate for sustained management.
 
-3. Hyaluronic Acid Injection (Synvisc-One) — A hyaluronic acid injection was administered in June 2024. The patient experienced minimal benefit from this intervention.
+3. Hyaluronic Acid Injection (Synvisc-One) — Administered in June 2024, this intervention yielded minimal benefit.
 
-4. Tylenol and Ibuprofen (OTC Analgesics/NSAID) — The patient has been using over-the-counter analgesics and anti-inflammatory medications on an ongoing basis. These medications have not been effective for a number of weeks.
+4. Tylenol and Ibuprofen (OTC Analgesics/NSAIDs) — The patient has been using over-the-counter analgesics and NSAIDs on an ongoing basis; these medications have not been effective for weeks and no longer provide meaningful pain relief.
 
 REQUESTED PROCEDURE
 
 Right Total Knee Arthroplasty (CPT 27447), anterior approach, standard primary TKA.
 
+Range of motion assessment of the right knee demonstrates flexion limited to 95 degrees with a flexion contracture of -5 degrees at extension. The patient's KOOS Score for the right knee is 28/100, reflecting severe functional impairment. Varus deformity of 8 degrees is present at the right knee. Radiographs obtained on 02/15/2025 confirm Kellgren-Lawrence Grade IV tricompartmental osteoarthritis of the right knee with bone-on-bone medial compartment involvement and the documented 8-degree varus deformity. The left knee demonstrates Kellgren-Lawrence Grade III osteoarthritis, less severe than the right.
+
 The patient carries an ASA III classification, reflecting the anesthetic risk profile accounted for in the perioperative surgical plan.
 
 MEDICAL NECESSITY SUMMARY
 
-Radiographs obtained on 02/15/2025 demonstrate severe tricompartmental osteoarthritis of the right knee with bone-on-bone medial compartment involvement, Kellgren-Lawrence Grade IV changes, and a varus deformity of 8 degrees. The left knee demonstrates moderate osteoarthritis with Kellgren-Lawrence Grade III changes, less severe than the right. Objective clinical assessment of the right knee reveals flexion limited to 95 degrees, a flexion contracture of 5 degrees (extension deficit of -5 degrees), a KOOS score of 28 out of 100, and a varus deformity of 8 degrees — findings collectively consistent with end-stage degenerative joint disease. The patient reports pain rated 8/10 with activity and 4/10 at rest. Conservative management to date has included a six-week course of physical therapy without meaningful benefit to the right knee, corticosteroid injections providing only two to three weeks of transient relief, a hyaluronic acid injection yielding minimal benefit, and ongoing use of over-the-counter analgesics that are no longer providing effective pain control. In light of the severity of radiographic and clinical findings, the failure of all documented conservative measures, and the patient's inability to maintain activities of daily living, right total knee arthroplasty is medically necessary and represents the appropriate next step in care. I respectfully request timely authorization for CPT 27447.
+The clinical, functional, and radiographic evidence presented in this letter collectively establishes that right total knee arthroplasty is medically necessary for this patient. More than three years of progressive bilateral knee osteoarthritis, culminating in Kellgren-Lawrence Grade IV disease with bone-on-bone medial compartment involvement and an 8-degree varus deformity of the right knee, has failed to respond to an adequate trial of conservative management including physical therapy, corticosteroid injections, hyaluronic acid injection, and ongoing analgesic use. The patient's KOOS Score of 28/100 and objective range of motion deficits confirm severe functional impairment. The patient is no longer able to maintain activities of daily living at an acceptable level, and surgical intervention represents the only remaining option to restore function and relieve pain. We respectfully request timely authorization for CPT 27447.
 
 Sincerely,
 Sandra Reyes, MD

@@ -1,17 +1,31 @@
 ---
 paths:
   - app/api/generate-pa/**
+  - lib/pa-pipeline.ts
   - lib/letter-system-prompt.ts
   - lib/anthropic.ts
 ---
 
 # Prompt Engineering Rules
 
-## Extraction prompt (in `app/api/generate-pa/route.ts`)
+## Extraction prompt (in `lib/pa-pipeline.ts`)
 - Always instruct the model to return ONLY valid JSON — no prose wrappers, no markdown fences
-- The `pa_strength` object must include all 8 factors: `diagnosis_codes`, `conservative_treatments_named`, `conservative_treatment_duration`, `imaging_findings`, `functional_limitations`, `surgical_approach`, `cpt_code_valid`, `symptom_duration`
+- The `pa_strength` object returned by the LLM covers only 2 of the 8 factors —
+  `diagnosis_codes` and `surgical_approach` — the two that genuinely require clinical
+  judgment (does the diagnosis support the requested procedure; is the surgical
+  approach specific/appropriate). The other 6 factors
+  (`conservative_treatments_named`, `conservative_treatment_duration`,
+  `imaging_findings`, `functional_limitations`, `cpt_code_valid`, `symptom_duration`)
+  are scored deterministically in code by `computeDeterministicPaStrength` in
+  `lib/pa-pipeline.ts`, computed directly from the already-normalized extracted
+  fields — do not ask the LLM to score them, and do not reintroduce LLM/subjective
+  judgment for them.
 - Each factor must have `score` (0 or 1), `note` (string), and optionally `anchorText` (only when score=0)
-- Scoring weights are defined in the extraction prompt itself and computed client-side — do not add server-side weight logic elsewhere
+- Scoring weights live in one shared module, `lib/pa-strength-weights.ts`
+  (`PA_STRENGTH_WEIGHTS` + `computeEarnedWeight`), imported by both the client review
+  page and any server code that needs the weighted 0-10 score (e.g. the PostHog
+  capture in `app/api/generate-pa/route.ts`). Do not hardcode the weight matrix a
+  second time anywhere else.
 
 ## Safety rules for all generation prompts
 - Never instruct the model to invent dates, CPT codes, or treatment names absent from the source chart
@@ -25,4 +39,4 @@ paths:
 - Model is `claude-sonnet-4-6` — do not hardcode a different model in ad-hoc calls
 
 ## Regression gate
-- Before merging any change to the extraction system prompt or `lib/letter-system-prompt.ts`, run the output against all three synthetic charts (Delgado, Chen, Vance) — use `/prompt-regression-check` or delegate to the `prompt-evaluator` subagent
+- Before merging any change to the extraction system prompt or `lib/letter-system-prompt.ts`, run the `/prompt-regression-check` skill, which runs `scripts/eval-pipeline.ts` against the three DOCX fixture charts (Kim/CPT 29827, Webb/CPT 27447, Vance-Sandra/CPT 27130) via the live API. Note: `lib/demo-data.ts` (Delgado/Chen/Vance) is a frozen UI sandbox fixture and must never be used for prompt evaluation.
