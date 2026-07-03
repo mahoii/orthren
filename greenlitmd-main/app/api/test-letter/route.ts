@@ -35,9 +35,9 @@ export async function POST(request: Request) {
   };
 
   // phiMap is empty since this path accepts pre-extracted data with no PHI tokens to swap
-  const letter = await generateLetterFromExtraction(body.extraction, requestDetails, {});
+  const { letter, sourceLockWarning } = await generateLetterFromExtraction(body.extraction, requestDetails, {});
 
-  return NextResponse.json({ letter });
+  return NextResponse.json({ letter, sourceLockWarning });
 }
 
 export async function GET(request: Request) {

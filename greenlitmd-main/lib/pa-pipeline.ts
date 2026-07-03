@@ -135,7 +135,7 @@ export async function generateLetterFromExtraction(
   requestDetails: RequestDetails,
   phiMap: Record<string, string> = {},
   payerInjectionBlock?: string | null
-): Promise<string> {
+): Promise<FinalizeLetterResult> {
   const { validation, pa_strength, denial_risk_flags, ...chartDataOnly } = extracted as any;
 
   const today = new Date().toLocaleDateString("en-US", {
@@ -177,7 +177,7 @@ export async function generateLetterFromExtraction(
   );
   const letterPhiMap = { ...structuralPhiMap, ...freeTextPhiMap };
 
-  let letter = await callAnthropicWithRetry({
+  const letter = await callAnthropicWithRetry({
     system: systemPromptWithContext,
     prompt: `Structured patient data:
 ${redactedChartData}
@@ -193,17 +193,245 @@ Letter date: ${today}${bmiAsaLines}${objectiveMeasurementsStr}`,
     temperature: 0,
   });
 
-  letter = postProcessLetter(letter, extracted);
-  letter = reidentify(letter, letterPhiMap);
+  return finalizeLetter({
+    rawLetter: letter,
+    extracted,
+    requestDetails,
+    phiMap: letterPhiMap,
+    letterDate: today,
+    regenerateRawLetter: () =>
+      callAnthropicWithRetry({
+        system: systemPromptWithContext,
+        prompt: `Structured patient data:
+${redactedChartData}
 
-  return sanitizeLetterPlaceholders(letter, {
+Request details:
+CPT code: ${requestDetails.cptCode}
+Insurance payer: ${requestDetails.payerName}
+Requesting provider: ${requestDetails.providerName}
+Practice name: ${requestDetails.practiceName}
+
+Letter date: ${today}${bmiAsaLines}${objectiveMeasurementsStr}`,
+        maxTokens: 8000,
+        temperature: 0,
+      }),
+  });
+}
+
+// ── Letter finalization (shared by generate-pa, regenerate-letter, regenerate-denial-fix) ──
+
+export type FinalizeLetterResult = {
+  letter: string;
+  /** Present only when the retry-once attempt still failed verification. */
+  sourceLockWarning?: string[];
+};
+
+const REFUSAL_PREFIX = "Cannot generate authorization letter:";
+
+/**
+ * Runs the deterministic post-processing tail shared by every letter-generation
+ * call site: postProcess -> reidentify -> verifySourceLock (retry once on
+ * failure) -> sanitize. Prompt construction and the initial Anthropic call stay
+ * at each call site — this only owns the tail plus the one semantic retry.
+ */
+export async function finalizeLetter(params: {
+  rawLetter: string;
+  extracted: ExtractedChartData;
+  requestDetails: RequestDetails;
+  phiMap: Record<string, string>;
+  letterDate: string;
+  regenerateRawLetter: () => Promise<string>;
+}): Promise<FinalizeLetterResult> {
+  const { rawLetter, extracted, requestDetails, phiMap, letterDate, regenerateRawLetter } = params;
+
+  let letter = reidentify(postProcessLetter(rawLetter, extracted), phiMap);
+
+  // The imaging-refusal path (CRITICAL RULE — MAJOR JOINT PROCEDURE WITHOUT
+  // IMAGING) is a data validation gate, not a letter — RULE 1 explicitly says
+  // "you MUST NOT generate a letter" here. Never run source-lock verification
+  // or sanitizeLetterPlaceholders (which would append a fabricated physician
+  // signature via ensureSignatureBlock) against it.
+  if (letter.startsWith(REFUSAL_PREFIX)) {
+    return { letter };
+  }
+
+  let violations = verifySourceLock(letter, extracted, letterDate);
+
+  if (violations.length > 0) {
+    const rawRetry = await regenerateRawLetter();
+    letter = reidentify(postProcessLetter(rawRetry, extracted), phiMap);
+    if (letter.startsWith(REFUSAL_PREFIX)) {
+      return { letter };
+    }
+    violations = verifySourceLock(letter, extracted, letterDate);
+  }
+
+  const sanitized = sanitizeLetterPlaceholders(letter, {
     patientName: extracted.patient_name,
+    dateOfBirth: extracted.date_of_birth,
     payerName: requestDetails.payerName,
     providerName: requestDetails.providerName,
     practiceName: requestDetails.practiceName,
     cptCode: requestDetails.cptCode,
     requestedProcedure: extracted.requested_procedure,
   });
+
+  return { letter: sanitized, sourceLockWarning: violations.length ? violations : undefined };
+}
+
+// High-risk implant/fixation/guidance vocabulary — any occurrence in a letter
+// must be traceable to the source extraction JSON. Grounded in the SURGICAL
+// TECHNIQUE RULE and SOURCE LOCK rule in lib/letter-system-prompt.ts.
+const HIGH_RISK_VOCABULARY = [
+  "cemented",
+  "cementless",
+  "press-fit",
+  "porous-coated",
+  "suture anchor",
+  "screw fixation",
+  "plate fixation",
+  "intramedullary nail",
+  "locking plate",
+  "interference screw",
+  "K-wire",
+  "external fixation",
+  "external fixator",
+  "hemiarthroplasty",
+  "unicompartmental",
+  "bipolar",
+  "allograft",
+  "autograft",
+  "bone graft",
+  "polyethylene liner",
+  "ultrasound-guided",
+  "fluoroscopic",
+  "fluoroscopically",
+  "image-guided",
+  "MRI-guided",
+  "CT-guided",
+];
+
+const DATE_PATTERNS = [
+  /\b\d{4}-\d{2}-\d{2}\b/g,
+  /\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/g,
+  /\b(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+\d{1,2},?\s+\d{4}\b/gi,
+  /\b(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+\d{4}\b/gi,
+  /\b(?:late|early)\s+\d{4}\b/gi,
+];
+
+const DURATION_PATTERN = /\b\d+\s?(?:day|week|month|year)s?\b/gi;
+const DOSAGE_PATTERN = /\b\d+\s?mg\b/gi;
+
+/**
+ * Runtime backstop for the SOURCE LOCK prompt rule: verifies dates/durations,
+ * high-risk implant/fixation/dosage vocabulary, and functional-limitation
+ * claims in a generated letter are all traceable to the extraction JSON.
+ * Returns an empty array when the letter is clean.
+ */
+export function verifySourceLock(letter: string, extracted: ExtractedChartData, letterDate: string): string[] {
+  const violations: string[] = [];
+  // Scoped to clinical-fact fields only — deliberately excludes denial_risk_flags
+  // and pa_strength. Both contain payer-threshold/gap commentary (e.g. "typical
+  // payer threshold of 3-6 months") that would otherwise "ground" a hallucinated
+  // date/duration/term never actually documented in the chart, defeating the
+  // DENIAL FLAG ISOLATION RULE (lib/letter-system-prompt.ts) this check backstops.
+  const haystack = JSON.stringify({
+    patient_name: extracted.patient_name,
+    date_of_birth: extracted.date_of_birth,
+    diagnosis_codes: extracted.diagnosis_codes,
+    primary_complaint: extracted.primary_complaint,
+    symptom_duration: extracted.symptom_duration,
+    functional_limitations: extracted.functional_limitations,
+    objective_measurements: extracted.objective_measurements,
+    conservative_treatments_attempted: extracted.conservative_treatments_attempted,
+    imaging_findings: extracted.imaging_findings,
+    imaging_status: extracted.imaging_status,
+    requested_procedure: extracted.requested_procedure,
+    surgical_approach_if_mentioned: extracted.surgical_approach_if_mentioned,
+    pain_score: extracted.pain_score,
+    bmi: extracted.bmi,
+    asa_classification: extracted.asa_classification,
+  });
+
+  for (const pattern of [...DATE_PATTERNS, DURATION_PATTERN]) {
+    pattern.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(letter)) !== null) {
+      const value = match[0];
+      if (value === letterDate) continue;
+      if (!haystack.includes(value)) {
+        violations.push(`Ungrounded date/duration in letter: "${value}"`);
+      }
+    }
+  }
+
+  for (const term of HIGH_RISK_VOCABULARY) {
+    if (letter.toLowerCase().includes(term.toLowerCase()) && !haystack.toLowerCase().includes(term.toLowerCase())) {
+      violations.push(`Ungrounded high-risk term in letter: "${term}"`);
+    }
+  }
+
+  DOSAGE_PATTERN.lastIndex = 0;
+  let dosageMatch: RegExpExecArray | null;
+  while ((dosageMatch = DOSAGE_PATTERN.exec(letter)) !== null) {
+    const value = dosageMatch[0];
+    if (!haystack.includes(value)) {
+      violations.push(`Ungrounded dosage in letter: "${value}"`);
+    }
+  }
+
+  violations.push(...findUngroundedLimitationClaims(letter, extracted.functional_limitations ?? []));
+
+  return violations;
+}
+
+// Ported verbatim from scripts/source-lock-multirun-check.ts's
+// findUngroundedLimitationClaims — flags "unable to X" / "difficulty with X"
+// style claims in the letter that don't map back to any entry in
+// functional_limitations. Runs against the whole letter text (not the
+// sectioned clinical-history/functional-limitations/summary extract that
+// multirun script restricts to) as a deliberate first-cut scope reduction.
+function findUngroundedLimitationClaims(text: string, allowedLimitations: string[]): string[] {
+  const allowed = allowedLimitations.map((l) => l.toLowerCase());
+  const patterns = [
+    /unable to ([a-z][a-z\s]{3,60})/gi,
+    /difficulty (?:with )?([a-z][a-z\s]{3,60})/gi,
+    /limited (?:ability|capacity) to ([a-z][a-z\s]{3,60})/gi,
+    /cannot ([a-z][a-z\s]{3,60})/gi,
+    /requires? (?:assistance|help) (?:with|from) ([a-z][a-z\s]{3,60})/gi,
+    /relies? on ([a-z][a-z\s]{3,60})/gi,
+  ];
+  const sents = text
+    .replace(/\n+/g, " ")
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const flagged: string[] = [];
+  for (const sent of sents) {
+    // Prompt mandates a generic ADL capstone sentence in the closing summary
+    // (letter-system-prompt.ts body item 5) — not an unsourced limitation claim.
+    if (/activities of daily living/i.test(sent)) continue;
+    for (const pat of patterns) {
+      pat.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = pat.exec(sent)) !== null) {
+        const claim = m[1].trim().toLowerCase().replace(/[.,;].*$/, "");
+        const claimWords = new Set(claim.split(/\s+/).filter((w) => w.length > 3));
+        const matched = allowed.some((a) => {
+          if (a.includes(claim.slice(0, 15)) || claim.includes(a.slice(0, 15))) return true;
+          const aWords = new Set(a.split(/\s+/).filter((w) => w.length > 3));
+          let overlap = 0;
+          Array.from(claimWords).forEach((w) => { if (aWords.has(w)) overlap++; });
+          return overlap >= 2;
+        });
+        if (!matched) {
+          flagged.push(`"${m[0].trim()}"  (sentence: ${sent})`);
+        }
+      }
+    }
+  }
+  return Array.from(new Set(flagged));
 }
 
 // ── JSON parser ─────────────────────────────────────────────────────────────

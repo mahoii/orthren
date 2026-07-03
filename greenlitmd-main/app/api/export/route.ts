@@ -9,8 +9,9 @@ import {
   Paragraph,
   TextRun
 } from "docx";
-import { formatLetterDate, sanitizeLetterPlaceholders } from "@/lib/letter-placeholders";
-import { postProcessLetter } from "@/lib/letter-postprocess";
+import { formatLetterDate } from "@/lib/letter-placeholders";
+import { rateLimiter } from "@/lib/rate-limit";
+import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import type { ExtractedChartData } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -30,6 +31,21 @@ type ExportRequest = {
 
 export async function POST(request: Request) {
   try {
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "127.0.0.1";
+    const { success } = await rateLimiter.limit(ip);
+    if (!success) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429 }
+      );
+    }
+
+    const supabase = createSupabaseAuthServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = (await request.json()) as ExportRequest;
 
     if (!body.extracted || !body.letter || !body.cptCode) {
@@ -41,17 +57,7 @@ export async function POST(request: Request) {
     const generatedDate = formatLetterDate(new Date());
     const providerName = body.providerName?.trim() || "Requesting provider not documented";
     const payerName = body.payerName?.trim() || "Payer not specified";
-    const sanitizedLetter = sanitizeLetterPlaceholders(body.letter, {
-      patientName: body.extracted.patient_name,
-      dateOfBirth: body.extracted.date_of_birth,
-      payerName,
-      providerName,
-      practiceName,
-      cptCode: body.cptCode,
-      requestedProcedure: body.extracted.requested_procedure
-    });
-    const postProcessed = postProcessLetter(sanitizedLetter, body.extracted);
-    const letterBody = stripLetterHeading(postProcessed);
+    const letterBody = stripLetterHeading(body.letter);
 
     const document = new Document({
       sections: [
@@ -86,7 +92,8 @@ export async function POST(request: Request) {
         "content-disposition": `attachment; filename="${filename}"`
       }
     });
-  } catch {
+  } catch (error) {
+    console.error("Export PA packet failed:", error);
     return NextResponse.json({ error: "Unable to export the PA packet." }, { status: 500 });
   }
 }
@@ -144,19 +151,23 @@ function letterParagraphs(letter: string) {
       spacing: { after: 300 },
       children: [new TextRun("Letter of Medical Necessity")]
     }),
-    ...paragraphs.map(
-      (paragraph) =>
-        new Paragraph({
-          spacing: { after: 240 },
-          children: [new TextRun({ text: paragraph, size: 24 })]
-        })
-    )
+    ...paragraphs.map((paragraph) => paragraphToParagraph(paragraph))
   ];
+}
+
+function paragraphToParagraph(paragraph: string) {
+  const lines = paragraph.split("\n");
+  return new Paragraph({
+    spacing: { after: 240 },
+    children: lines.map(
+      (line, index) => new TextRun({ text: line, size: 24, break: index > 0 ? 1 : undefined })
+    )
+  });
 }
 
 function checklistPage(extracted: ExtractedChartData) {
   const items: { label: string; missing: boolean }[] = [
-    { label: "Authorization form attached", missing: false },
+    { label: "Authorization form attached", missing: true },
     {
       label: "Imaging reports attached",
       missing: extracted.imaging_findings === null
@@ -165,7 +176,7 @@ function checklistPage(extracted: ExtractedChartData) {
       label: "PT/conservative care notes attached",
       missing: (extracted.conservative_treatments_attempted ?? []).length === 0
     },
-    { label: "Operative report attached (if applicable)", missing: false }
+    { label: "Operative report attached (if applicable)", missing: true }
   ];
 
   return [

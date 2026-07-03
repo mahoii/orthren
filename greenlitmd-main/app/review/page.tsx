@@ -78,6 +78,7 @@ export default function ReviewPage() {
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [sourceLockWarning, setSourceLockWarning] = useState<string[] | null>(null);
 
   const [mode, setMode] = useState<'review' | 'edit'>('review');
   const [editedLetter, setEditedLetter] = useState("");
@@ -110,6 +111,7 @@ export default function ReviewPage() {
       const parsed = JSON.parse(stored) as ReviewData;
       setData(parsed);
       setEditedLetter(parsed.letter);
+      setSourceLockWarning(parsed.sourceLockWarning ?? null);
     } catch {
       sessionStorage.removeItem("pa-review-data");
     }
@@ -330,9 +332,20 @@ export default function ReviewPage() {
           extractionJson: data.extracted,
           currentLetter: editedLetter,
           supplements: activeSupplements,
+          requestDetails: {
+            cptCode: data.cptCode,
+            payerName: data.payerName,
+            providerName: data.providerName,
+            practiceName: data.practiceName ?? "",
+          },
         }),
       });
-      const json = await res.json() as { letter?: string; error?: string };
+      const json = await res.json() as {
+        letter?: string;
+        extractionJson?: Partial<ExtractedChartData>;
+        sourceLockWarning?: string[];
+        error?: string;
+      };
       if (!res.ok) throw new Error(json.error ?? 'Unable to regenerate the letter.');
       if (json.letter) {
         // Detect changed paragraphs for amber flash
@@ -344,10 +357,13 @@ export default function ReviewPage() {
         setTimeout(() => setChangedParaIds(new Set()), 1500);
 
         setEditedLetter(json.letter);
+        setSourceLockWarning(json.sourceLockWarning ?? null);
 
-        // Update pa_strength scores for supplemented factors so the score reflects the fix
+        // Update pa_strength scores for supplemented factors so the score reflects the fix,
+        // and merge the server-returned extractionJson so review-page state / export stop
+        // diverging from what the regenerated letter actually says.
         const supplementedKeys = Object.keys(activeSupplements);
-        if (supplementedKeys.length > 0) {
+        if (supplementedKeys.length > 0 || json.extractionJson) {
           setData(prev => {
             if (!prev) return prev;
             const updatedPaStrength = { ...prev.extracted.pa_strength } as Record<string, { score: number; note: string; anchorText?: string }>;
@@ -358,7 +374,11 @@ export default function ReviewPage() {
             }
             return {
               ...prev,
-              extracted: { ...prev.extracted, pa_strength: updatedPaStrength as typeof prev.extracted.pa_strength },
+              extracted: {
+                ...prev.extracted,
+                ...json.extractionJson,
+                pa_strength: updatedPaStrength as typeof prev.extracted.pa_strength,
+              },
             };
           });
         }
@@ -569,8 +589,14 @@ export default function ReviewPage() {
           <button
             type="button"
             onClick={handleDownload}
-            disabled={isDownloading || Boolean(data.isDemo)}
-            title={data.isDemo ? 'Download available with a real chart' : undefined}
+            disabled={isDownloading || Boolean(data.isDemo) || Boolean(sourceLockWarning?.length)}
+            title={
+              sourceLockWarning?.length
+                ? 'Export is blocked until this letter is regenerated or corrected — see warning below.'
+                : data.isDemo
+                ? 'Download available with a real chart'
+                : undefined
+            }
             style={{
               background: '#1E3A5F',
               color: '#fff',
@@ -579,8 +605,8 @@ export default function ReviewPage() {
               fontSize: 13,
               fontWeight: 600,
               border: 'none',
-              cursor: isDownloading || data.isDemo ? 'not-allowed' : 'pointer',
-              opacity: isDownloading || data.isDemo ? 0.5 : 1,
+              cursor: isDownloading || data.isDemo || sourceLockWarning?.length ? 'not-allowed' : 'pointer',
+              opacity: isDownloading || data.isDemo || sourceLockWarning?.length ? 0.5 : 1,
               fontFamily: 'inherit',
             }}
           >
@@ -599,6 +625,19 @@ export default function ReviewPage() {
           style={{ overflowY: 'auto', background: '#eef1f5', padding: '40px 32px 80px' }}
         >
           <div style={{ maxWidth: 768, margin: '0 auto' }}>
+            {sourceLockWarning && sourceLockWarning.length > 0 && (
+              <div style={{ marginBottom: 16, borderRadius: 8, border: '1px solid #fecaca', background: '#fef2f2', padding: '12px 14px', fontSize: 13, color: '#dc2626' }}>
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                  This letter contains unverified content and cannot be exported until it's regenerated or corrected.
+                </div>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {sourceLockWarning.map((violation, i) => (
+                    <li key={i} style={{ marginTop: i === 0 ? 0 : 4 }}>{violation}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {downloadError && (
               <div style={{ marginBottom: 16, borderRadius: 8, border: '1px solid #fecaca', background: '#fef2f2', padding: '10px 14px', fontSize: 13, color: '#dc2626' }}>
                 {downloadError}

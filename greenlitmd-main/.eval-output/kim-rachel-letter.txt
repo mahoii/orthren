@@ -1,4 +1,4 @@
-July 1, 2026
+July 3, 2026
 Blue Cross Blue Shield
 Prior Authorization Department
 
@@ -6,48 +6,49 @@ Re: Kim, Rachel | DOB: 04/15/1975 | Arthroscopic Rotator Cuff Repair (CPT 29827)
 Member ID: See attached insurance card
 Patient: Kim, Rachel
 Date of Birth: 04/15/1975
-Procedure: Arthroscopic Rotator Cuff Repair, Right Shoulder
+Procedure: Arthroscopic Rotator Cuff Repair
 CPT Code: 29827
 
 Dear Prior Authorization Reviewer,
 
-**CLINICAL HISTORY AND PRESENTING COMPLAINT**
+CLINICAL HISTORY AND PRESENTING COMPLAINT
 
-Rachel Kim is a patient presenting with right shoulder pain and weakness following a work-related lifting injury, with symptoms persisting over eight months. She reports pain rated 7/10 at rest and 9/10 with overhead activity, reflecting a significant and sustained pain burden that has failed to resolve with conservative management. Her functional deficits are severe, precluding return to occupational duties and substantially limiting her ability to perform activities of daily living.
+This patient presents with an eight-month history of right shoulder pain and weakness following a work-related lifting injury, reporting pain rated 7/10 at rest and 9/10 with overhead activity. The patient is unable to lift objects above shoulder height, cannot perform overhead reaching for daily tasks, experiences disturbed sleep due to shoulder pain, and is unable to return to work duties requiring arm elevation.
 
-**DIAGNOSIS**
+Range of motion assessment demonstrates active forward flexion limited to 95 degrees with pain, active abduction of 80 degrees, internal rotation of 40 degrees, and external rotation of 55 degrees. Strength testing reveals 3/5 supraspinatus strength on empty can testing. The American Shoulder and Elbow Surgeons (ASES) score is 35.2 out of 100, reflecting severe functional compromise.
 
-M75.121 — Complete rotator cuff tear, right shoulder
-M75.111 — Incomplete rotator cuff tear, right shoulder
+DIAGNOSIS
 
-**FUNCTIONAL LIMITATIONS**
+The patient carries diagnoses of complete rotator cuff tear of the right shoulder (M75.121) and incomplete rotator cuff tear of the right shoulder (M75.111), confirmed by clinical examination and advanced imaging as detailed below.
+
+FUNCTIONAL LIMITATIONS
 
 1. Unable to lift objects above shoulder height
 2. Cannot perform overhead reaching for daily tasks
 3. Disturbed sleep due to shoulder pain
 4. Unable to return to work duties requiring arm elevation
 
-**CONSERVATIVE TREATMENT HISTORY**
+CONSERVATIVE TREATMENT HISTORY
 
-1. **Physical Therapy** (September–October 2024, 8 weeks): Ms. Kim completed an eight-week course of physical therapy. The patient experienced minimal improvement, with pain persisting with overhead activity. Functional goals were not achieved.
+1. Physical Therapy (September through the conclusion of that course, spanning 8 weeks): The patient underwent a structured course of physical therapy. Minimal improvement was achieved, with pain persisting throughout overhead activity. Therapy was ultimately discontinued without achieving treatment goals.
 
-2. **Corticosteroid Injection — Kenalog 40mg** (11/05/2024): A single corticosteroid injection was administered. The patient experienced two weeks of partial relief, after which symptoms returned to baseline.
+2. Corticosteroid Injection — Kenalog 40mg: A subacromial corticosteroid injection was administered. The patient experienced two weeks of partial relief, after which symptoms returned to baseline.
 
-3. **NSAIDs — Meloxicam 15mg daily** (July–October 2024, 3 months): The patient was maintained on meloxicam 15mg daily for three months. This regimen provided inadequate pain control, and GI intolerance developed, necessitating discontinuation.
+3. NSAIDs — Meloxicam 15mg daily (July through the end of the treatment course, spanning 3 months): The patient was maintained on meloxicam 15mg daily. This regimen provided inadequate pain control, and GI intolerance subsequently developed, necessitating discontinuation.
 
-**REQUESTED PROCEDURE**
+Conservative management to date has included physical therapy, corticosteroid injection, and NSAID therapy.
 
-Arthroscopic rotator cuff repair with mini-open rotator cuff repair, right shoulder (CPT 29827).
+REQUESTED PROCEDURE
 
-The patient's BMI of 27.4 and ASA II classification have been factored into the perioperative surgical plan. The patient carries an ASA II classification, reflecting the anesthetic risk profile accounted for in the perioperative surgical plan.
+Arthroscopic rotator cuff repair with mini-open technique, right shoulder (CPT 29827).
 
-Imaging obtained on 01/22/2025 provides objective structural confirmation of the surgical indication. Plain radiographs demonstrate Grade II AC joint arthrosis with no calcific deposits and no significant glenohumeral arthrosis. MRI of the right shoulder reveals a full-thickness supraspinatus tear measuring 2.1 cm with retraction to the musculotendinous junction, accompanied by moderate subacromial bursitis. The subscapularis is intact. These findings are consistent with the severity of the patient's clinical presentation and confirm a structural lesion that is not amenable to further conservative management.
+The patient's BMI of 27.4 and ASA II classification have been factored into the perioperative surgical plan.
 
-Physical examination corroborates the imaging findings. Active forward flexion is limited to 95 degrees by pain, and active abduction is restricted to 80 degrees. Internal rotation measures 40 degrees and external rotation 55 degrees. Strength testing demonstrates 3/5 supraspinatus strength on the empty can test, indicating significant rotator cuff dysfunction. The patient's American Shoulder and Elbow Surgeons (ASES) score of 35.2 out of 100 reflects severe functional impairment and is well below the threshold associated with acceptable shoulder function.
+Imaging obtained confirms the structural basis for surgical intervention. X-ray obtained on 01/22/2025 demonstrates Grade II acromioclavicular joint arthrosis with no calcific deposits and no significant glenohumeral arthrosis. MRI obtained on 01/22/2025 reveals a full-thickness supraspinatus tear measuring 2.1 centimeters with retraction to the musculotendinous junction, accompanied by moderate subacromial bursitis. The subscapularis is intact. These findings are consistent with the patient's clinical presentation and are not amenable to further conservative management.
 
-**MEDICAL NECESSITY SUMMARY**
+MEDICAL NECESSITY SUMMARY
 
-Rachel Kim presents with a confirmed full-thickness supraspinatus tear measuring 2.1 cm with musculotendinous junction retraction, substantiated by MRI and corroborated by objective physical examination findings including markedly restricted range of motion, 3/5 supraspinatus strength, and an ASES score of 35.2/100. Conservative management to date has included eight weeks of physical therapy with minimal improvement, a corticosteroid injection yielding only two weeks of partial relief, and three months of NSAID therapy that was discontinued due to inadequate efficacy and GI intolerance. Despite this course of treatment, Ms. Kim remains unable to perform overhead reaching, lift objects above shoulder height, sleep without pain-related disruption, or return to her occupational duties. The natural history of full-thickness rotator cuff tears of this size and degree of retraction is one of progressive enlargement and irreversible muscle atrophy without surgical intervention. Arthroscopic rotator cuff repair with mini-open technique represents the medically necessary and appropriate next step to restore shoulder function, prevent further structural deterioration, and enable this patient to return to her activities of daily living and occupational responsibilities. Authorization for CPT 29827 is respectfully requested.
+This patient has sustained a structurally confirmed, full-thickness supraspinatus tear of the right shoulder that has failed to respond to an eight-month course of multimodal conservative management, including physical therapy, corticosteroid injection, and NSAID therapy. Objective measurements document severely restricted range of motion, significant supraspinatus weakness at 3/5 on strength testing, and an ASES score of 35.2/100, collectively reflecting profound functional impairment. The patient's inability to maintain activities of daily living, combined with the documented failure of conservative care and the structural severity confirmed on MRI, establishes clear medical necessity for arthroscopic rotator cuff repair of the right shoulder. Timely surgical intervention is requested to prevent further tendon retraction, muscle atrophy, and irreversible functional decline.
 
 Sincerely,
 Michael Torres, MD

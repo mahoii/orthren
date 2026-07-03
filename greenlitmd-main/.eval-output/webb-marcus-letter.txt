@@ -1,51 +1,51 @@
-July 1, 2026
+July 3, 2026
 Aetna PPO
 Prior Authorization Department
 
-Re: Webb, Marcus | DOB: 11/03/1958 | Right Total Knee Arthroplasty (CPT 27447) | M17.11, M17.12
+Re: Webb, Marcus D | DOB: 11/03/1958 | Right Total Knee Arthroplasty (CPT 27447) | M17.11, M17.12
+
 Member ID: See attached insurance card
-Patient: Webb, Marcus
+Patient: Webb, Marcus D
 Date of Birth: 11/03/1958
 Procedure: Right Total Knee Arthroplasty
 CPT Code: 27447
 
 Dear Prior Authorization Reviewer,
 
-**CLINICAL HISTORY AND PRESENTING COMPLAINT**
+CLINICAL HISTORY AND PRESENTING COMPLAINT
 
-Mr. Marcus Webb presents with bilateral knee pain, right greater than left, with symptoms ongoing for more than three years, resulting in severe functional compromise that has rendered him unable to perform basic activities of daily living. Marcus Webb has a documented BMI of 34.2, Class I obesity, which represents a significant contributor to articular cartilage loading and disease progression. The severity of his right knee degeneration, combined with progressive functional decline, has exhausted non-operative management and now necessitates surgical intervention.
+This patient presents with bilateral knee pain, right worse than left, with symptoms ongoing for more than three years. Webb, Marcus D has a documented BMI of 34.2, Class I obesity, which represents a significant contributor to articular cartilage loading and disease progression. The patient cannot walk more than one block, cannot use stairs without a handrail, and pain limits the ability to demonstrate drills as a volunteer coach.
 
-**DIAGNOSIS**
+DIAGNOSIS
 
-Mr. Webb carries a diagnosis of primary osteoarthritis of the right knee (M17.11) and primary osteoarthritis of the left knee (M17.12). The right knee represents the primary surgical target, demonstrating end-stage tricompartmental disease with radiographically confirmed bone-on-bone changes and significant coronal plane deformity.
+Primary Diagnosis: Primary osteoarthritis, right knee (M17.11)
+Secondary Diagnosis: Primary osteoarthritis, left knee (M17.12)
 
-**FUNCTIONAL LIMITATIONS**
+FUNCTIONAL LIMITATIONS
 
-1. Mr. Webb is unable to walk more than one city block before pain forces him to stop.
-2. He is unable to use stairs without the assistance of a handrail due to right knee pain and instability.
-3. Pain in the right knee limits his ability to demonstrate drills in his capacity as a volunteer coach, significantly impacting his ability to participate in this meaningful community role.
+1. Cannot walk more than 1 block
+2. Cannot use stairs without handrail
+3. Pain limits ability to demonstrate drills as volunteer coach
 
-**CONSERVATIVE TREATMENT HISTORY**
+CONSERVATIVE TREATMENT HISTORY
 
-1. **Physical Therapy** — Mr. Webb completed a six-week course of physical therapy. Functional improvement was insufficient to restore meaningful mobility, and therapy was ultimately discontinued without achieving treatment goals, with no benefit reported for the right knee.
+1. Physical Therapy — The patient completed a six-week course of physical therapy. This treatment did not help the right knee, and therapy was discontinued without achieving treatment goals.
 
-2. **Corticosteroid Injection (Cortisone)** — Mr. Webb received corticosteroid injections approximately in 2023. Each injection provided only two to three weeks of symptomatic relief, after which pain returned to baseline, demonstrating an inadequate and unsustained clinical response.
+2. Corticosteroid Injection (Cortisone) — Corticosteroid injections were administered on approximately 2023. Each injection provided relief lasting only two to three weeks, after which symptoms returned to baseline.
 
-3. **Hyaluronic Acid Injection (Synvisc-One)** — Administered in June 2024, this viscosupplementation injection yielded minimal benefit, failing to produce a clinically meaningful or durable reduction in pain or improvement in function.
+3. Hyaluronic Acid Injection (Synvisc-One) — A hyaluronic acid injection was administered in June 2024. The patient experienced minimal benefit from this intervention.
 
-4. **Over-the-Counter Analgesics and NSAIDs (Acetaminophen and Ibuprofen)** — Mr. Webb has used over-the-counter acetaminophen and ibuprofen on an ongoing basis. These medications are no longer providing effective pain relief and have failed to restore functional capacity.
+4. Tylenol and Ibuprofen (OTC Analgesics/NSAID) — The patient has been using over-the-counter analgesics and anti-inflammatory medications on an ongoing basis. These medications have not been effective for a number of weeks.
 
-**REQUESTED PROCEDURE**
+REQUESTED PROCEDURE
 
 Right Total Knee Arthroplasty (CPT 27447), anterior approach, standard primary TKA.
 
 The patient carries an ASA III classification, reflecting the anesthetic risk profile accounted for in the perioperative surgical plan.
 
-**MEDICAL NECESSITY SUMMARY**
+MEDICAL NECESSITY SUMMARY
 
-Radiographs of the right knee obtained on 02/15/2025 demonstrate severe tricompartmental osteoarthritis with bone-on-bone medial compartment involvement, Kellgren-Lawrence Grade IV changes, and a varus deformity of 8 degrees. Radiographs of the left knee demonstrate moderate osteoarthritis with Kellgren-Lawrence Grade III changes, less severe than the right. Objective range of motion assessment of the right knee reveals flexion limited to 95 degrees with a flexion contracture of 5 degrees (extension deficit of -5 degrees). A KOOS score of 28 out of 100 for the right knee confirms severe functional impairment. Mr. Webb reports pain rated 8/10 with activity and 4/10 at rest.
-
-The totality of clinical, radiographic, and functional evidence establishes that Mr. Webb's right knee osteoarthritis has progressed to end-stage disease refractory to all attempted conservative measures. He is unable to ambulate more than one block, cannot navigate stairs independently, and is precluded from meaningful participation in activities he values as a volunteer coach. Right total knee arthroplasty represents the medically necessary and appropriate next step to restore functional independence, relieve intractable pain, and prevent further deterioration in this patient's quality of life. Authorization for CPT 27447 is respectfully requested.
+Radiographs obtained on 02/15/2025 demonstrate severe tricompartmental osteoarthritis of the right knee with bone-on-bone medial compartment involvement, Kellgren-Lawrence Grade IV changes, and a varus deformity of 8 degrees. The left knee demonstrates moderate osteoarthritis with Kellgren-Lawrence Grade III changes, less severe than the right. Objective clinical assessment of the right knee reveals flexion limited to 95 degrees, a flexion contracture of 5 degrees (extension deficit of -5 degrees), a KOOS score of 28 out of 100, and a varus deformity of 8 degrees — findings collectively consistent with end-stage degenerative joint disease. The patient reports pain rated 8/10 with activity and 4/10 at rest. Conservative management to date has included a six-week course of physical therapy without meaningful benefit to the right knee, corticosteroid injections providing only two to three weeks of transient relief, a hyaluronic acid injection yielding minimal benefit, and ongoing use of over-the-counter analgesics that are no longer providing effective pain control. In light of the severity of radiographic and clinical findings, the failure of all documented conservative measures, and the patient's inability to maintain activities of daily living, right total knee arthroplasty is medically necessary and represents the appropriate next step in care. I respectfully request timely authorization for CPT 27447.
 
 Sincerely,
 Sandra Reyes, MD

@@ -115,7 +115,12 @@ export async function POST(request: Request) {
     }
 
     stage = "narrative";
-    const letter = await generateLetterFromExtraction(extractedWithWarnings, requestDetails, _phiMap, payerInjectionBlock);
+    const { letter, sourceLockWarning } = await generateLetterFromExtraction(
+      extractedWithWarnings,
+      requestDetails,
+      _phiMap,
+      payerInjectionBlock
+    );
 
     const paScore = extractedWithWarnings.pa_strength
       ? Object.values(extractedWithWarnings.pa_strength).reduce((sum, f) => sum + ((f as any)?.score ?? 0), 0)
@@ -132,7 +137,13 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({ extracted: extractedWithWarnings, letter, payerRule, usedUnvalidatedPayerRule });
+    return NextResponse.json({
+      extracted: extractedWithWarnings,
+      letter,
+      payerRule,
+      usedUnvalidatedPayerRule,
+      sourceLockWarning,
+    });
   } catch (error) {
     console.error("[generate-pa] POST handler error:", error);
     serverPosthog.capture({

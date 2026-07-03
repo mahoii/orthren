@@ -234,7 +234,7 @@ async function main() {
       process.stdout.write(`  run ${run}/${RUNS}: extracting... `);
       const { _phiMap, ...extracted } = await extractChartDataFromText(chartText, fixture.requestDetails);
       process.stdout.write("generating letter... ");
-      const letter = await generateLetterFromExtraction(extracted as any, fixture.requestDetails, _phiMap);
+      const { letter } = await generateLetterFromExtraction(extracted as any, fixture.requestDetails, _phiMap);
 
       const sections = extractLetterSections(letter);
       const combinedLimitationText = [

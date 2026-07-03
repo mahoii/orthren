@@ -391,7 +391,7 @@ async function main() {
 
       // Step 2b: Run letter generation call
       console.log("  [3/3] Generating letter (call 2 of 2) …");
-      const letter = await generateLetterFromExtraction(extracted, fixture.requestDetails, _phiMap);
+      const { letter } = await generateLetterFromExtraction(extracted, fixture.requestDetails, _phiMap);
 
       // Write raw extraction JSON + letter for inspection
       const slug = fixture.name.split("—")[0].trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");

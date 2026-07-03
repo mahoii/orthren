@@ -78,4 +78,5 @@ export type GeneratePaResponse = {
   extracted: ExtractedChartDataWithValidation;
   letter: string;
   payerRule?: PayerRule | null;
+  sourceLockWarning?: string[];
 };

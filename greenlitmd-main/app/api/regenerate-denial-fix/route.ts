@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { rateLimiter } from "@/lib/rate-limit";
 import { callAnthropicWithRetry } from "@/lib/anthropic";
-import { createDeidentifyState, deidentify, reidentify } from "@/lib/deidentify";
-import { postProcessLetter } from "@/lib/letter-postprocess";
+import { createDeidentifyState, deidentify } from "@/lib/deidentify";
 import { letterSystemPrompt } from "@/lib/letter-system-prompt";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
-import type { ExtractedChartData } from "@/lib/types";
+import { finalizeLetter, type RequestDetails } from "@/lib/pa-pipeline";
+import type { ExtractedChartData, ConservativeTreatment } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,13 +35,14 @@ export async function POST(request: Request) {
       extractionJson?: object;
       currentLetter?: string;
       supplements?: Record<string, string>;
+      requestDetails?: RequestDetails;
     };
 
-    if (!body?.extractionJson || !body.currentLetter || !body.supplements) {
+    if (!body?.extractionJson || !body.currentLetter || !body.supplements || !body.requestDetails) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
     }
 
-    const { extractionJson, currentLetter, supplements } = body;
+    const { extractionJson, currentLetter, supplements, requestDetails } = body;
 
     const supplementList = Object.entries(supplements)
       .filter(([, v]) => v.trim())
@@ -87,16 +88,38 @@ REVISION INSTRUCTIONS:
 5. Single signature block only. Do not add a second signature.
 6. Return the complete revised letter only. No preamble, no explanation, no markdown.`;
 
+    const today = new Date().toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    const systemPromptWithDate = letterSystemPrompt.replace("[LETTER_DATE]", today);
+
     const rawLetterText = await callAnthropicWithRetry({
-      system: letterSystemPrompt,
+      system: systemPromptWithDate,
       prompt: userMessage,
       maxTokens: 6000,
       temperature: 0,
     });
 
-    const processedLetter = reidentify(
-      postProcessLetter(rawLetterText, extractionJson as ExtractedChartData),
-      mergedPhiMap
+    const { letter: processedLetter, sourceLockWarning } = await finalizeLetter({
+      rawLetter: rawLetterText,
+      extracted: extractionJson as ExtractedChartData,
+      requestDetails,
+      phiMap: mergedPhiMap,
+      letterDate: today,
+      regenerateRawLetter: () =>
+        callAnthropicWithRetry({
+          system: systemPromptWithDate,
+          prompt: userMessage,
+          maxTokens: 6000,
+          temperature: 0,
+        }),
+    });
+
+    const updatedExtractionJson = mergeSupplementsIntoExtraction(
+      extractionJson as ExtractedChartData,
+      supplements
     );
 
     if (process.env.NODE_ENV === "development") {
@@ -104,9 +127,103 @@ REVISION INSTRUCTIONS:
       console.log("[regenerate-denial-fix] processed letter end:", processedLetter.slice(-200));
     }
 
-    return NextResponse.json({ letter: processedLetter });
+    return NextResponse.json({
+      letter: processedLetter,
+      extractionJson: updatedExtractionJson,
+      sourceLockWarning,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to regenerate the letter.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+// Writes physician-supplied supplements back into the extraction record so the
+// letter, extraction JSON, review-page state, and export stop diverging after a
+// denial-fix regeneration. Pure function — never mutates `extracted` in place.
+function mergeSupplementsIntoExtraction(
+  extracted: ExtractedChartData,
+  supplements: Record<string, string>
+): ExtractedChartData {
+  const result: ExtractedChartData = { ...extracted };
+
+  for (const [key, rawValue] of Object.entries(supplements)) {
+    const supplement = rawValue.trim();
+    if (!supplement) continue;
+
+    switch (key) {
+      case "symptom_duration":
+        result.symptom_duration = appendOrSet(result.symptom_duration, supplement);
+        break;
+
+      case "surgical_approach":
+        result.surgical_approach_if_mentioned = appendOrSet(result.surgical_approach_if_mentioned, supplement);
+        break;
+
+      case "diagnosis_codes":
+        result.diagnosis_codes = pushDeduped(result.diagnosis_codes, supplement);
+        break;
+
+      case "functional_limitations":
+        result.functional_limitations = pushDeduped(result.functional_limitations, supplement);
+        break;
+
+      case "imaging_findings":
+        result.imaging_findings = result.imaging_findings
+          ? { ...result.imaging_findings, key_findings: appendOrSet(result.imaging_findings.key_findings, supplement) }
+          : { modality: null, key_findings: supplement };
+        break;
+
+      case "conservative_treatments_named":
+        result.conservative_treatments_attempted = [
+          ...result.conservative_treatments_attempted,
+          { treatment: supplement, duration: null, outcome: null, dates: null, relief_duration: null },
+        ];
+        break;
+
+      case "conservative_treatment_duration": {
+        const candidates = result.conservative_treatments_attempted.filter(
+          (t) => t.duration === null
+        );
+        if (candidates.length === 1) {
+          result.conservative_treatments_attempted = result.conservative_treatments_attempted.map((t) =>
+            t === candidates[0] ? { ...t, duration: supplement } : t
+          );
+        } else {
+          const synthetic: ConservativeTreatment = {
+            treatment: "Conservative care duration clarification",
+            duration: supplement,
+            outcome: null,
+            dates: null,
+            relief_duration: null,
+          };
+          result.conservative_treatments_attempted = [...result.conservative_treatments_attempted, synthetic];
+        }
+        break;
+      }
+
+      case "cpt_code_valid":
+        // Form-validation result (CPT-vs-payer-rules check), not chart-derived
+        // data — does not belong in ExtractedChartData. It already reaches the
+        // letter via the supplementList prompt injection above and already
+        // bumps pa_strength client-side (app/review/page.tsx handleRegenerate) —
+        // both paths are unchanged, so this key is intentionally skipped here.
+        break;
+
+      default:
+        break;
+    }
+  }
+
+  return result;
+}
+
+function appendOrSet(existing: string | null, supplement: string): string {
+  if (!existing || !existing.trim()) return supplement;
+  return `${existing}; physician-supplied clarification: ${supplement}`;
+}
+
+function pushDeduped(existing: string[], supplement: string): string[] {
+  const alreadyPresent = existing.some((e) => e.toLowerCase() === supplement.toLowerCase());
+  return alreadyPresent ? existing : [...existing, supplement];
 }

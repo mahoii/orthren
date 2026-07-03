@@ -5,7 +5,7 @@
     "M75.121",
     "M75.111"
   ],
-  "primary_complaint": "Right shoulder pain and weakness following a work-related lifting injury in June 2024",
+  "primary_complaint": "Right shoulder pain and weakness following a work-related lifting injury",
   "symptom_duration": "8 months",
   "functional_limitations": [
     "Unable to lift objects above shoulder height",
@@ -24,8 +24,8 @@
   "conservative_treatments_attempted": [
     {
       "treatment": "Physical Therapy",
-      "duration": "8 weeks (September–October 2024)",
-      "outcome": "minimal improvement, pain persisted with overhead activity",
+      "duration": "8 weeks",
+      "outcome": "Minimal improvement, pain persisted with overhead activity",
       "dates": "September–October 2024",
       "relief_duration": null
     },
@@ -38,8 +38,8 @@
     },
     {
       "treatment": "NSAIDs — Meloxicam 15mg daily",
-      "duration": "3 months (July–October 2024)",
-      "outcome": "inadequate pain control, GI intolerance developed",
+      "duration": "3 months",
+      "outcome": "Inadequate pain control, GI intolerance developed",
       "dates": "July–October 2024",
       "relief_duration": null
     }
@@ -48,66 +48,75 @@
     "modality": "X-ray and MRI",
     "key_findings": "X-ray (01/22/2025): AC joint arthrosis Grade II. No calcific deposits. No significant glenohumeral arthrosis.; MRI (01/22/2025): Full-thickness supraspinatus tear measuring 2.1 cm with retraction to the musculotendinous junction. Moderate subacromial bursitis. Intact subscapularis."
   },
+  "imaging_status": "completed",
   "requested_procedure": "Arthroscopic rotator cuff repair, right shoulder — CPT 29827",
   "surgical_approach_if_mentioned": "Arthroscopic with mini-open rotator cuff repair",
   "denial_risk_flags": [
     {
       "id": "flag-1",
-      "label": "Attending Provider Name Placeholder",
-      "severity": "high",
-      "explanation": "The attending surgeon is listed as Dr. Michael Torres, a placeholder token, rather than a verified provider name. Payers require a credentialed, identifiable requesting provider for prior authorization submission.",
-      "recommendation": "Confirm and populate the attending surgeon's full name and NPI before submitting. The requesting provider listed in the request details (Dr. Michael Torres) should be verified against the chart's attending surgeon field.",
-      "anchorText": "Attending Surgeon: Dr. Michael Torres"
+      "label": "Physical Therapy End Date Uses Placeholder",
+      "severity": "medium",
+      "explanation": "The physical therapy course end date is recorded as 'October 2024', a placeholder token, which prevents verification of the exact treatment timeline. Payers may question whether the 8-week duration is accurate without a confirmed end date.",
+      "recommendation": "Confirm and document the exact end date of the physical therapy course to replace the 'October 2024' placeholder before submission.",
+      "anchorText": "September–October 2024"
     },
     {
       "id": "flag-2",
-      "label": "Requesting Provider Mismatch",
+      "label": "NSAID Course End Date Uses Placeholder",
       "severity": "medium",
-      "explanation": "The requesting provider listed in the submission details is Dr. Michael Torres, but the chart lists Dr. Michael Torres as the attending surgeon. Payers may deny if the submitting provider does not match the treating/operating surgeon on record.",
-      "recommendation": "Reconcile the requesting provider name between the submission form and the chart. Ensure Dr. Michael Torres and Dr. Michael Torres refer to the same individual, or clarify the role of each provider.",
-      "anchorText": "Attending Surgeon: Dr. Michael Torres"
+      "explanation": "The NSAID (Meloxicam) course end date is recorded as 'October 2024', a placeholder token. Payers require confirmed treatment dates to validate the 3-month duration claim.",
+      "recommendation": "Replace 'October 2024' with the actual end date of the Meloxicam course to substantiate the 3-month duration for payer review.",
+      "anchorText": "July–October 2024"
     },
     {
       "id": "flag-3",
-      "label": "Facility Name Placeholder Present",
+      "label": "Corticosteroid Injection Date Is Placeholder",
       "severity": "medium",
-      "explanation": "The practice is listed as Summit Orthopedic Group, a placeholder token. Payers require a verified facility name and address for prior authorization processing.",
-      "recommendation": "Replace Summit Orthopedic with the actual practice or facility name before submission to avoid administrative denial.",
-      "anchorText": "Practice: Summit Orthopedic Group"
+      "explanation": "The corticosteroid injection date is recorded as '11/05/2024', a placeholder token. Payers require a specific administration date to confirm the injection occurred within an appropriate pre-surgical timeframe.",
+      "recommendation": "Replace '11/05/2024' with the actual injection date to confirm the timeline of conservative care before submission.",
+      "anchorText": "11/05/2024"
     },
     {
       "id": "flag-4",
-      "label": "Corticosteroid Injection Duration Not Documented",
+      "label": "Imaging Date Is Placeholder",
       "severity": "medium",
-      "explanation": "The Kenalog 40mg corticosteroid injection is documented as a single administration on 11/05/2024 with only 2 weeks of partial relief. While single injections do not require a duration, some BCBS policies require documentation of at least one repeat injection or a minimum observation period post-injection before approving surgical intervention.",
-      "recommendation": "Add a chart note clarifying whether a second injection was considered or attempted, and document the clinical rationale for proceeding to surgery after a single injection with only 2 weeks of relief.",
-      "anchorText": "Corticosteroid Injection — Kenalog 40mg"
+      "explanation": "Both MRI and X-ray dates are recorded as '01/22/2025', a placeholder token. Payers may require confirmed imaging dates to verify that studies were performed within an acceptable pre-authorization window.",
+      "recommendation": "Replace '01/22/2025' with the actual imaging date to ensure the studies are recognized as current and valid for authorization.",
+      "anchorText": "01/22/2025"
     },
     {
       "id": "flag-5",
-      "label": "Injury Date Placeholder Unresolved",
-      "severity": "low",
-      "explanation": "The onset of injury is referenced as June 2024, a placeholder token. Payers may require a specific injury date to verify work-related injury status and timeline of conservative care.",
-      "recommendation": "Populate June 2024 with the actual date of the work-related lifting injury to establish a clear clinical timeline and support medical necessity.",
-      "anchorText": "lifting injury in June 2024"
+      "label": "Requesting Provider Name Is Placeholder",
+      "severity": "high",
+      "explanation": "The attending surgeon is listed as 'Dr. Michael Torres', a placeholder token. Payers require a valid NPI-linked provider name on all prior authorization submissions.",
+      "recommendation": "Replace 'Dr. Michael Torres' with the attending surgeon's full legal name and NPI number before submitting the authorization request.",
+      "anchorText": "Dr. Michael Torres"
+    },
+    {
+      "id": "flag-6",
+      "label": "Work Injury Origin May Require Workers' Comp Coordination",
+      "severity": "medium",
+      "explanation": "The chart documents the injury as work-related, which may trigger a coordination-of-benefits review by Blue Cross Blue Shield to determine whether Workers' Compensation is the primary payer.",
+      "recommendation": "Document whether a Workers' Compensation claim has been filed or denied, and confirm that BCBS is the appropriate primary payer for this procedure.",
+      "anchorText": "work-related lifting injury"
     }
   ],
   "pa_strength": {
     "diagnosis_codes": {
       "score": 1,
-      "note": "Two ICD-10 codes are documented (M75.121 and M75.111), clearly identifying full-thickness rotator cuff tear and shoulder impingement syndrome."
+      "note": "Two ICD-10 codes are documented (M75.121 and M75.111), clearly supporting the diagnosis of full-thickness rotator cuff tear and shoulder impingement syndrome."
     },
     "conservative_treatments_named": {
       "score": 1,
-      "note": "Three distinct conservative treatments are named: Physical Therapy, Corticosteroid Injection (Kenalog 40mg), and NSAIDs (Meloxicam 15mg daily), all with documented outcomes."
+      "note": "Three distinct conservative treatments are named: Physical Therapy, Corticosteroid Injection (Kenalog 40mg), and NSAIDs (Meloxicam 15mg daily), meeting the minimum threshold."
     },
     "conservative_treatment_duration": {
       "score": 1,
-      "note": "Step 1 — Build denominator N: Duration-eligible treatments are Physical Therapy and NSAIDs (Meloxicam). The Corticosteroid Injection is a single-administration procedure and is excluded from N. N = 2. Step 2 — N = 2, which is ≥ 2, so proceed to Step 3. Step 3 — Build numerator D: Physical Therapy has '8 weeks (September–October 2024)' — specific number plus time unit, counts. NSAIDs have '3 months (July–October 2024)' — specific number plus time unit, counts. D = 2. Step 4 — D/N = 2/2 = 100%, which is ≥ 50%, score = 1."
+      "note": "Step 1 — Build denominator (N): Duration-eligible treatments are Physical Therapy and NSAIDs (Meloxicam). The Corticosteroid Injection is a single-administration treatment and is excluded from N. N = 2. Step 2 — N = 2, which is ≥ 2, so proceed to Step 3. Step 3 — Build numerator (D): Physical Therapy has '8 weeks' — specific number plus time unit, counts. NSAIDs have '3 months' — specific number plus time unit, counts. D = 2. Step 4 — D/N = 2/2 = 100%, which is ≥ 50%, score = 1. 2 of 2 = 100%, meets threshold, score = 1."
     },
     "imaging_findings": {
       "score": 1,
-      "note": "Both MRI and X-ray of the right shoulder are documented as completed on 01/22/2025 with specific, detailed findings confirming the diagnosis and surgical candidacy."
+      "note": "Both MRI and X-ray of the right shoulder are documented as completed with detailed findings, including a 2.1 cm full-thickness supraspinatus tear on MRI, directly supporting surgical necessity."
     },
     "functional_limitations": {
       "score": 1,
@@ -115,11 +124,11 @@
     },
     "surgical_approach": {
       "score": 1,
-      "note": "Surgical approach is explicitly documented as 'Arthroscopic with mini-open rotator cuff repair', providing clear technique detail."
+      "note": "Surgical approach is explicitly documented as 'Arthroscopic with mini-open rotator cuff repair', providing sufficient detail for payer review."
     },
     "cpt_code_valid": {
       "score": 1,
-      "note": "CPT 29827 (arthroscopic rotator cuff repair) is explicitly stated in the requested procedure and is consistent with the documented diagnosis of full-thickness rotator cuff tear."
+      "note": "CPT 29827 (arthroscopic rotator cuff repair) is explicitly stated and is consistent with the documented diagnosis of full-thickness rotator cuff tear."
     },
     "symptom_duration": {
       "score": 1,
