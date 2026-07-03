@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { rateLimiter } from "@/lib/rate-limit";
 import { callAnthropicWithRetry } from "@/lib/anthropic";
-import { deidentify, reidentify } from "@/lib/deidentify";
+import { createDeidentifyState, deidentify, reidentify } from "@/lib/deidentify";
 import { postProcessLetter } from "@/lib/letter-postprocess";
 import { letterSystemPrompt } from "@/lib/letter-system-prompt";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
@@ -52,9 +52,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No supplemental data provided." }, { status: 400 });
     }
 
-    const { redacted: redactedExtraction, map: extractionPhiMap } = deidentify(JSON.stringify(extractionJson, null, 2));
-    const { redacted: redactedLetter, map: letterPhiMap } = deidentify(currentLetter);
-    const mergedPhiMap = { ...extractionPhiMap, ...letterPhiMap };
+    // Shared state so the second deidentify() call extends token numbering
+    // instead of restarting it — otherwise e.g. [DATE_1] could mean a
+    // different real date in each map, silently resolved in the letter
+    // map's favor by the old object-spread merge.
+    const phiState = createDeidentifyState();
+    const { redacted: redactedExtraction } = deidentify(JSON.stringify(extractionJson, null, 2), phiState);
+    const { redacted: redactedLetter } = deidentify(currentLetter, phiState);
+    const mergedPhiMap = phiState.map;
 
     const userMessage = `You are performing a surgical revision of an existing Letter of Medical Necessity.
 

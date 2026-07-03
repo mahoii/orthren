@@ -3,25 +3,57 @@ export type DeidentifyResult = {
   map: Record<string, string>;
 };
 
-export function deidentify(chartText: string): DeidentifyResult {
-  const map: Record<string, string> = {};
+// Shared, mutable state that can be threaded through multiple deidentify()
+// calls so placeholder numbering (and singleton fields like [MRN]/[DOB])
+// stays consistent instead of restarting per call and colliding.
+export type DeidentifyState = {
+  map: Record<string, string>;
+  dateIndex: Map<string, string>;
+  providerIndex: Map<string, string>;
+  counters: {
+    date: number;
+    memberId: number;
+    zip: number;
+    npi: number;
+    dea: number;
+    email: number;
+    ssn: number;
+    fax: number;
+    provider: number;
+  };
+};
+
+export function createDeidentifyState(): DeidentifyState {
+  return {
+    map: {},
+    dateIndex: new Map(),
+    providerIndex: new Map(),
+    counters: {
+      date: 1,
+      memberId: 1,
+      zip: 1,
+      npi: 1,
+      dea: 1,
+      email: 1,
+      ssn: 1,
+      fax: 1,
+      provider: 1,
+    },
+  };
+}
+
+export function deidentify(chartText: string, sharedState?: DeidentifyState): DeidentifyResult {
+  const state = sharedState ?? createDeidentifyState();
+  const map = state.map;
+  const dateIndex = state.dateIndex;
+  const providerIndex = state.providerIndex;
+  const counters = state.counters;
   let text = chartText;
-  let dateCounter = 1;
-  const dateIndex = new Map<string, string>();
-  let memberIdCounter = 1;
-  let zipCounter = 1;
-  let npiCounter = 1;
-  let deaCounter = 1;
-  let emailCounter = 1;
-  let ssnCounter = 1;
-  let faxCounter = 1;
-  let providerCounter = 1;
-  const providerIndex = new Map<string, string>();
 
   const getOrCreateDatePlaceholder = (raw: string): string => {
     const key = raw.trim().toLowerCase();
     if (!dateIndex.has(key)) {
-      const ph = `[DATE_${dateCounter++}]`;
+      const ph = `[DATE_${counters.date++}]`;
       dateIndex.set(key, ph);
       map[ph] = raw.trim();
     }
@@ -32,7 +64,7 @@ export function deidentify(chartText: string): DeidentifyResult {
   text = text.replace(
     /\b(SSN|Social\s+Security(?:\s+Number)?)\s*[:\-#]?\s*(\d{3}-\d{2}-\d{4})\b/gi,
     (_, label, ssn) => {
-      const ph = `[SSN_${ssnCounter++}]`;
+      const ph = `[SSN_${counters.ssn++}]`;
       map[ph] = ssn;
       return `${label}: ${ph}`;
     }
@@ -41,7 +73,7 @@ export function deidentify(chartText: string): DeidentifyResult {
   text = text.replace(
     /\b(\d{3}-\d{2}-\d{4})\b/g,
     (match) => {
-      const ph = `[SSN_${ssnCounter++}]`;
+      const ph = `[SSN_${counters.ssn++}]`;
       map[ph] = match;
       return ph;
     }
@@ -51,7 +83,7 @@ export function deidentify(chartText: string): DeidentifyResult {
   text = text.replace(
     /(Fax\s*#?)\s*[:\-]?\s*(\(?\d{3}\)?[\s.\-]\d{3}[\s.\-]\d{4})\b/gi,
     (_, label, num) => {
-      const ph = `[FAX_${faxCounter++}]`;
+      const ph = `[FAX_${counters.fax++}]`;
       map[ph] = num.trim();
       return `${label}: ${ph}`;
     }
@@ -79,7 +111,7 @@ export function deidentify(chartText: string): DeidentifyResult {
   text = text.replace(
     /\b(Member\s+ID|Health\s+Plan\s+ID|Beneficiary\s+ID|Policy\s+#|Policy\s+Number)\s*[:\-]?\s*([A-Z0-9][A-Z0-9\-]{2,})\b/gi,
     (_, label, id) => {
-      const ph = `[MEMBERID_${memberIdCounter++}]`;
+      const ph = `[MEMBERID_${counters.memberId++}]`;
       map[ph] = id.trim();
       return `${label}: ${ph}`;
     }
@@ -89,7 +121,7 @@ export function deidentify(chartText: string): DeidentifyResult {
   text = text.replace(
     /\b(NPI\s*#?)\s*[:\-]?\s*(\d{10})\b/gi,
     (_, label, npi) => {
-      const ph = `[NPI_${npiCounter++}]`;
+      const ph = `[NPI_${counters.npi++}]`;
       map[ph] = npi;
       return `${label}: ${ph}`;
     }
@@ -99,7 +131,7 @@ export function deidentify(chartText: string): DeidentifyResult {
   text = text.replace(
     /\b(DEA\s*#?)\s*[:\-]?\s*([A-Z]{2}\d{7})\b/gi,
     (_, label, dea) => {
-      const ph = `[DEA_${deaCounter++}]`;
+      const ph = `[DEA_${counters.dea++}]`;
       map[ph] = dea;
       return `${label}: ${ph}`;
     }
@@ -109,7 +141,7 @@ export function deidentify(chartText: string): DeidentifyResult {
   text = text.replace(
     /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g,
     (match) => {
-      const ph = `[EMAIL_${emailCounter++}]`;
+      const ph = `[EMAIL_${counters.email++}]`;
       map[ph] = match;
       return ph;
     }
@@ -168,7 +200,7 @@ export function deidentify(chartText: string): DeidentifyResult {
   text = text.replace(
     /(?<=,\s*[A-Z]{2}\s+)(\d{5}(?:-\d{4})?)\b/g,
     (match) => {
-      const ph = `[ZIP_${zipCounter++}]`;
+      const ph = `[ZIP_${counters.zip++}]`;
       map[ph] = match;
       return ph;
     }
@@ -199,7 +231,7 @@ export function deidentify(chartText: string): DeidentifyResult {
     (match) => {
       const key = match.trim().toLowerCase();
       if (!providerIndex.has(key)) {
-        const ph = `[PROVIDER_${providerCounter++}]`;
+        const ph = `[PROVIDER_${counters.provider++}]`;
         providerIndex.set(key, ph);
         map[ph] = match.trim();
       }
@@ -207,15 +239,51 @@ export function deidentify(chartText: string): DeidentifyResult {
     }
   );
 
-  // Patient name — extract from labeled field, then replace all occurrences globally
-  const nameMatch = text.match(
-    /(?:patient(?:\s+name)?|name)\s*[:\-]\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\b/i
-  );
+  // Patient name — extract from labeled field, then replace all occurrences globally.
+  // Whitespace inside the name is restricted to [ \t] (never \n) so a line break
+  // can't pull the next line's token into the captured name. Allows "Last, First",
+  // middle initials, and ALL-CAPS surnames.
+  // Prefer a "patient"-qualified label over a bare "name:" label — a bare "name:"
+  // match() only returns the first hit in the whole text, so without this
+  // prioritization an earlier "Emergency contact name:" / "Guardian name:" field
+  // would be captured instead of the actual patient.
+  // The stopword lookahead guards against messy single-line charts where the
+  // next field's label directly follows the name with no punctuation (e.g.
+  // "PATIENT: Robert Chen DOB 11/14/1978") — without it, "DOB" gets swallowed
+  // as a trailing name token and later corrupts the [DOB] placeholder itself
+  // when the per-token redaction pass below runs.
+  const stopword =
+    "(?!(?:DOB|MRN|SSN|AGE|SEX|DOB|DATE|POLICY|PHONE|FAX|ADDRESS|INSURANCE|RACE|GENDER|MD|DO)\\b)";
+  const namePattern = `([A-Z][A-Za-z'\\-]+(?:,)?(?:[ \\t]+${stopword}[A-Z][A-Za-z'.\\-]*){0,3})`;
+  const nameMatch =
+    text.match(new RegExp(`\\bpatient(?:'s)?\\s+name\\s*[:\\-]\\s*${namePattern}`, "i")) ??
+    text.match(new RegExp(`\\bpatient\\s*[:\\-]\\s*${namePattern}`, "i")) ??
+    text.match(new RegExp(`\\bpt\\.?\\s*[:\\-]\\s*${namePattern}`, "i")) ??
+    text.match(new RegExp(`\\bname\\s*[:\\-]\\s*${namePattern}`, "i"));
   if (nameMatch?.[1]) {
     const name = nameMatch[1].trim();
     map["[PATIENT_NAME]"] = name;
     const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    text = text.replace(new RegExp(`\\b${escaped}\\b`, "g"), "[PATIENT_NAME]");
+    // Right-side boundary uses a negative lookahead instead of \b: when name
+    // ends in a middle-initial period ("Maria A."), \b never matches between
+    // "." and a following space/newline (neither is a \w character), which
+    // silently no-ops this replace and leaves the initial in cleartext.
+    text = text.replace(new RegExp(`\\b${escaped}(?![A-Za-z0-9_])`, "g"), "[PATIENT_NAME]");
+
+    // Also redact each individual name token (last name, first name, etc.)
+    // wherever it appears on its own elsewhere in the text — not just the
+    // exact "Last, First M." string captured above. Skip bare single-letter
+    // initials to avoid over-redacting unrelated single letters.
+    const tokens = name
+      .replace(/,/g, " ")
+      .split(/[ \t]+/)
+      .map((t) => t.replace(/\.+$/, "").trim())
+      .filter((t) => t.length > 1);
+
+    for (const token of tokens) {
+      const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      text = text.replace(new RegExp(`\\b${escapedToken}\\b`, "g"), "[PATIENT_NAME]");
+    }
   }
 
   return { redacted: text, map };
@@ -227,4 +295,25 @@ export function reidentify(text: string, map: Record<string, string>): string {
     out = out.replaceAll(placeholder, real);
   }
   return out;
+}
+
+// Re-identifies string values inside a parsed object tree in place of each
+// field, instead of round-tripping through JSON.stringify/JSON.parse. This
+// avoids corrupting JSON structure when a real PHI value contains a `"` or
+// `\` character that isn't valid unescaped inside a JSON string.
+export function reidentifyDeep<T>(value: T, map: Record<string, string>): T {
+  if (typeof value === "string") {
+    return reidentify(value, map).replace(/[\x01-\x1F\x7F-\x9F]/g, " ") as unknown as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => reidentifyDeep(item, map)) as unknown as T;
+  }
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = reidentifyDeep(v, map);
+    }
+    return out as unknown as T;
+  }
+  return value;
 }

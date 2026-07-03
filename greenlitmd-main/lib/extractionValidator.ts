@@ -2,14 +2,38 @@
 // Returns array of discrepancy strings. Empty array = clean.
 
 import { callAnthropicWithRetry } from "@/lib/anthropic";
-import { deidentify } from "@/lib/deidentify";
+import { createDeidentifyState, deidentify } from "@/lib/deidentify";
 
 export async function validateExtraction(
   chartText: string,
   extractedJson: Record<string, unknown>
 ): Promise<string[]> {
-  const { redacted: deidentifiedText } = deidentify(chartText);
-  const { redacted: redactedJson } = deidentify(JSON.stringify(extractedJson, null, 2));
+  // Shared state so both calls extend the same token numbering — otherwise
+  // a placeholder like [DATE_1] could refer to different real dates in the
+  // chart text vs. the extracted JSON, since each text has its own date
+  // ordering.
+  const phiState = createDeidentifyState();
+  const { redacted: deidentifiedText } = deidentify(chartText, phiState);
+
+  // Pull patient_name/date_of_birth structurally before serializing — once
+  // quoted inside JSON (e.g. "patient_name": "Delgado, Maria A.") the
+  // regex-based label match in deidentify() can't see them, so the plain
+  // regex pass alone would send the real name/DOB to the Anthropic API.
+  const jsonForRedaction: Record<string, unknown> = { ...extractedJson };
+  if (typeof jsonForRedaction.patient_name === "string" && jsonForRedaction.patient_name.trim()) {
+    if (!phiState.map["[PATIENT_NAME]"]) {
+      phiState.map["[PATIENT_NAME]"] = jsonForRedaction.patient_name.trim();
+    }
+    jsonForRedaction.patient_name = "[PATIENT_NAME]";
+  }
+  if (typeof jsonForRedaction.date_of_birth === "string" && jsonForRedaction.date_of_birth.trim()) {
+    if (!phiState.map["[DOB]"]) {
+      phiState.map["[DOB]"] = jsonForRedaction.date_of_birth.trim();
+    }
+    jsonForRedaction.date_of_birth = "[DOB]";
+  }
+
+  const { redacted: redactedJson } = deidentify(JSON.stringify(jsonForRedaction, null, 2), phiState);
   const prompt = `You are a medical data auditor. Compare the EXTRACTED JSON against the SOURCE CHART TEXT and identify any factual discrepancies.
 
 SOURCE CHART TEXT:
