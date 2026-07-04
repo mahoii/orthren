@@ -34,6 +34,22 @@
 - **Edge Runtime incompatibility:** Never set `export const runtime = 'edge'` on any route that imports pdf-parse or mammoth — they require the Node.js serverless runtime.
 - **Sandbox isolation:** `/sandbox` and its handlers must only read from the static Delgado / Chen / Vance profiles in `lib/demo-data.ts`. Zero live Anthropic calls from sandbox, ever.
 
+## Which Agent/Skill When
+- Change to `lib/letter-system-prompt.ts` → `letter-prompt-logic-auditor` agent (static, no API calls, checks SOURCE LOCK/sig block/Re: line/pa_strength against the fixtures).
+- Change to `/api/export`, `/api/regenerate-denial-fix`, or `postProcessLetter` → `docx-export-verifier` agent.
+- Diff touching chart ingestion, `/api/generate-pa`, `/api/suggest-fix`, `lib/deidentify.ts`, or any Supabase query over patient data → `phi-reviewer` agent.
+- Any change to the extraction prompt, `lib/letter-system-prompt.ts`, or `lib/anthropic.ts` before merging → `/prompt-regression-check` skill (live API, runs against Kim/Webb/Vance).
+
+## Windows Environment Notes
+- No `python` on PATH (Windows Store alias only, exits 49) — use `node -e "..."` for one-off scripts instead.
+- The Bash tool runs Git Bash, not PowerShell — never feed it PowerShell cmdlets (`Remove-Item`, `Get-Content`, etc.) or `$var` syntax.
+- Run project scripts from the repo root (or `cd` into it first) so relative imports resolve against the real `node_modules` — a script written to a scratch/temp dir will fail to resolve project packages like `mammoth` or `dotenv`.
+- `Bash(rm -rf *)` is deny-listed. Delete a directory with `node -e "fs.rmSync('<dir>',{recursive:true,force:true})"` instead of retrying `rm -rf` or reaching for PowerShell's `Remove-Item`.
+- Avoid a trailing backslash immediately before a closing quote in a bash string (`"C:\...\"`) — Git Bash reads it as an escaped quote and the command hangs on an unterminated string.
+
+## Deploy Triage
+- Production is `orthren.com` (Vercel). If the Vercel MCP server is enabled, prefer `get_deployment_build_logs` / `get_runtime_errors` scoped directly to that project over pasting logs by hand — but don't discover the project via `list_teams`/`list_projects` unless it's actually unknown; ask the user for the project name/ID first if a deploy-triage session needs it repeatedly.
+
 ## Testing / Regression Workflow
 - The standard regression set is the three **DOCX** fixture charts in `lib/sample-charts/`: **Kim, Rachel** (CPT 29827, Clean rotator cuff), **Webb, Marcus** (CPT 27447, Messy TKA), **Vance, Sandra** (CPT 27130, Incomplete THA) — run via `scripts/eval-pipeline.ts`. Note: `lib/demo-data.ts` (Maria Delgado / Robert Chen / Eleanor Vance) is a separate, frozen `/sandbox` UI fixture and must never be used for prompt evaluation.
 - Any change to the extraction prompt or letter-generation prompt must be checked against all three before merging. Use the `/prompt-regression-check` skill.
