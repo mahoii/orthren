@@ -14,7 +14,7 @@ Last updated: 2026-07-03
 | Track | State |
 |---|---|
 | Extraction/letter pipeline | SOURCE LOCK validated — 60/60 PASS (see below) |
-| Security (auth/RLS) | Rate limiter live (`lib/rate-limit.ts`); RLS policy + regression test exist (`supabase_setup.sql`, `scripts/test-rls.mjs`) for `waitlist_signups`. `[VERIFY: full list of tables covered by RLS policies and current pass/fail state of scripts/test-rls.mjs — not run as part of this update]` |
+| Security (auth/RLS) | Verified 2026-07-04 — `scripts/test-rls.mjs` PASS on all 7 tables (0 leaks). Only `waitlist`, `waitlist_signups` exist in the live project; both have RLS enabled with a `service_role_only` policy (added to `waitlist` this pass). `users`, `pa_cases`, `submissions`, `profiles`, `subscriptions`, `payer_rules` do not exist in the schema yet — no RLS risk, but also not yet real tables to secure. |
 | Payer rules engine | 8/12 rules `validated` in `lib/payer-rules.ts`; 3 UHC rules blocked (defer to licensed InterQual criteria); 1 Aetna rule blocked (no dedicated primary source exists) — see `scripts/payer-rules-status.ts` |
 | Outreach infra | `[VERIFY: no outreach tooling (Streak, leave-behind materials, practice list) is tracked in this repo — status lives outside the codebase]` |
 | Billing | Not built in repo — no Stripe integration present |
@@ -45,11 +45,24 @@ Webb bug class doesn't apply to it.
 
 - Auth rate limiting: `lib/rate-limit.ts` (Upstash sliding window, 5 req/60s),
   added in commit `11d6ee6`.
-- RLS: `supabase_setup.sql` enables RLS + a `service_role_only` policy on
-  `waitlist_signups`. `scripts/test-rls.mjs` is a regression check (anon-key
-  probe) covering `waitlist`, `users`, `pa_cases`, `submissions`, `profiles`,
-  `subscriptions`, `payer_rules`.
-- `[VERIFY: whether all tables in scripts/test-rls.mjs's TABLES list currently have RLS policies defined, and whether the script has been run recently — this doc does not re-run it]`
+- RLS: `scripts/test-rls.mjs` run against the live Supabase project
+  (`greenlitmd`, `zvarxrjfjxghclarvoux`) on 2026-07-04 with the anon key.
+  Result: **0 leaks / 7 checked, all PASS.**
+
+  | Table | Exists live? | RLS enabled | `service_role_only` policy | Result |
+  |---|---|---|---|---|
+  | `waitlist` | yes | yes | added this pass (`supabase_setup.sql` + live migration `add_service_role_only_policy_waitlist`) — coexists with the pre-existing `Allow public inserts` anon INSERT policy needed for the signup form | PASS |
+  | `waitlist_signups` | yes | yes | yes (pre-existing) | PASS |
+  | `users` | no | n/a | n/a | PASS (table does not exist — `test-rls.mjs` reports this as `[OK]` rather than `[SKIP]` because PostgREST's "table not found" error isn't code `42P01`; script's skip-detection is stale) |
+  | `pa_cases` | no | n/a | n/a | PASS (does not exist, same caveat as above) |
+  | `submissions` | no | n/a | n/a | PASS (does not exist, same caveat as above) |
+  | `profiles` | no | n/a | n/a | PASS (does not exist, same caveat as above) |
+  | `subscriptions` | no | n/a | n/a | PASS (does not exist, same caveat as above) |
+  | `payer_rules` | no | n/a | n/a | PASS (does not exist, same caveat as above) |
+
+  Note: `public.waitlist` is a separate, smaller table from `public.waitlist_signups`
+  (different columns, 0 vs 2 rows) — looks like a legacy/duplicate table still
+  live in prod. Not in scope to consolidate here; flagging for follow-up.
 
 ## Payer rules engine
 

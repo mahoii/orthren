@@ -43,15 +43,34 @@ const TABLES = [
 console.log('Testing RLS with anon key (unauthenticated)...\n')
 
 let leaks = 0
+let cacheSkips = 0
+
+// PostgREST error codes that mean "table not in schema cache" (stale cache or
+// insufficient anon grants), as opposed to a genuine Postgres 42P01 (table
+// never existed).  PGRST204/205 are the common codes; guard on the message too
+// because Supabase has occasionally returned 42P01 from PostgREST itself when
+// the cache is stale rather than the table being absent.
+const isCacheMiss = (err) =>
+  err.code === 'PGRST205' ||
+  err.code === 'PGRST204' ||
+  (err.message && /relation .* does not exist/i.test(err.message) && err.code !== '42P01')
 
 for (const table of TABLES) {
   const { data, error } = await supabase.from(table).select('*').limit(5)
 
   if (error) {
     if (error.code === '42P01') {
-      console.log(`  [SKIP]  ${table} — table does not exist`)
+      // Table does not exist in Postgres at all — skip silently.
+      console.log(`  [SKIP]  ${table} — table does not exist in DB (42P01)`)
+    } else if (isCacheMiss(error)) {
+      // Table exists in Postgres but PostgREST hasn't cached it yet (or the
+      // anon role lacks USAGE/SELECT, causing it to be hidden from the cache).
+      // This is NOT a passing result — reload the schema cache or check grants.
+      console.log(`  [SKIP/CACHE]  ${table} — PostgREST schema-cache miss (${error.code}); run: NOTIFY pgrst, 'reload schema';`)
+      cacheSkips++
     } else {
-      console.log(`  [OK]    ${table} — blocked: ${error.message}`)
+      // Any other error (e.g. 42501 permission denied) counts as RLS blocking.
+      console.log(`  [OK]    ${table} — blocked: ${error.message} (${error.code})`)
     }
   } else {
     const rowCount = data?.length ?? 0
@@ -64,5 +83,9 @@ for (const table of TABLES) {
   }
 }
 
-console.log(`\n${leaks === 0 ? 'All tables passed.' : `${leaks} table(s) leaking data — fix RLS before deploying.`}`)
+if (cacheSkips > 0) {
+  console.log(`\n⚠  ${cacheSkips} table(s) skipped due to PostgREST schema-cache miss.`)
+  console.log('   Fix: run  NOTIFY pgrst, \'reload schema\';  in the Supabase SQL editor, then re-run this script.')
+}
+console.log(`\n${leaks === 0 ? 'All tested tables passed.' : `${leaks} table(s) leaking data — fix RLS before deploying.`}`)
 process.exit(leaks > 0 ? 1 : 0)
