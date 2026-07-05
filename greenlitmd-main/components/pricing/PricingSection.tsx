@@ -234,7 +234,7 @@ export default function PricingSection() {
               </div>
               {isAnnual ? (
                 <p className="mt-1 text-xs text-slate-400">
-                  Billed ${(annualPrice * 12).toLocaleString()}/year
+                  Billed ${(price * 10).toLocaleString()}/year
                 </p>
               ) : (
                 <p className="mt-1 text-xs text-transparent select-none">–</p>
