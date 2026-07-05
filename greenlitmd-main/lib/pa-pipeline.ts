@@ -1,5 +1,6 @@
 import { callAnthropicWithRetry } from "@/lib/anthropic";
-import { deidentify, reidentify, reidentifyDeep } from "@/lib/deidentify";
+import { deidentify, reidentify, reidentifyDeep, createDeidentifyState } from "@/lib/deidentify";
+import { assertDeidentified } from "@/lib/deid-verify";
 import { letterSystemPrompt } from "@/lib/letter-system-prompt";
 import { buildBmiAsaPromptLines, postProcessLetter } from "@/lib/letter-postprocess";
 import { sanitizeLetterPlaceholders } from "@/lib/letter-placeholders";
@@ -102,6 +103,7 @@ export async function extractChartDataFromText(
   requestDetails: RequestDetails
 ): Promise<ExtractedChartData & { validation: any; _phiMap: Record<string, string> }> {
   const { redacted, map: phiMap } = deidentify(chartText);
+  assertDeidentified(redacted, phiMap, "pa-pipeline.extraction");
   const content = await callAnthropicWithRetry({
     system: extractionSystemPrompt,
     prompt: `Request details:
@@ -154,26 +156,29 @@ export async function generateLetterFromExtraction(
 
   const bmiAsaLines = buildBmiAsaPromptLines(extracted);
 
-  // Pull structured PHI fields directly into the map before serializing —
-  // the regex-based deidentify() below can't reliably match patient_name
-  // once it's inside a quoted JSON value (e.g. "Delgado, Maria A."). The
-  // regex pass is kept only to catch dates/names embedded in free-text
-  // fields (denial_risk_flags explanations, etc.).
+  // Seed patient_name/date_of_birth into a fresh state before serializing,
+  // rather than manually substituting placeholder strings into the object
+  // first: deidentify() now natively recognizes JSON-quoted keys like
+  // "patient_name"/"date_of_birth", so the structural pull here is a
+  // redundant net rather than the sole defense. Seeding also activates the
+  // patient-name variant sweep over any FREE-TEXT occurrence of the name
+  // elsewhere in the JSON (e.g. inside a denial_risk_flags explanation),
+  // which a plain per-field substitution would never reach.
   const chartDataForRedaction: Record<string, unknown> = { ...chartDataOnly };
-  const structuralPhiMap: Record<string, string> = {};
+  const phiState = createDeidentifyState();
   if (typeof chartDataForRedaction.patient_name === "string" && chartDataForRedaction.patient_name.trim()) {
-    structuralPhiMap["[PATIENT_NAME]"] = chartDataForRedaction.patient_name.trim();
-    chartDataForRedaction.patient_name = "[PATIENT_NAME]";
+    phiState.map["[PATIENT_NAME]"] = chartDataForRedaction.patient_name.trim();
   }
   if (typeof chartDataForRedaction.date_of_birth === "string" && chartDataForRedaction.date_of_birth.trim()) {
-    structuralPhiMap["[DOB]"] = chartDataForRedaction.date_of_birth.trim();
-    chartDataForRedaction.date_of_birth = "[DOB]";
+    phiState.map["[DOB]"] = chartDataForRedaction.date_of_birth.trim();
   }
 
-  const { redacted: redactedChartData, map: freeTextPhiMap } = deidentify(
-    JSON.stringify(chartDataForRedaction, null, 2)
+  const { redacted: redactedChartData } = deidentify(
+    JSON.stringify(chartDataForRedaction, null, 2),
+    phiState
   );
-  const letterPhiMap = { ...structuralPhiMap, ...freeTextPhiMap };
+  const letterPhiMap = phiState.map;
+  assertDeidentified(redactedChartData, letterPhiMap, "pa-pipeline.letter");
 
   const letter = await callAnthropicWithRetry({
     system: systemPromptWithContext,

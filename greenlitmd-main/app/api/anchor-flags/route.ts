@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { rateLimiter } from "@/lib/rate-limit";
 import { callAnthropicWithRetry } from "@/lib/anthropic";
 import { deidentify } from "@/lib/deidentify";
+import { assertDeidentified, DeidVerificationError } from "@/lib/deid-verify";
+import { serverPosthog } from "@/lib/posthog";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -39,7 +41,8 @@ export async function POST(request: Request) {
     }
 
     const { letter, flags } = body;
-    const { redacted: redactedLetter } = deidentify(letter);
+    const { redacted: redactedLetter, map: letterPhiMap } = deidentify(letter);
+    assertDeidentified(redactedLetter, letterPhiMap, "anchor-flags");
     const userMessage = `Letter:\n${redactedLetter}\n\nFlags:\n${flags.map((f, i) => `${i}: ${f}`).join("\n")}`;
 
     let anchors: { flagIndex: number; anchorText: string | null }[];
@@ -58,6 +61,17 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ anchors });
   } catch (error) {
+    if (error instanceof DeidVerificationError) {
+      serverPosthog.capture({
+        distinctId: "server",
+        event: "deid_verification_failed",
+        properties: { seam: error.seam, route: "anchor-flags", categories: error.categories, leak_count: error.leakCount },
+      });
+      return NextResponse.json(
+        { error: "DEID_VERIFICATION_FAILED", categories: error.categories },
+        { status: 422 }
+      );
+    }
     const message = error instanceof Error ? error.message : "Unable to anchor flags.";
     return NextResponse.json({ error: message }, { status: 500 });
   }

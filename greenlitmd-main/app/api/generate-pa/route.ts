@@ -5,6 +5,7 @@ import { rateLimiter } from "@/lib/rate-limit";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import { validateExtraction } from "@/lib/extractionValidator";
 import { serverPosthog } from "@/lib/posthog";
+import { DeidVerificationError } from "@/lib/deid-verify";
 import {
   extractChartDataFromText,
   generateLetterFromExtraction,
@@ -26,6 +27,7 @@ const maxUploadSizeBytes = 10 * 1024 * 1024;
 export async function POST(request: Request) {
   const startTime = Date.now();
   let stage: "extraction" | "narrative" = "extraction";
+  let distinctId = "server";
   try {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "127.0.0.1";
     const { success } = await rateLimiter.limit(ip);
@@ -41,6 +43,7 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    distinctId = user.id;
 
     if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
@@ -119,7 +122,7 @@ export async function POST(request: Request) {
 
     const paScore = computeEarnedWeight(extractedWithWarnings.pa_strength) / 10;
     serverPosthog.capture({
-      distinctId: user.id,
+      distinctId,
       event: "pa_generation_succeeded",
       properties: {
         cpt_code: cptCode,
@@ -138,6 +141,17 @@ export async function POST(request: Request) {
       sourceLockWarning,
     });
   } catch (error) {
+    if (error instanceof DeidVerificationError) {
+      serverPosthog.capture({
+        distinctId,
+        event: "deid_verification_failed",
+        properties: { seam: error.seam, route: "generate-pa", categories: error.categories, leak_count: error.leakCount },
+      });
+      return NextResponse.json(
+        { error: "DEID_VERIFICATION_FAILED", categories: error.categories },
+        { status: 422 }
+      );
+    }
     console.error("[generate-pa] POST handler error:", error);
     serverPosthog.capture({
       distinctId: "server",

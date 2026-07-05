@@ -3,6 +3,7 @@
 
 import { callAnthropicWithRetry } from "@/lib/anthropic";
 import { createDeidentifyState, deidentify } from "@/lib/deidentify";
+import { assertDeidentified } from "@/lib/deid-verify";
 
 export async function validateExtraction(
   chartText: string,
@@ -14,26 +15,27 @@ export async function validateExtraction(
   // ordering.
   const phiState = createDeidentifyState();
   const { redacted: deidentifiedText } = deidentify(chartText, phiState);
+  assertDeidentified(deidentifiedText, phiState.map, "extraction-validator.chart");
 
-  // Pull patient_name/date_of_birth structurally before serializing — once
-  // quoted inside JSON (e.g. "patient_name": "Delgado, Maria A.") the
-  // regex-based label match in deidentify() can't see them, so the plain
-  // regex pass alone would send the real name/DOB to the Anthropic API.
+  // Seed patient_name/date_of_birth so the variant sweep also catches any
+  // free-text mention of the name elsewhere in the JSON — deidentify() now
+  // natively recognizes JSON-quoted keys like "patient_name", so this
+  // seeding is a redundant net rather than the sole defense (see
+  // lib/pa-pipeline.ts for the same pattern).
   const jsonForRedaction: Record<string, unknown> = { ...extractedJson };
   if (typeof jsonForRedaction.patient_name === "string" && jsonForRedaction.patient_name.trim()) {
     if (!phiState.map["[PATIENT_NAME]"]) {
       phiState.map["[PATIENT_NAME]"] = jsonForRedaction.patient_name.trim();
     }
-    jsonForRedaction.patient_name = "[PATIENT_NAME]";
   }
   if (typeof jsonForRedaction.date_of_birth === "string" && jsonForRedaction.date_of_birth.trim()) {
     if (!phiState.map["[DOB]"]) {
       phiState.map["[DOB]"] = jsonForRedaction.date_of_birth.trim();
     }
-    jsonForRedaction.date_of_birth = "[DOB]";
   }
 
   const { redacted: redactedJson } = deidentify(JSON.stringify(jsonForRedaction, null, 2), phiState);
+  assertDeidentified(redactedJson, phiState.map, "extraction-validator.json");
   const prompt = `You are a medical data auditor. Compare the EXTRACTED JSON against the SOURCE CHART TEXT and identify any factual discrepancies.
 
 SOURCE CHART TEXT:

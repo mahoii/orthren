@@ -5,7 +5,7 @@
     "M17.11",
     "M17.12"
   ],
-  "primary_complaint": "Bilateral knee pain, right greater than left",
+  "primary_complaint": "Bilateral knee pain, right worse than left",
   "symptom_duration": "3+ years",
   "functional_limitations": [
     "Cannot walk more than 1 block",
@@ -13,11 +13,11 @@
     "Pain limits ability to demonstrate drills as volunteer coach"
   ],
   "objective_measurements": [
-    "Right knee flexion limited to 95 degrees",
+    "Right knee flexion 95 degrees",
     "Right knee extension -5 degrees (flexion contracture)",
     "KOOS Score Right: 28/100",
-    "Varus deformity 8 degrees right knee",
     "Kellgren-Lawrence Grade IV right knee",
+    "Varus deformity 8 degrees right knee",
     "Kellgren-Lawrence Grade III left knee"
   ],
   "conservative_treatments_attempted": [
@@ -36,7 +36,7 @@
       "relief_duration": "2-3 weeks each time"
     },
     {
-      "treatment": "Hyaluronic Acid Injection (Synvisc-One)",
+      "treatment": "Hyaluronic Acid Injection — Synvisc-One",
       "duration": "Unknown",
       "outcome": "minimal benefit",
       "dates": "06/2024",
@@ -60,51 +60,51 @@
   "denial_risk_flags": [
     {
       "id": "flag-1",
-      "label": "Corticosteroid Injection Dates Undocumented",
+      "label": "Cortisone Injection Dates Undocumented",
       "severity": "medium",
-      "explanation": "The two cortisone injections are dated only as 'approx 2023, exact date unclear,' which does not meet payer documentation standards requiring specific dates for each injection to verify conservative care timeline.",
-      "recommendation": "Obtain and document exact dates for both corticosteroid injections from pharmacy records, injection logs, or prior visit notes to establish a verifiable conservative care timeline.",
+      "explanation": "The two corticosteroid injections are dated only as 'approx 2023' with no exact dates, which may be insufficient for payer documentation requirements that mandate specific treatment dates to verify conservative care timeline.",
+      "recommendation": "Obtain and document exact dates of the cortisone injections from the administering provider's records or pharmacy records to establish a precise conservative care timeline.",
       "anchorText": "approx 2023, exact date unclear"
     },
     {
       "id": "flag-2",
-      "label": "Physical Therapy Duration at Minimum Threshold",
-      "severity": "medium",
-      "explanation": "Physical therapy is documented at exactly 6 weeks, which meets some payer minimums but falls at the lower boundary; Aetna PPO may require documentation of specific session counts, functional goals, and a formal discharge summary to confirm adequate trial.",
-      "recommendation": "Obtain PT discharge summary from Lakeside Rehab documenting session frequency, functional goals attempted, and objective measures at discharge to substantiate failure of conservative care.",
+      "label": "Physical Therapy Duration Below Payer Threshold",
+      "severity": "high",
+      "explanation": "Only 6 weeks of physical therapy is documented. Aetna PPO typically requires a minimum of 6–8 weeks of formal PT with documented failure; 6 weeks is at the lower boundary and may be challenged if outcomes documentation is sparse.",
+      "recommendation": "Provide detailed PT progress notes from Lakeside Rehab documenting specific functional outcomes, attendance, and clinical rationale for discontinuation to support the 6-week course as adequate and failed.",
       "anchorText": "PT at Lakeside Rehab for 6 weeks"
     },
     {
       "id": "flag-3",
       "label": "Hyaluronic Acid Injection Duration Not Documented",
-      "severity": "low",
-      "explanation": "The Synvisc-One injection in 06/2024 has no documented follow-up interval or duration of observation before declaring minimal benefit, which payers may use to question whether adequate time was allowed to assess response.",
-      "recommendation": "Add a chart note specifying the follow-up date after the 06/2024 Synvisc-One injection and the duration over which minimal benefit was assessed.",
-      "anchorText": "Synvisc-One hyaluronic acid injection right knee 06/2024"
+      "severity": "medium",
+      "explanation": "The Synvisc-One injection dated 06/2024 lacks a documented follow-up period or duration of observation before concluding minimal benefit, which payers may require to confirm adequate trial.",
+      "recommendation": "Add a chart note specifying the follow-up interval after the 06/2024 Synvisc-One injection and the duration over which 'minimal benefit' was assessed.",
+      "anchorText": "06/2024 - minimal benefit"
     },
     {
       "id": "flag-4",
-      "label": "Elevated BMI May Require Additional Clearance",
+      "label": "BMI 34.2 May Trigger Medical Review",
       "severity": "medium",
-      "explanation": "BMI of 34.2 combined with ASA III comorbidities (HTN, T2DM, OSA) may trigger Aetna PPO's requirement for pre-operative medical optimization documentation or a weight management program attempt prior to elective TKA authorization.",
-      "recommendation": "Document that the patient has been counseled on BMI-related surgical risk and that medical optimization (A1c, blood pressure, CPAP compliance) has been reviewed and cleared by the appropriate specialist.",
+      "explanation": "A BMI of 34.2 may prompt Aetna to request additional documentation of weight management counseling or a formal weight optimization program prior to elective TKA, as some payers apply BMI thresholds for surgical authorization.",
+      "recommendation": "Document any weight management counseling, dietary referral, or discussion of BMI optimization in the pre-operative notes to preempt a payer request for weight loss prior to surgery.",
       "anchorText": "BMI: 34.2"
     },
     {
       "id": "flag-5",
-      "label": "No MRI Documented for Soft Tissue Assessment",
+      "label": "Bilateral Diagnosis, Unilateral Request Noted",
       "severity": "low",
-      "explanation": "While X-ray findings are robust (KL Grade IV, bone-on-bone), some Aetna PPO policies for CPT 27447 may request MRI to rule out alternative diagnoses or confirm soft tissue integrity, particularly when bilateral disease is present.",
-      "recommendation": "Confirm with Aetna PPO whether MRI is required for CPT 27447 authorization; if so, order and complete MRI of the right knee prior to submission.",
-      "anchorText": "X-Ray Right Knee 02/15/2025"
+      "explanation": "The chart documents bilateral knee OA (M17.11 and M17.12) but requests only right TKA; payers may query whether the left knee diagnosis is relevant to the current authorization or flag it as a potential staged procedure requiring separate justification.",
+      "recommendation": "Add a brief note clarifying that M17.12 is documented for completeness but the current authorization request is limited to the right knee (M17.11) only, and that the left knee will be addressed separately if indicated.",
+      "anchorText": "only requesting right side at this time"
     },
     {
       "id": "flag-6",
-      "label": "Operating Surgeon Identity Placeholder Present",
-      "severity": "high",
-      "explanation": "The operating surgeon is listed as Dr. Sandra Reyes MD in the chart, which is a placeholder and does not match the requesting provider Dr. Sandra Reyes listed in the request details; payers require a clearly identified, credentialed operating surgeon on all prior authorization submissions.",
-      "recommendation": "Confirm and document the full name and NPI of the operating surgeon in the chart and ensure it matches the provider listed on the prior authorization request before submission.",
-      "anchorText": "OR: Dr. Sandra Reyes MD"
+      "label": "ASA III Comorbidities Require Clearance Documentation",
+      "severity": "medium",
+      "explanation": "The patient's ASA III classification with HTN, T2DM (A1c 7.1), and OSA on CPAP may require documented medical clearance from the patient's primary care or specialist prior to Aetna approving elective TKA.",
+      "recommendation": "Include pre-operative medical clearance documentation from the managing physician addressing cardiovascular risk, glycemic control (A1c 7.1), and OSA/CPAP compliance to satisfy Aetna's pre-surgical evaluation requirements.",
+      "anchorText": "ASA III (HTN, DM, OSA)"
     }
   ],
   "pa_strength": {
@@ -141,7 +141,7 @@
       "note": "Symptom duration (\"3+ years\") is ≥ 12 weeks."
     }
   },
-  "pain_score": "8/10 with activity, 4/10 at rest",
+  "pain_score": "4/10 at rest, 8/10 with activity",
   "bmi": 34.2,
   "asa_classification": "ASA III",
   "validation": {

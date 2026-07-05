@@ -26,21 +26,21 @@
       "treatment": "Physical Therapy",
       "duration": "8 weeks",
       "outcome": "minimal improvement, pain persisted with overhead activity",
-      "dates": "September–October 2024",
+      "dates": "September-October 2024",
       "relief_duration": null
     },
     {
-      "treatment": "Corticosteroid Injection — Kenalog 40mg",
+      "treatment": "Corticosteroid Injection - Kenalog 40mg",
       "duration": "Unknown",
       "outcome": "2 weeks of partial relief, then return to baseline symptoms",
       "dates": "11/05/2024",
       "relief_duration": "2 weeks"
     },
     {
-      "treatment": "NSAIDs — Meloxicam 15mg daily",
+      "treatment": "NSAIDs - Meloxicam 15mg daily",
       "duration": "3 months",
       "outcome": "inadequate pain control, GI intolerance developed",
-      "dates": "July–October 2024",
+      "dates": "July-October 2024",
       "relief_duration": null
     }
   ],
@@ -49,40 +49,40 @@
     "key_findings": "X-ray (01/22/2025): AC joint arthrosis Grade II. No calcific deposits. No significant glenohumeral arthrosis.; MRI (01/22/2025): Full-thickness supraspinatus tear measuring 2.1 cm with retraction to the musculotendinous junction. Moderate subacromial bursitis. Intact subscapularis."
   },
   "imaging_status": "completed",
-  "requested_procedure": "Arthroscopic rotator cuff repair, right shoulder — CPT 29827",
+  "requested_procedure": "Arthroscopic rotator cuff repair, right shoulder - CPT 29827",
   "surgical_approach_if_mentioned": "Arthroscopic with mini-open rotator cuff repair",
   "denial_risk_flags": [
     {
       "id": "flag-1",
       "label": "Physical Therapy Duration Below Typical Threshold",
       "severity": "medium",
-      "explanation": "Physical therapy was documented for only 8 weeks. Many BCBS policies for CPT 29827 require a minimum of 6–12 weeks of formal PT, but reviewers may scrutinize whether 8 weeks is sufficient given the severity of the tear and the short relief window.",
-      "recommendation": "Add documentation clarifying that PT was maximally attempted and that the treating therapist concurred with surgical candidacy, or provide PT discharge summary confirming plateau of progress.",
+      "explanation": "Physical therapy was documented for only 8 weeks. Many BCBS policies for CPT 29827 require a minimum of 6–12 weeks of formal PT, but reviewers may scrutinize whether 8 weeks is sufficient given the severity of the tear and the short duration relative to some payer thresholds.",
+      "recommendation": "Add documentation clarifying the number of PT sessions attended, the specific exercises performed, and objective measurements at start and end of PT to demonstrate a structured, supervised program was completed and failed.",
       "anchorText": "Physical Therapy: 8 weeks"
     },
     {
       "id": "flag-2",
       "label": "Corticosteroid Injection Duration Not Documented",
       "severity": "medium",
-      "explanation": "The corticosteroid injection entry does not include a treatment duration or number of injections attempted. Payers may require documentation of at least one injection trial with a defined observation period before approving surgical intervention.",
-      "recommendation": "Amend the chart to specify the observation period following the 11/05/2024 injection and confirm whether a second injection was considered or contraindicated.",
-      "anchorText": "Corticosteroid Injection — Kenalog 40mg"
+      "explanation": "The corticosteroid injection entry does not include a duration of treatment or a follow-up interval, only a single administration date placeholder (11/05/2024). Payers may flag incomplete conservative care timelines as insufficient to establish failure.",
+      "recommendation": "Add a follow-up note dated after 11/05/2024 documenting the patient's return to baseline symptoms and confirming the injection provided only 2 weeks of partial relief before surgical planning was initiated.",
+      "anchorText": "Corticosteroid Injection - Kenalog"
     },
     {
       "id": "flag-3",
-      "label": "Conservative Care Dates Contain Placeholders",
+      "label": "Work Injury Origin May Require Workers' Comp Coordination",
       "severity": "medium",
-      "explanation": "Treatment dates for physical therapy, NSAIDs, and the corticosteroid injection reference placeholder tokens (October 2024, 11/05/2024) rather than resolved calendar dates. Payers require specific, verifiable treatment dates to confirm adequate conservative care duration.",
-      "recommendation": "Ensure all placeholder dates (October 2024, 11/05/2024) are replaced with actual calendar dates prior to submission to establish a clear and auditable conservative care timeline.",
-      "anchorText": "September–October 2024"
+      "explanation": "The chart documents the injury as work-related, which may trigger a workers' compensation coordination-of-benefits review by BCBS before authorizing the procedure under the health plan.",
+      "recommendation": "Confirm whether a workers' compensation claim has been filed or denied. If denied or not applicable, include documentation of that determination in the prior authorization submission to prevent a COB-related denial.",
+      "anchorText": "work-related lifting injury"
     },
     {
       "id": "flag-4",
-      "label": "Imaging Date Contains Placeholder Token",
-      "severity": "low",
-      "explanation": "Both MRI and X-ray are dated 01/22/2025, which is a placeholder token. Payers require actual imaging dates to confirm the study was performed within an acceptable pre-authorization window.",
-      "recommendation": "Replace 01/22/2025 with the actual imaging date before submission to ensure the imaging is recognized as current and valid for the authorization request.",
-      "anchorText": "MRI Right Shoulder (01/22/2025)"
+      "label": "Attending Provider Name Is a Placeholder",
+      "severity": "high",
+      "explanation": "The attending surgeon is listed as Dr. Michael Torres in the chart, which is a placeholder token rather than a verified provider name. Payers require a credentialed, identified requesting provider for prior authorization approval.",
+      "recommendation": "Ensure the attending surgeon's full legal name, NPI, and BCBS credentialing information are populated before submission. Confirm Dr. Michael Torres resolves to the correct provider on file.",
+      "anchorText": "Dr. Michael Torres"
     }
   ],
   "pa_strength": {
@@ -108,7 +108,7 @@
     },
     "surgical_approach": {
       "score": 1,
-      "note": "The chart explicitly documents 'Arthroscopic with mini-open rotator cuff repair' as the planned surgical approach, which is a specific and procedure-appropriate technique for CPT 29827."
+      "note": "The surgical approach is explicitly documented as 'Arthroscopic with mini-open rotator cuff repair,' which is a specific, procedure-appropriate technique for CPT 29827."
     },
     "cpt_code_valid": {
       "score": 1,

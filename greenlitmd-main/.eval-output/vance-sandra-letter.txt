@@ -1,9 +1,8 @@
-July 3, 2026
+July 5, 2026
 United Healthcare
 Prior Authorization Department
 
 Re: Vance, Sandra M. | DOB: 07/28/1962 | Left Total Hip Arthroplasty (CPT 27130) | M16.12
-
 Member ID: See attached insurance card
 Patient: Vance, Sandra M.
 Date of Birth: 07/28/1962
@@ -14,11 +13,11 @@ Dear Prior Authorization Reviewer,
 
 **CLINICAL HISTORY AND PRESENTING COMPLAINT**
 
-Vance, Sandra M. presents with worsening left hip pain over the past several months, for which surgical evaluation has been initiated. The patient has difficulty ambulating distances greater than 200 feet and is unable to perform prolonged standing.
+Vance, Sandra M. presents with worsening left hip pain over the past several months, for which surgical evaluation has been initiated. The patient is unable to ambulate distances greater than 200 feet and cannot perform prolonged standing, significantly limiting independent mobility.
 
 **DIAGNOSIS**
 
-The patient carries a diagnosis of primary osteoarthritis of the left hip (ICD-10: M16.12), consistent with the clinical presentation of progressive hip joint deterioration and associated functional decline.
+The patient carries a confirmed diagnosis of primary osteoarthritis of the left hip (M16.12), consistent with the clinical presentation of progressive hip joint deterioration and functional decline.
 
 **FUNCTIONAL LIMITATIONS**
 
@@ -33,11 +32,11 @@ The patient carries a diagnosis of primary osteoarthritis of the left hip (ICD-1
 
 [REQUIRES PHYSICIAN REVIEW — IMAGING PENDING]
 
-The requested procedure is left total hip arthroplasty (CPT 27130). Advanced imaging has been ordered and results are pending. Authorization is requested in advance of imaging completion to prevent unnecessary delays in patient care once results are available.
+The treating surgeon, James Holloway, MD, is requesting authorization for left total hip arthroplasty (CPT 27130) of the left hip. Advanced imaging has been ordered and results are pending. Authorization is requested in advance of imaging completion to prevent unnecessary delays in patient care once results are available.
 
 **MEDICAL NECESSITY SUMMARY**
 
-Vance, Sandra M. presents with primary osteoarthritis of the left hip resulting in significant and progressive functional impairment. Conservative management to date has included over-the-counter pain medication, which has failed to provide meaningful relief. The patient's inability to ambulate distances greater than 200 feet and to perform prolonged standing reflects a level of functional compromise that substantially limits activities of daily living. Left total hip arthroplasty is medically necessary to restore functional mobility, alleviate pain, and allow this patient to resume an acceptable level of independent function. We respectfully request timely authorization of CPT 27130 to avoid further deterioration and delay in care.
+Vance, Sandra M. presents with primary osteoarthritis of the left hip resulting in significant and progressive functional decline. Conservative management to date has included over-the-counter pain medication, which has failed to provide meaningful relief. The patient's inability to ambulate distances greater than 200 feet and to perform prolonged standing has substantially compromised the ability to maintain activities of daily living. Left total hip arthroplasty represents the appropriate and necessary next step in restoring functional independence and improving quality of life for this patient. We respectfully request timely authorization for CPT 27130.
 
 Sincerely,
 James Holloway, MD

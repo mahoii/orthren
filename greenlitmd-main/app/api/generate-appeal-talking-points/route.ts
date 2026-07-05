@@ -4,7 +4,9 @@ import { callAnthropicWithRetry } from "@/lib/anthropic";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import { getPayerRule, normalizePayerName, buildPayerInjectionBlock } from "@/lib/payer-rules";
 import { parseJsonObject } from "@/lib/pa-pipeline";
-import { deidentify, createDeidentifyState, type DeidentifyState } from "@/lib/deidentify";
+import { deidentify, createDeidentifyState, reidentifyDeep, type DeidentifyState } from "@/lib/deidentify";
+import { assertDeidentified, DeidVerificationError } from "@/lib/deid-verify";
+import { serverPosthog } from "@/lib/posthog";
 import type { ExtractedChartData, ConservativeTreatment, ImagingFindings, DenialRiskFlag } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -163,11 +165,20 @@ export async function POST(request: Request) {
     // restarting per field and risking collisions — same pattern used by
     // regenerate-denial-fix.
     const phiState = createDeidentifyState();
+    // Seed from the FULL pre-whitelist chart (buildSanitizedChart drops
+    // patient_name/date_of_birth entirely) so the patient-name variant sweep
+    // still catches a bare mention of the name inside a retained free-text
+    // field (e.g. "Mr. Smith reports..." inside primary_complaint) or inside
+    // the physician-pasted denial_reason text.
+    const fullChart = extracted_chart as ExtractedChartData;
+    if (typeof fullChart.patient_name === "string" && fullChart.patient_name.trim()) {
+      phiState.map["[PATIENT_NAME]"] = fullChart.patient_name.trim();
+    }
     const denialReason = deidentify(denial_reason as string, phiState).redacted;
-    const sanitizedChart = deidentifySanitizedChart(
-      buildSanitizedChart(extracted_chart as ExtractedChartData),
-      phiState
-    );
+    const sanitizedChart = deidentifySanitizedChart(buildSanitizedChart(fullChart), phiState);
+    const sanitizedChartJson = JSON.stringify(sanitizedChart, null, 2);
+    assertDeidentified(denialReason, phiState.map, "appeal-talking-points.denial");
+    assertDeidentified(sanitizedChartJson, phiState.map, "appeal-talking-points.chart");
 
     const normalizedPayer = normalizePayerName(payerName);
     const payerRule = normalizedPayer ? getPayerRule(normalizedPayer, cptCode) : null;
@@ -175,7 +186,7 @@ export async function POST(request: Request) {
       payerRule && payerRule.validation_status === "validated" ? buildPayerInjectionBlock(payerRule) : null;
 
     const userPrompt = `<chart_data>
-${JSON.stringify(sanitizedChart, null, 2)}
+${sanitizedChartJson}
 </chart_data>
 
 <denial_reason>
@@ -194,7 +205,14 @@ Payer: ${payerName}`;
       useStructuredOutput: true,
     });
 
-    const parsed = await parseJsonObject(content);
+    const rawParsed = await parseJsonObject(content);
+    // Reidentify before validating/returning -- the model occasionally
+    // echoes a placeholder token verbatim into its own output (e.g. a
+    // rebuttal point mentioning "[PROVIDER_1]"), which would otherwise reach
+    // the physician-facing response as literal bracket text instead of the
+    // real name. This never leaves the server logic; the same pattern is
+    // used by finalizeLetter() in lib/pa-pipeline.ts.
+    const parsed = reidentifyDeep(rawParsed, phiState.map);
 
     const rebuttalPoints = parsed.rebuttal_points;
     const suggestedNextStep = parsed.suggested_next_step;
@@ -223,6 +241,22 @@ Payer: ${payerName}`;
       suggested_next_step: suggestedNextStep,
     });
   } catch (error) {
+    if (error instanceof DeidVerificationError) {
+      serverPosthog.capture({
+        distinctId: "server",
+        event: "deid_verification_failed",
+        properties: {
+          seam: error.seam,
+          route: "generate-appeal-talking-points",
+          categories: error.categories,
+          leak_count: error.leakCount,
+        },
+      });
+      return NextResponse.json(
+        { error: "DEID_VERIFICATION_FAILED", categories: error.categories },
+        { status: 422 }
+      );
+    }
     const message = error instanceof Error ? error.message : "Unable to generate appeal talking points.";
     return NextResponse.json({ error: message }, { status: 500 });
   }

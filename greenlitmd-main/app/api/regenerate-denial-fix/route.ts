@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { rateLimiter } from "@/lib/rate-limit";
 import { callAnthropicWithRetry } from "@/lib/anthropic";
 import { createDeidentifyState, deidentify } from "@/lib/deidentify";
+import { assertDeidentified, DeidVerificationError } from "@/lib/deid-verify";
+import { serverPosthog } from "@/lib/posthog";
 import { letterSystemPrompt } from "@/lib/letter-system-prompt";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import { finalizeLetter, computeDeterministicPaStrength, type RequestDetails } from "@/lib/pa-pipeline";
@@ -62,6 +64,11 @@ export async function POST(request: Request) {
     const { redacted: redactedExtraction } = deidentify(JSON.stringify(extractionJson, null, 2), phiState);
     const { redacted: redactedLetter } = deidentify(currentLetter, phiState);
     const mergedPhiMap = phiState.map;
+    // Verify both redacted strings against the FINAL shared map -- a value
+    // discovered while redacting the letter but missed in the (already
+    // redacted) extraction JSON would otherwise go unchecked.
+    assertDeidentified(redactedExtraction, mergedPhiMap, "regenerate-denial-fix.extraction");
+    assertDeidentified(redactedLetter, mergedPhiMap, "regenerate-denial-fix.letter");
 
     const userMessage = `You are performing a surgical revision of an existing Letter of Medical Necessity.
 
@@ -150,6 +157,22 @@ REVISION INSTRUCTIONS:
       sourceLockWarning,
     });
   } catch (error) {
+    if (error instanceof DeidVerificationError) {
+      serverPosthog.capture({
+        distinctId: "server",
+        event: "deid_verification_failed",
+        properties: {
+          seam: error.seam,
+          route: "regenerate-denial-fix",
+          categories: error.categories,
+          leak_count: error.leakCount,
+        },
+      });
+      return NextResponse.json(
+        { error: "DEID_VERIFICATION_FAILED", categories: error.categories },
+        { status: 422 }
+      );
+    }
     const message = error instanceof Error ? error.message : "Unable to regenerate the letter.";
     return NextResponse.json({ error: message }, { status: 500 });
   }

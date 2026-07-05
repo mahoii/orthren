@@ -6,6 +6,8 @@ import { buildBmiAsaPromptLines } from "@/lib/letter-postprocess";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import { callAnthropicWithRetry } from "@/lib/anthropic";
 import { deidentify } from "@/lib/deidentify";
+import { assertDeidentified, DeidVerificationError } from "@/lib/deid-verify";
+import { serverPosthog } from "@/lib/posthog";
 import { finalizeLetter, type RequestDetails } from "@/lib/pa-pipeline";
 
 export const runtime = "nodejs";
@@ -69,6 +71,7 @@ export async function POST(request: Request) {
     }
 
     const { redacted: redactedChartData, map: letterPhiMap } = deidentify(JSON.stringify(chartDataOnly, null, 2));
+    assertDeidentified(redactedChartData, letterPhiMap, "regenerate-letter");
 
     const buildPrompt = () => `Structured patient data:
 <document_to_analyze>
@@ -109,6 +112,22 @@ Letter date: ${today}${bmiAsaLines}${objectiveMeasurementsStr}${buildSoftWarning
 
     return NextResponse.json({ letter: sanitized, sourceLockWarning });
   } catch (error) {
+    if (error instanceof DeidVerificationError) {
+      serverPosthog.capture({
+        distinctId: "server",
+        event: "deid_verification_failed",
+        properties: {
+          seam: error.seam,
+          route: "regenerate-letter",
+          categories: error.categories,
+          leak_count: error.leakCount,
+        },
+      });
+      return NextResponse.json(
+        { error: "DEID_VERIFICATION_FAILED", categories: error.categories },
+        { status: 422 }
+      );
+    }
     const message = error instanceof Error ? error.message : "Unable to regenerate the letter.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
