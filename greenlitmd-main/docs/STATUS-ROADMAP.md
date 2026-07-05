@@ -5,17 +5,19 @@ roadmap doc kept outside the repository — this repo is the source of truth for
 project status. Keep it updated in the same PR as any change that closes or
 reopens an item below.
 
-Last updated: 2026-07-03
+Last updated: 2026-07-05
 
 ---
 
-## STATUS SNAPSHOT (as of 2026-07-03)
+## STATUS SNAPSHOT (as of 2026-07-05)
 
 | Track | State |
 |---|---|
 | Extraction/letter pipeline | SOURCE LOCK validated — 60/60 PASS (see below) |
+| De-identification | Strengthened 2026-07-05 — independent fail-closed verification layer (`lib/deid-verify.ts`) now gates every route that sends PHI-bearing text off-server; offline stress harness (`scripts/deid-stress-check.ts`) 30/30 PASS across 3 fixtures + adversarial cases (see below) |
 | Security (auth/RLS) | Verified 2026-07-04 — `scripts/test-rls.mjs` PASS on all 7 tables (0 leaks). Only `waitlist`, `waitlist_signups` exist in the live project; both have RLS enabled with a `service_role_only` policy (added to `waitlist` this pass). `users`, `pa_cases`, `submissions`, `profiles`, `subscriptions`, `payer_rules` do not exist in the schema yet — no RLS risk, but also not yet real tables to secure. |
 | Payer rules engine | 8/12 rules `validated` in `lib/payer-rules.ts`; 3 UHC rules blocked (defer to licensed InterQual criteria); 1 Aetna rule blocked (no dedicated primary source exists) — see `scripts/payer-rules-status.ts` |
+| Appeal talking points | Route built 2026-07-05 (`app/api/generate-appeal-talking-points/route.ts`) — SOURCE LOCK + CITATION LOCK + de-id verification wired in. **Not called from any UI yet** — no `/review` or `/builder` surface exists for it |
 | Outreach infra | `[VERIFY: no outreach tooling (Streak, leave-behind materials, practice list) is tracked in this repo — status lives outside the codebase]` |
 | Billing | Not built in repo — no Stripe integration present |
 | Congressional App Challenge | `[VERIFY: frozen-branch / submission-date status — not discoverable from repo state alone]` |
@@ -40,6 +42,26 @@ the fix).
 `scripts/source-lock-multirun-check.ts` is a separate, narrower script and is
 explicitly out of scope for this fix — it has no date-matching logic and the
 Webb bug class doesn't apply to it.
+
+## De-identification
+
+**Status: strengthened, commit `a97bec9` ("de id layer strength optimized").**
+
+- `lib/deidentify.ts` substantially reworked (627 insertions / 191 deletions) — broader normalization (bidi/formatting control chars, smart quotes, NFKC), more identifier categories, credential/name-dedupe fixes.
+- New `lib/deid-verify.ts`: an independent, fail-closed post-redaction leak detector. By design it never imports detection regexes from `deidentify.ts` (only the name stoplist is shared as pure data) — the two passes are kept structurally independent so a bug in one can't silently blind the other. Leak reports carry only a category label + offset, never a raw value, so even a thrown error can't leak PHI through a log or API response.
+- `assertDeidentified` / `DeidVerificationError` are now wired in as a hard gate (422 `DEID_VERIFICATION_FAILED` + PostHog `deid_verification_failed` event) at every seam that sends PHI-bearing text to Anthropic or off-server: `generate-pa`, `regenerate-letter`, `regenerate-denial-fix` (both the extraction-JSON and letter redactions, checked against the final merged PHI map), and `anchor-flags`.
+- New offline harness `scripts/deid-stress-check.ts` (`npx tsx scripts/deid-stress-check.ts`, no live API calls) — regression-checks `deidentify.ts` + `deid-verify.ts` against the 3 real fixture charts (name/MRN/date/etc. must be scrubbed; clinical content like CPT/ICD codes and treatment values must survive) plus ~25 adversarial cases (zero-width-split SSNs, smart-quote/JSON-escaping edge cases, unlabeled bare digits, planted-leak controls, etc.). **Current result: 30/30 PASS** (verified 2026-07-05).
+
+**Exit criteria for CLAUDE.md's "de-identification pipeline verified against a real chart, not just fixtures" item:** still open — this pass strengthens and regression-tests against the fixture set, but does not itself constitute a real (non-fixture) chart run.
+
+## Appeal talking points
+
+**Status: route implemented, not yet wired to any UI.** Commit `e8801e1`.
+
+- `app/api/generate-appeal-talking-points/route.ts` — new Anthropic-backed route that turns a denial reason + extracted chart into structured peer-to-peer/appeal rebuttal points (`rebuttal_points`, `criteria_citations`, `suggested_next_step`).
+- Carries the same SOURCE LOCK / CITATION LOCK / injection-guard discipline as the letter pipeline, plus field-whitelisting (`buildSanitizedChart`) and de-identification (`deidentifySanitizedChart`, now gated by `assertDeidentified` per the de-id section above) before any chart data leaves the server.
+- Explicit code comment flags the sandbox-isolation risk if this is ever wired up: must short-circuit for the Delgado/Chen/Vance sandbox demo profiles, zero live Anthropic calls from sandbox.
+- Not called from `/review`, `/builder`, or any other page yet — no product surface consumes it.
 
 ## Security
 
