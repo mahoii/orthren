@@ -7,7 +7,7 @@ const CALENDLY_URL =
   // TODO: replace with real Calendly URL
   "https://calendly.com/kamarishabazz/30min";
 
-const SOLO_FEATURES = [
+const PRICING_FEATURES = [
   "AI-assisted Letter of Medical Necessity",
   "PA Strength Score with inline fix suggestions",
   "Denial risk flagging before submission",
@@ -15,11 +15,6 @@ const SOLO_FEATURES = [
   "All major payers supported",
   "Sub-60-second turnaround",
   "Submission-ready DOCX download",
-  "1 user account · Email support",
-];
-
-const SMALL_PLUS_FEATURES = [
-  "Up to 5 surgeon seats",
   "Multiple staff logins (PA coordinators + front desk)",
   "Dedicated onboarding call + setup support",
   "Priority email support",
@@ -130,9 +125,10 @@ export default function PricingSection() {
   const [isAnnual, setIsAnnual] = useState(false);
   const [paPerWeek, setPaPerWeek] = useState(20);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [surgeonCount, setSurgeonCount] = useState(1);
 
-  const soloPrice = isAnnual ? 249 : 299;
-  const smallPrice = isAnnual ? 499 : 599;
+  const price = surgeonCount === 1 ? 299 : 199 + 80 * surgeonCount;
+  const annualPrice = isAnnual ? Math.round((price * 10) / 12) : price;
   const roiResult = `$${Math.round(paPerWeek * 4.33 * 16).toLocaleString()}/mo`;
 
   function handleFaqClick(index: number) {
@@ -183,84 +179,71 @@ export default function PricingSection() {
         </span>
       </div>
 
-      {/* 3. Pricing cards */}
+      {/* 3. Pricing card */}
       <section className="px-6 pb-16">
-        <div className="mx-auto max-w-4xl grid gap-8 md:grid-cols-2">
-
-          {/* Solo Practice */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5">
-            <div>
-              <h2 className="text-xl font-bold text-clinical-navy">Solo practice</h2>
-              <p className="mt-1 text-sm text-slate-500">For single surgeons and solo practitioners</p>
-              <div className="mt-6 flex items-baseline gap-1">
-                <span className="text-5xl font-extrabold tracking-tight text-slate-900">
-                  ${soloPrice}
-                </span>
-                <span className="text-sm font-semibold text-slate-500">/mo</span>
-                {isAnnual && (
-                  <span className="ml-1 text-sm text-slate-400 line-through">$299</span>
-                )}
-              </div>
-              {isAnnual ? (
-                <p className="mt-1 text-xs text-slate-400">Billed $2,988/year</p>
-              ) : (
-                <p className="mt-1 text-xs text-transparent select-none">–</p>
-              )}
-              <ul className="mt-8 space-y-3">
-                {SOLO_FEATURES.map((f) => (
-                  <li key={f} className="flex items-start gap-2.5 text-sm text-slate-600">
-                    <span className="mt-0.5"><IconCheck /></span>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <a
-              href={CALENDLY_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              id="pricing-solo-cta"
-              className="mt-8 block w-full rounded-lg border-2 border-clinical-navy px-4 py-2.5 text-center text-sm font-semibold text-clinical-navy transition hover:bg-slate-50"
-            >
-              Book a free demo
-            </a>
-          </div>
-
-          {/* Small Practice */}
+        <div className="mx-auto max-w-lg">
           <div className="relative rounded-2xl border-2 border-clinical-navy bg-white p-8 shadow-lg flex flex-col justify-between transition-all hover:shadow-xl hover:-translate-y-0.5">
             <span className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-clinical-navy px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-white shadow">
-              Most Popular
+              Simple, scalable pricing
             </span>
             <div>
-              <h2 className="text-xl font-bold text-clinical-navy">Small practice</h2>
-              <p className="mt-1 text-sm text-slate-500">For growing multi-surgeon clinics</p>
+              <h2 className="text-xl font-bold text-clinical-navy">
+                {surgeonCount === 1 ? "Solo practice" : `Practice (${surgeonCount} surgeons)`}
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                One plan that scales with your surgeon count
+              </p>
+
+              <div className="mt-6 flex items-center justify-between gap-4">
+                <label htmlFor="surgeon-count" className="text-sm text-slate-600">
+                  Surgeons:
+                </label>
+                <input
+                  id="surgeon-count"
+                  type="number"
+                  min={1}
+                  max={15}
+                  step={1}
+                  value={surgeonCount}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    if (Number.isNaN(next)) return;
+                    setSurgeonCount(Math.min(15, Math.max(1, next)));
+                  }}
+                  className="w-20 rounded-lg border border-slate-200 px-3 py-1.5 text-right text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-clinical-blue"
+                />
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={15}
+                step={1}
+                value={surgeonCount}
+                onChange={(e) => setSurgeonCount(Number(e.target.value))}
+                className="mt-3 w-full accent-clinical-navy"
+              />
+
               <div className="mt-6 flex items-baseline gap-1">
                 <span className="text-5xl font-extrabold tracking-tight text-slate-900">
-                  ${smallPrice}
+                  ${annualPrice}
                 </span>
                 <span className="text-sm font-semibold text-slate-500">/mo</span>
                 {isAnnual && (
-                  <span className="ml-1 text-sm text-slate-400 line-through">$599</span>
+                  <span className="ml-1 text-sm text-slate-400 line-through">${price}</span>
                 )}
               </div>
               {isAnnual ? (
-                <p className="mt-1 text-xs text-slate-400">Billed $5,988/year</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Billed ${(annualPrice * 12).toLocaleString()}/year
+                </p>
               ) : (
                 <p className="mt-1 text-xs text-transparent select-none">–</p>
               )}
+
               <ul className="mt-8 space-y-3">
-                {SOLO_FEATURES.map((f) => (
+                {PRICING_FEATURES.map((f) => (
                   <li key={f} className="flex items-start gap-2.5 text-sm text-slate-600">
                     <span className="mt-0.5"><IconCheck /></span>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-6 text-xs italic text-slate-400">Everything in solo, plus:</p>
-              <ul className="mt-3 space-y-3">
-                {SMALL_PLUS_FEATURES.map((f) => (
-                  <li key={f} className="flex items-start gap-2.5 text-sm text-slate-600">
-                    <span className="mt-0.5"><IconPlus /></span>
                     {f}
                   </li>
                 ))}
@@ -330,7 +313,7 @@ export default function PricingSection() {
                 </p>
               </div>
               <div className="sm:text-right">
-                <p className="text-2xl font-medium text-green-600">$599/mo</p>
+                <p className="text-2xl font-medium text-green-600">${annualPrice}/mo</p>
               </div>
             </div>
           </div>
