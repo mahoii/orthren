@@ -276,7 +276,7 @@ function UploadPage() {
             isDemo: true
           })
         );
-        router.push("/review");
+        router.push(isPublicDemo ? "/review?demo=true" : "/review");
       } catch (caughtError) {
         setError(caughtError instanceof Error ? caughtError.message : "Failed to run simulation.");
       } finally {

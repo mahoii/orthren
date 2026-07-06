@@ -3,9 +3,11 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
-  // Public demo mode — bypass auth entirely for /builder?demo=true
+  // Public demo mode — bypass auth entirely for /builder?demo=true and the
+  // /review it redirects to, so unauthenticated visitors can complete the
+  // full sandbox flow without signing in.
   if (
-    request.nextUrl.pathname === "/builder" &&
+    (request.nextUrl.pathname === "/builder" || request.nextUrl.pathname === "/review") &&
     request.nextUrl.searchParams.get("demo") === "true"
   ) {
     return NextResponse.next({ request });
