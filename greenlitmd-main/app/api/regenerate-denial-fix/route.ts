@@ -7,7 +7,13 @@ import { captureEvent } from "@/lib/posthog";
 import { letterSystemPrompt } from "@/lib/letter-system-prompt";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import { finalizeLetter, computeDeterministicPaStrength, type RequestDetails } from "@/lib/pa-pipeline";
-import { getPayerRule, normalizePayerName, applyValidatedPayerDurationPenalty } from "@/lib/payer-rules";
+import {
+  getPayerRule,
+  normalizePayerName,
+  applyValidatedPayerDurationPenalty,
+  getPayerChecklist,
+  deriveHardRequirementRiskFlags,
+} from "@/lib/payer-rules";
 import type { ExtractedChartData, ConservativeTreatment } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -144,7 +150,25 @@ REVISION INSTRUCTIONS:
       payerRule,
       mergedExtraction.conservative_treatments_attempted
     );
-    const updatedExtractionJson: ExtractedChartData = { ...mergedExtraction, pa_strength };
+
+    // Same advisory payer-checklist flags as generate-pa — recomputed here too,
+    // otherwise a regenerate silently drops any hard-requirement flags that
+    // were present after the initial generation. `extractionJson` coming in
+    // may already carry payer-hardreq-* flags from a prior generate-pa call,
+    // so strip and recompute fresh rather than accumulate stale ones (e.g. a
+    // requirement the reviewer just supplemented would otherwise keep showing
+    // a "not found" flag forever). See lib/payer-rules.ts.
+    const rescored: ExtractedChartData = { ...mergedExtraction, pa_strength };
+    const nonPayerFlags = rescored.denial_risk_flags.filter((f) => !f.id.startsWith("payer-hardreq-"));
+    const rescoredForChecklist: ExtractedChartData = { ...rescored, denial_risk_flags: nonPayerFlags };
+    const payerChecklist = payerRule ? getPayerChecklist(payerRule, rescoredForChecklist) : [];
+    const updatedExtractionJson: ExtractedChartData = {
+      ...rescoredForChecklist,
+      denial_risk_flags: [
+        ...nonPayerFlags,
+        ...deriveHardRequirementRiskFlags(payerRule, rescoredForChecklist, payerChecklist),
+      ],
+    };
 
     if (process.env.NODE_ENV === "development") {
       console.log("[regenerate-denial-fix] processed letter start:", processedLetter.slice(0, 200));

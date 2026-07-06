@@ -3,7 +3,7 @@
 // IMPORTANT: this module must stay free of server-only imports (no `server-only`,
 // no Supabase, no Node built-ins) so it can be imported by both server routes and
 // client components (e.g. components/PayerCombobox.tsx).
-import type { PaStrength, ConservativeTreatment } from "@/lib/types";
+import type { PaStrength, ConservativeTreatment, ExtractedChartData, DenialRiskFlag } from "@/lib/types";
 
 export interface ImageRequirement {
   modality: string;
@@ -753,23 +753,138 @@ INSTRUCTION: Address each criterion using only facts present in the extraction J
 
 // ── Review-page checklist ────────────────────────────────────────────────────
 
+// "met"/"not_met" are only ever produced against a validated payer rule and a
+// confident match against extracted chart data — anything ambiguous (no clean
+// name match, unvalidated rule, or no extraction supplied) falls back to
+// "unverifiable" and stays a manual, reviewer-toggled checkbox. A false "met"
+// is worse than an unnecessary manual check, so matching is deliberately
+// conservative (see hasNearbyNegation / findCleanTreatmentMatches below).
+export type ChecklistVerification = "met" | "not_met" | "unverifiable";
+
 export interface PayerChecklistItem {
   label: string;
   requirement: string;
   isHardRequirement: boolean;
+  verification: ChecklistVerification;
+}
+
+const NEGATION_TOKENS = new Set(["no", "denies", "denied", "without", "not", "never", "declined", "refused"]);
+
+// True if a negation token appears within `windowWords` words immediately
+// before `matchIndex` in `text` — guards against a substring match landing
+// inside a negated statement (e.g. treatment field text like "No NSAIDs
+// prescribed" should not count as a documented NSAID trial).
+function hasNearbyNegation(text: string, matchIndex: number, windowWords = 4): boolean {
+  const before = text.slice(0, matchIndex).trim();
+  if (!before) return false;
+  const words = before.split(/\s+/).slice(-windowWords);
+  return words.some((w) => NEGATION_TOKENS.has(w.replace(/[^a-z]/g, "")));
+}
+
+// Payer requirement labels are frequently a compound ask joined by "or"/"/"
+// (e.g. "NSAIDs or acetaminophen", "Physical therapy or supervised exercise")
+// with parenthetical asides ("Weight management (if BMI ≥30)"). Matching the
+// whole label as one substring against a chart's much shorter free-text
+// treatment name would essentially never hit, so split into individual
+// candidate phrases first — this is still plain substring matching (no
+// fuzzy/synonym inference), just handling the "X or Y" convention already
+// used throughout the payer rule data.
+function candidateTreatmentPhrases(reqLabel: string): string[] {
+  const stripped = reqLabel.replace(/\([^)]*\)/g, "").trim();
+  return stripped
+    .split(/\s+or\s+|\//i)
+    .map((p) => p.trim().toLowerCase())
+    .filter((p) => p.length >= 3);
+}
+
+// Find conservative-treatment entries whose free-text `treatment` name
+// contains one of the payer requirement's candidate phrases, excluding any
+// match that lands inside a negated statement. An unmatched requirement (e.g.
+// payer rule says "Corticosteroid Injection", chart says "Kenalog injection")
+// safely falls back to "unverifiable" rather than a guessed result.
+function findCleanTreatmentMatches(
+  reqLabel: string,
+  treatments: ConservativeTreatment[]
+): ConservativeTreatment[] {
+  const phrases = candidateTreatmentPhrases(reqLabel);
+  if (phrases.length === 0) return [];
+  const matches: ConservativeTreatment[] = [];
+  for (const t of treatments) {
+    const name = (t?.treatment ?? "").toLowerCase();
+    if (!name) continue;
+    for (const phrase of phrases) {
+      const idx = name.indexOf(phrase);
+      if (idx === -1) continue;
+      if (hasNearbyNegation(name, idx)) continue;
+      matches.push(t);
+      break;
+    }
+  }
+  return matches;
+}
+
+function evaluateConservativeTreatmentRequirement(
+  req: ConservativeTxRequirement,
+  extracted: ExtractedChartData | null | undefined,
+  validated: boolean
+): ChecklistVerification {
+  if (!extracted || !validated) return "unverifiable";
+
+  const matches = findCleanTreatmentMatches(req.treatment, extracted.conservative_treatments_attempted ?? []);
+  if (matches.length === 0) return "unverifiable";
+
+  const requiredWeeks = parseMinimumWeeks(req.minimum_duration);
+  const actualWeeks = parseTreatmentWeeksFromExtracted(matches, () => true);
+  if (requiredWeeks === 0 || actualWeeks === 0) return "unverifiable";
+
+  return actualWeeks >= requiredWeeks ? "met" : "not_met";
+}
+
+// Payer imaging labels carry descriptive parenthetical detail the extraction's
+// collapsed modality string won't ("X-ray (weight-bearing bilateral)" vs. a
+// chart value like "X-ray and MRI") — strip the parenthetical and match on the
+// leading modality name itself (X-ray, MRI, CT), which is a small, canonical
+// vocabulary. Unlike conservative-treatment names, an absent match here is
+// treated as a real "not_met" rather than falling back to "unverifiable".
+function coreModalityLabel(reqModality: string): string {
+  const idx = reqModality.indexOf("(");
+  return (idx === -1 ? reqModality : reqModality.slice(0, idx)).trim().toLowerCase();
+}
+
+function evaluateImagingRequirement(
+  req: ImageRequirement,
+  extracted: ExtractedChartData | null | undefined,
+  validated: boolean
+): ChecklistVerification {
+  if (!extracted || !validated) return "unverifiable";
+
+  const label = coreModalityLabel(req.modality);
+  if (!label) return "unverifiable";
+
+  const modality = (extracted.imaging_findings?.modality ?? "").toLowerCase();
+  const matched = modality.includes(label);
+  return matched && extracted.imaging_status === "completed" ? "met" : "not_met";
 }
 
 // Build a flat pre-flight checklist for the review page. Conservative treatment
 // minimums and required imaging are hard requirements; optional imaging,
-// functional/radiographic criteria, and additional docs are soft.
-export function getPayerChecklist(rule: PayerRule): PayerChecklistItem[] {
+// functional/radiographic criteria, and additional docs are soft. When
+// `extracted` chart data is supplied, hard requirements are auto-verified
+// against it (see evaluate*Requirement above); everything else stays
+// "unverifiable" and renders as today's manual checkbox.
+export function getPayerChecklist(
+  rule: PayerRule,
+  extracted?: ExtractedChartData | null
+): PayerChecklistItem[] {
   const items: PayerChecklistItem[] = [];
+  const validated = rule.validation_status === "validated";
 
   for (const c of rule.conservative_treatment_requirements) {
     items.push({
       label: c.treatment,
       requirement: `${c.minimum_duration}${c.notes ? ` — ${c.notes}` : ""}`,
       isHardRequirement: true,
+      verification: evaluateConservativeTreatmentRequirement(c, extracted, validated),
     });
   }
 
@@ -778,22 +893,58 @@ export function getPayerChecklist(rule: PayerRule): PayerChecklistItem[] {
       label: img.modality,
       requirement: img.minimum_findings ?? img.notes ?? (img.required ? "Required" : "Optional"),
       isHardRequirement: img.required,
+      verification: evaluateImagingRequirement(img, extracted, validated),
     });
   }
 
   for (const f of rule.functional_criteria) {
-    items.push({ label: f, requirement: "Functional criterion — address in letter", isHardRequirement: false });
+    items.push({ label: f, requirement: "Functional criterion — address in letter", isHardRequirement: false, verification: "unverifiable" });
   }
 
   for (const r of rule.radiographic_criteria) {
-    items.push({ label: r, requirement: "Radiographic criterion", isHardRequirement: false });
+    items.push({ label: r, requirement: "Radiographic criterion", isHardRequirement: false, verification: "unverifiable" });
   }
 
   for (const d of rule.additional_documentation) {
-    items.push({ label: d, requirement: "Supporting documentation", isHardRequirement: false });
+    items.push({ label: d, requirement: "Supporting documentation", isHardRequirement: false, verification: "unverifiable" });
   }
 
   return items;
+}
+
+// Derive advisory denial-risk flags for hard payer requirements that failed
+// auto-verification. These merge into ExtractedChartData.denial_risk_flags —
+// the same advisory, acknowledgeable, non-blocking pipeline every other risk
+// flag on the review page already uses (only sourceLockWarning hard-blocks
+// export, for a categorically different reason: verified data-integrity
+// failure vs. a probabilistic text match here). Ids are namespaced
+// `payer-hardreq-*` to avoid colliding with the extraction LLM's own `flag-*`
+// ids, since both feed the same id-keyed dedup/acknowledge logic.
+export function deriveHardRequirementRiskFlags(
+  rule: PayerRule | null,
+  extracted: ExtractedChartData,
+  checklist: PayerChecklistItem[]
+): DenialRiskFlag[] {
+  if (!rule || rule.validation_status !== "validated") return [];
+
+  const existingLabels = new Set(extracted.denial_risk_flags.map((f) => f.label));
+  const flags: DenialRiskFlag[] = [];
+
+  checklist.forEach((item, index) => {
+    if (!item.isHardRequirement || item.verification !== "not_met") return;
+    const label = `Payer requirement not confirmed: ${item.label}`;
+    if (existingLabels.has(label)) return;
+    flags.push({
+      id: `payer-hardreq-${index}`,
+      label,
+      severity: "high",
+      explanation: `${rule.payer_name} requires ${item.label} (${item.requirement}), which was not found in the extracted chart data.`,
+      recommendation: `Confirm ${item.label} is documented in the chart, or add supporting documentation before submission.`,
+      anchorText: "",
+    });
+  });
+
+  return flags;
 }
 
 // ── Validated-payer PA Strength adjustment ───────────────────────────────────
@@ -821,20 +972,32 @@ export function parseMinimumWeeks(duration: string): number {
   return Math.round(weeks);
 }
 
-// Find documented physical-therapy treatments in the extracted chart data and
-// return the largest parsed week count (most favorable to the provider).
-// Returns 0 when no PT is documented or its duration cannot be parsed into weeks.
-export function parsePtWeeksFromExtracted(treatments: ConservativeTreatment[]): number {
+// Find treatments whose lowercased name satisfies `nameMatcher` and return the
+// largest parsed week count among them (most favorable to the provider).
+// Returns 0 when nothing matches or no duration can be parsed into weeks.
+export function parseTreatmentWeeksFromExtracted(
+  treatments: ConservativeTreatment[],
+  nameMatcher: (name: string) => boolean
+): number {
   if (!Array.isArray(treatments)) return 0;
   let maxWeeks = 0;
   for (const t of treatments) {
     const name = (t?.treatment ?? "").toLowerCase();
-    const isPt = name.includes("physical therapy") || /\bpt\b/.test(name);
-    if (!isPt) continue;
+    if (!nameMatcher(name)) continue;
     const weeks = parseMinimumWeeks(t?.duration ?? "");
     if (weeks > maxWeeks) maxWeeks = weeks;
   }
   return maxWeeks;
+}
+
+// Find documented physical-therapy treatments in the extracted chart data and
+// return the largest parsed week count (most favorable to the provider).
+// Returns 0 when no PT is documented or its duration cannot be parsed into weeks.
+export function parsePtWeeksFromExtracted(treatments: ConservativeTreatment[]): number {
+  return parseTreatmentWeeksFromExtracted(
+    treatments,
+    (name) => name.includes("physical therapy") || /\bpt\b/.test(name)
+  );
 }
 
 // Payer-specific PA Strength adjustment: penalizes conservative-care duration

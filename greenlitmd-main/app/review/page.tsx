@@ -796,7 +796,7 @@ export default function ReviewPage() {
           </div>
 
           {/* Payer Criteria Panel */}
-          <PayerCriteriaPanel payerRule={data?.payerRule ?? null} />
+          <PayerCriteriaPanel payerRule={data?.payerRule ?? null} extracted={data?.extracted ?? null} />
 
           {/* Needs Attention Header */}
           <div style={{ margin: '26px 2px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -996,11 +996,17 @@ export default function ReviewPage() {
 
 // ─── PayerCriteriaPanel ───────────────────────────────────────────────────────
 
-function PayerCriteriaPanel({ payerRule }: { payerRule: PayerRule | null }) {
+function PayerCriteriaPanel({
+  payerRule,
+  extracted,
+}: {
+  payerRule: PayerRule | null;
+  extracted: ExtractedChartData | null;
+}) {
   const [open, setOpen] = useState(false);
   const [checked, setChecked] = useState<Set<number>>(new Set());
 
-  const items = payerRule ? getPayerChecklist(payerRule) : [];
+  const items = payerRule ? getPayerChecklist(payerRule, extracted) : [];
 
   function toggle(i: number) {
     setChecked(prev => {
@@ -1044,25 +1050,42 @@ function PayerCriteriaPanel({ payerRule }: { payerRule: PayerRule | null }) {
             </p>
           ) : (
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 9 }}>
-              {items.map((item, i) => (
-                <li key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                  <input
-                    type="checkbox"
-                    checked={checked.has(i)}
-                    onChange={() => toggle(i)}
-                    style={{ marginTop: 3, flexShrink: 0, cursor: 'pointer', accentColor: item.isHardRequirement ? '#dc2626' : '#d97706' }}
-                  />
-                  <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: item.isHardRequirement ? '#dc2626' : '#b45309' }}>
-                      {item.label}
-                      {item.isHardRequirement ? null : (
-                        <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>optional</span>
-                      )}
+              {items.map((item, i) => {
+                const isAuto = item.verification !== "unverifiable";
+                const isMet = item.verification === "met";
+                return (
+                  <li key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <input
+                      type="checkbox"
+                      checked={isAuto ? isMet : checked.has(i)}
+                      disabled={isAuto}
+                      onChange={isAuto ? undefined : () => toggle(i)}
+                      style={{
+                        marginTop: 3,
+                        flexShrink: 0,
+                        cursor: isAuto ? 'default' : 'pointer',
+                        accentColor: isMet ? '#16a34a' : item.isHardRequirement ? '#dc2626' : '#d97706',
+                      }}
+                    />
+                    <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: item.isHardRequirement ? '#dc2626' : '#b45309' }}>
+                        {item.label}
+                        {item.isHardRequirement ? null : (
+                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>optional</span>
+                        )}
+                      </span>
+                      <span style={{ fontSize: 12, color: '#64748b', lineHeight: 1.4 }}>{item.requirement}</span>
+                      {isMet ? (
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#16a34a' }}>✓ Confirmed in chart</span>
+                      ) : item.verification === "not_met" ? (
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#b91c1c' }}>
+                          Not found in extracted chart — verify manually
+                        </span>
+                      ) : null}
                     </span>
-                    <span style={{ fontSize: 12, color: '#64748b', lineHeight: 1.4 }}>{item.requirement}</span>
-                  </span>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

@@ -16,6 +16,8 @@ import {
   normalizePayerName,
   buildPayerInjectionBlock,
   applyValidatedPayerDurationPenalty,
+  getPayerChecklist,
+  deriveHardRequirementRiskFlags,
 } from "@/lib/payer-rules";
 import { computeEarnedWeight } from "@/lib/pa-strength-weights";
 
@@ -111,6 +113,17 @@ export async function POST(request: Request) {
       payerRule,
       extractedWithWarnings.conservative_treatments_attempted
     );
+
+    // Advisory-only: surface any payer hard requirement that failed
+    // auto-verification against the extraction as a denial risk flag, reusing
+    // the existing acknowledgeable attention-rail pipeline. Self-gated on
+    // validation_status inside the helpers — never asserted against an
+    // unvalidated (research-sourced, unconfirmed) rule.
+    const payerChecklist = payerRule ? getPayerChecklist(payerRule, extractedWithWarnings) : [];
+    extractedWithWarnings.denial_risk_flags = [
+      ...extractedWithWarnings.denial_risk_flags,
+      ...deriveHardRequirementRiskFlags(payerRule, extractedWithWarnings, payerChecklist),
+    ];
 
     stage = "narrative";
     const { letter, sourceLockWarning } = await generateLetterFromExtraction(
