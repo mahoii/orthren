@@ -4,7 +4,7 @@ import mammoth from "mammoth";
 import { rateLimiter } from "@/lib/rate-limit";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import { validateExtraction } from "@/lib/extractionValidator";
-import { serverPosthog } from "@/lib/posthog";
+import { captureEvent } from "@/lib/posthog";
 import { DeidVerificationError } from "@/lib/deid-verify";
 import {
   extractChartDataFromText,
@@ -121,7 +121,7 @@ export async function POST(request: Request) {
     );
 
     const paScore = computeEarnedWeight(extractedWithWarnings.pa_strength) / 10;
-    serverPosthog.capture({
+    await captureEvent({
       distinctId,
       event: "pa_generation_succeeded",
       properties: {
@@ -142,7 +142,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     if (error instanceof DeidVerificationError) {
-      serverPosthog.capture({
+      await captureEvent({
         distinctId,
         event: "deid_verification_failed",
         properties: { seam: error.seam, route: "generate-pa", categories: error.categories, leak_count: error.leakCount },
@@ -153,7 +153,7 @@ export async function POST(request: Request) {
       );
     }
     console.error("[generate-pa] POST handler error:", error);
-    serverPosthog.capture({
+    await captureEvent({
       distinctId: "server",
       event: "pa_generation_failed",
       properties: {

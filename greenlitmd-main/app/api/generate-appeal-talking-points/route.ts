@@ -6,7 +6,7 @@ import { getPayerRule, normalizePayerName, buildPayerInjectionBlock } from "@/li
 import { parseJsonObject } from "@/lib/pa-pipeline";
 import { deidentify, createDeidentifyState, reidentifyDeep, type DeidentifyState } from "@/lib/deidentify";
 import { assertDeidentified, DeidVerificationError } from "@/lib/deid-verify";
-import { serverPosthog } from "@/lib/posthog";
+import { captureEvent } from "@/lib/posthog";
 import type { ExtractedChartData, ConservativeTreatment, ImagingFindings, DenialRiskFlag } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -242,7 +242,7 @@ Payer: ${payerName}`;
     });
   } catch (error) {
     if (error instanceof DeidVerificationError) {
-      serverPosthog.capture({
+      await captureEvent({
         distinctId: "server",
         event: "deid_verification_failed",
         properties: {

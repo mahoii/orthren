@@ -3,7 +3,7 @@ import { rateLimiter } from "@/lib/rate-limit";
 import { callAnthropicWithRetry } from "@/lib/anthropic";
 import { createDeidentifyState, deidentify } from "@/lib/deidentify";
 import { assertDeidentified, DeidVerificationError } from "@/lib/deid-verify";
-import { serverPosthog } from "@/lib/posthog";
+import { captureEvent } from "@/lib/posthog";
 import { letterSystemPrompt } from "@/lib/letter-system-prompt";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import { finalizeLetter, computeDeterministicPaStrength, type RequestDetails } from "@/lib/pa-pipeline";
@@ -158,7 +158,7 @@ REVISION INSTRUCTIONS:
     });
   } catch (error) {
     if (error instanceof DeidVerificationError) {
-      serverPosthog.capture({
+      await captureEvent({
         distinctId: "server",
         event: "deid_verification_failed",
         properties: {

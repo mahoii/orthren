@@ -7,7 +7,7 @@ import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import { callAnthropicWithRetry } from "@/lib/anthropic";
 import { deidentify } from "@/lib/deidentify";
 import { assertDeidentified, DeidVerificationError } from "@/lib/deid-verify";
-import { serverPosthog } from "@/lib/posthog";
+import { captureEvent } from "@/lib/posthog";
 import { finalizeLetter, type RequestDetails } from "@/lib/pa-pipeline";
 
 export const runtime = "nodejs";
@@ -113,7 +113,7 @@ Letter date: ${today}${bmiAsaLines}${objectiveMeasurementsStr}${buildSoftWarning
     return NextResponse.json({ letter: sanitized, sourceLockWarning });
   } catch (error) {
     if (error instanceof DeidVerificationError) {
-      serverPosthog.capture({
+      await captureEvent({
         distinctId: "server",
         event: "deid_verification_failed",
         properties: {
