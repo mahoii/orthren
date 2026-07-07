@@ -1,5 +1,12 @@
 import { callAnthropicWithRetry } from "@/lib/anthropic";
-import { deidentify, reidentify, reidentifyDeep, createDeidentifyState } from "@/lib/deidentify";
+import {
+  deidentify,
+  reidentify,
+  reidentifyDeep,
+  createDeidentifyState,
+  applyKnownMap,
+  seedCountersPastKnownMap,
+} from "@/lib/deidentify";
 import { assertDeidentified } from "@/lib/deid-verify";
 import { letterSystemPrompt } from "@/lib/letter-system-prompt";
 import { buildBmiAsaPromptLines, postProcessLetter } from "@/lib/letter-postprocess";
@@ -173,10 +180,23 @@ export async function generateLetterFromExtraction(
     phiState.map["[DOB]"] = chartDataForRedaction.date_of_birth.trim();
   }
 
-  const { redacted: redactedChartData } = deidentify(
-    JSON.stringify(chartDataForRedaction, null, 2),
-    phiState
-  );
+  // Pre-mask anything already discovered at the extraction seam (line 105's
+  // deidentify() call) by literal match, over the object tree, before
+  // re-running the regex passes -- reidentifyDeep() above round-tripped raw
+  // PHI back into chartDataOnly in whatever exact textual form it was
+  // originally captured in (date separators, prose vs. numeric, etc.), which
+  // is not guaranteed to match deidentify()'s detection regexes when
+  // re-scanned cold. Must run before JSON.stringify, not after -- stringify
+  // escapes quotes/backslashes inside a raw value and would desync a
+  // post-serialization literal match. See applyKnownMap doc comment in
+  // lib/deidentify.ts.
+  const preMaskedData = applyKnownMap(chartDataForRedaction, phiMap);
+  // Any token applyKnownMap just embedded (e.g. "[DATE_3]") must not collide
+  // with a token phiState mints fresh below for genuinely new PHI -- collision
+  // would silently swap one patient's date/provider for another's at
+  // reidentify() time. See seedCountersPastKnownMap doc comment.
+  seedCountersPastKnownMap(phiState, phiMap);
+  const { redacted: redactedChartData } = deidentify(JSON.stringify(preMaskedData, null, 2), phiState);
   const letterPhiMap = phiState.map;
   assertDeidentified(redactedChartData, letterPhiMap, "pa-pipeline.letter");
 

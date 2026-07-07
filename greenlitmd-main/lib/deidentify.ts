@@ -724,6 +724,92 @@ export function deidentify(chartText: string, sharedState?: DeidentifyState): De
   return { redacted: text, map: state.map };
 }
 
+// Inverse of reidentify(): re-applies a map of already-discovered
+// placeholder -> raw-value pairs to a value tree (e.g. the reidentified
+// extraction result, before it is JSON.stringify'd, at the letter-generation
+// seam) by literal substring match over each string leaf, before
+// deidentify()'s regex passes run. This exists because reidentifyDeep()
+// round-trips a raw PHI value back into downstream data in WHATEVER exact
+// form deidentify() originally captured it in (a date's separators, an
+// ordinal suffix, a prose vs. numeric format, etc.) -- there is no guarantee
+// that exact form matches any of this module's detection regexes when
+// re-scanned cold in a fresh pass. A literal, case-insensitive substring
+// replace sidesteps that: if deidentify() found it once, it is masked
+// forever, regardless of format. The regex passes remain the catch-all for
+// genuinely new PHI-shaped text introduced downstream (e.g. an LLM
+// paraphrase) that was never in the map to begin with.
+//
+// Deliberately operates on string LEAVES, not the JSON.stringify'd text --
+// stringify escapes `"`/`\` inside a raw value (e.g. a name or address
+// containing a quote), which would desync the literal match from the
+// now-escaped substring and let that occurrence fall through unmasked.
+// Substituting before serialization means only safe bracket-token text
+// (never containing a quote or backslash) is present when stringify runs.
+function applyKnownMapToString(text: string, entries: ReadonlyArray<readonly [string, string]>): string {
+  for (const [token, raw] of entries) {
+    const escaped = raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    text = text.replace(new RegExp(escaped, "gi"), token);
+  }
+  return text;
+}
+
+export function applyKnownMap<T>(value: T, map: Record<string, string>): T {
+  const entries = Object.entries(map)
+    .map(([token, raw]) => [token, raw.trim()] as const)
+    .filter(([, raw]) => raw.length >= 3)
+    .sort((a, b) => b[1].length - a[1].length);
+  const walk = (v: unknown): unknown => {
+    if (typeof v === "string") return applyKnownMapToString(v, entries);
+    if (Array.isArray(v)) return v.map(walk);
+    if (v && typeof v === "object") {
+      const out: Record<string, unknown> = {};
+      for (const [k, val] of Object.entries(v as Record<string, unknown>)) out[k] = walk(val);
+      return out;
+    }
+    return v;
+  };
+  return walk(value) as T;
+}
+
+// Bumps a fresh DeidentifyState's counters past any numbered token already
+// present in a KNOWN map (e.g. one applied via applyKnownMap() into the same
+// text) so that new tokens this state mints during its own regex passes can
+// never collide with an already-embedded token backed by a different raw
+// value. Without this, e.g. a pre-existing "[DATE_1]" from applyKnownMap and
+// a freshly-minted "[DATE_1]" for a different date would share one map slot
+// (last write wins), silently swapping one patient's date for another's at
+// reidentify() time -- not a redaction leak, but a PHI-integrity bug.
+const TOKEN_COUNTER_BY_PREFIX: Record<string, CounterKey> = {
+  DATE: "date",
+  MEMBERID: "memberId",
+  ZIP: "zip",
+  NPI: "npi",
+  DEA: "dea",
+  EMAIL: "email",
+  SSN: "ssn",
+  FAX: "fax",
+  PROVIDER: "provider",
+  CONTACT: "contact",
+  DEVICE: "device",
+  URL: "url",
+  IP: "ip",
+  ACCOUNT: "account",
+  LICENSE: "license",
+  VEHICLE: "vehicle",
+  CITY: "city",
+};
+
+export function seedCountersPastKnownMap(state: DeidentifyState, map: Record<string, string>): void {
+  for (const key of Object.keys(map)) {
+    const m = key.match(/^\[([A-Z]+)_(\d+)\]$/);
+    if (!m) continue;
+    const counterName = TOKEN_COUNTER_BY_PREFIX[m[1]];
+    if (!counterName) continue;
+    const num = parseInt(m[2], 10);
+    if (num >= state.counters[counterName]) state.counters[counterName] = num + 1;
+  }
+}
+
 export function reidentify(text: string, map: Record<string, string>): string {
   let out = text;
   const entries = Object.entries(map).sort((a, b) => b[0].length - a[0].length);

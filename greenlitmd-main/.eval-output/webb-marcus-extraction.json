@@ -62,48 +62,48 @@
       "id": "flag-1",
       "label": "Cortisone Injection Dates Undocumented",
       "severity": "medium",
-      "explanation": "The two corticosteroid injections are dated only as 'approx 2023' with no exact dates, which may be insufficient for payer documentation requirements that mandate specific treatment dates to verify conservative care timeline.",
-      "recommendation": "Obtain and document exact dates of the cortisone injections from the administering provider's records or pharmacy records to establish a precise conservative care timeline.",
+      "explanation": "The two corticosteroid injections are dated only as 'approx 2023, exact date unclear,' which does not meet payer documentation standards requiring specific dates for each injection to verify conservative care timeline.",
+      "recommendation": "Obtain and document exact dates for both cortisone injections from the administering provider's records or pharmacy records, and add a chart addendum specifying the precise dates.",
       "anchorText": "approx 2023, exact date unclear"
     },
     {
       "id": "flag-2",
-      "label": "Physical Therapy Duration Below Payer Threshold",
-      "severity": "high",
-      "explanation": "Only 6 weeks of physical therapy is documented. Aetna PPO typically requires a minimum of 6–8 weeks of formal PT with documented failure; 6 weeks is at the lower boundary and may be challenged if outcomes documentation is sparse.",
-      "recommendation": "Provide detailed PT progress notes from Lakeside Rehab documenting specific functional outcomes, attendance, and clinical rationale for discontinuation to support the 6-week course as adequate and failed.",
-      "anchorText": "PT at Lakeside Rehab for 6 weeks"
+      "label": "Corticosteroid Injection Count May Be Insufficient",
+      "severity": "medium",
+      "explanation": "Only 2 cortisone injections are documented, and Aetna PPO may require documentation of a minimum number of injection attempts with specific dates and response details before approving CPT 27447.",
+      "recommendation": "Document the exact dates, dosage, and clinical response for each injection attempt, and confirm whether additional injection trials are required under Aetna's TKA criteria.",
+      "anchorText": "Cortisone shots x2 in right knee"
     },
     {
       "id": "flag-3",
-      "label": "Hyaluronic Acid Injection Duration Not Documented",
+      "label": "Physical Therapy Duration at Minimum Threshold",
       "severity": "medium",
-      "explanation": "The Synvisc-One injection dated 06/2024 lacks a documented follow-up period or duration of observation before concluding minimal benefit, which payers may require to confirm adequate trial.",
-      "recommendation": "Add a chart note specifying the follow-up interval after the 06/2024 Synvisc-One injection and the duration over which 'minimal benefit' was assessed.",
-      "anchorText": "06/2024 - minimal benefit"
+      "explanation": "Physical therapy is documented at exactly 6 weeks, which is at the lower boundary of many payer requirements (typically 6–8 weeks minimum). Aetna PPO may require documentation of specific session counts, functional outcome measures at start and end, and a formal discharge summary.",
+      "recommendation": "Obtain PT records from Lakeside Rehab documenting session frequency, functional outcomes at intake and discharge, and a formal statement of treatment failure to substantiate the 6-week course.",
+      "anchorText": "PT at Lakeside Rehab for 6 weeks"
     },
     {
       "id": "flag-4",
-      "label": "BMI 34.2 May Trigger Medical Review",
-      "severity": "medium",
-      "explanation": "A BMI of 34.2 may prompt Aetna to request additional documentation of weight management counseling or a formal weight optimization program prior to elective TKA, as some payers apply BMI thresholds for surgical authorization.",
-      "recommendation": "Document any weight management counseling, dietary referral, or discussion of BMI optimization in the pre-operative notes to preempt a payer request for weight loss prior to surgery.",
-      "anchorText": "BMI: 34.2"
+      "label": "Hyaluronic Acid Injection Duration Not Documented",
+      "severity": "low",
+      "explanation": "The Synvisc-One injection dated 06/2024 lacks documentation of the follow-up period used to assess benefit, which payers may require to confirm adequate trial duration before approving surgical intervention.",
+      "recommendation": "Add a chart note specifying the follow-up interval after the 06/2024 Synvisc-One injection and the clinical basis for determining minimal benefit.",
+      "anchorText": "Synvisc-One hyaluronic acid injection right knee 06/2024"
     },
     {
       "id": "flag-5",
-      "label": "Bilateral Diagnosis, Unilateral Request Noted",
+      "label": "BMI 34.2 May Trigger Payer Weight Review",
       "severity": "low",
-      "explanation": "The chart documents bilateral knee OA (M17.11 and M17.12) but requests only right TKA; payers may query whether the left knee diagnosis is relevant to the current authorization or flag it as a potential staged procedure requiring separate justification.",
-      "recommendation": "Add a brief note clarifying that M17.12 is documented for completeness but the current authorization request is limited to the right knee (M17.11) only, and that the left knee will be addressed separately if indicated.",
-      "anchorText": "only requesting right side at this time"
+      "explanation": "A BMI of 34.2 may prompt Aetna to request documentation that weight optimization was discussed or attempted prior to elective TKA, as some payers apply BMI thresholds (typically 35–40) for additional review.",
+      "recommendation": "Document in the chart that BMI was discussed with the patient, that weight management was addressed, and that the clinical decision to proceed was made with full consideration of surgical risk.",
+      "anchorText": "BMI: 34.2"
     },
     {
       "id": "flag-6",
       "label": "ASA III Comorbidities Require Clearance Documentation",
       "severity": "medium",
-      "explanation": "The patient's ASA III classification with HTN, T2DM (A1c 7.1), and OSA on CPAP may require documented medical clearance from the patient's primary care or specialist prior to Aetna approving elective TKA.",
-      "recommendation": "Include pre-operative medical clearance documentation from the managing physician addressing cardiovascular risk, glycemic control (A1c 7.1), and OSA/CPAP compliance to satisfy Aetna's pre-surgical evaluation requirements.",
+      "explanation": "The patient carries ASA III status with HTN, T2DM (A1c 7.1), and OSA on CPAP. Aetna PPO may require documented medical clearance from the patient's primary care or relevant specialists confirming optimization of these conditions prior to elective surgery.",
+      "recommendation": "Obtain and attach pre-operative medical clearance letters from the managing providers for HTN, T2DM, and OSA, confirming the patient is medically optimized for elective TKA.",
       "anchorText": "ASA III (HTN, DM, OSA)"
     }
   ],
@@ -130,7 +130,7 @@
     },
     "surgical_approach": {
       "score": 1,
-      "note": "The chart explicitly documents 'Anterior approach. Will perform standard primary TKA,' which is a specific, procedure-appropriate technique for CPT 27447."
+      "note": "The chart explicitly documents 'Anterior approach. Will perform standard primary TKA,' which is a specific and procedure-appropriate technique for CPT 27447."
     },
     "cpt_code_valid": {
       "score": 1,
@@ -141,7 +141,7 @@
       "note": "Symptom duration (\"3+ years\") is ≥ 12 weeks."
     }
   },
-  "pain_score": "4/10 at rest, 8/10 with activity",
+  "pain_score": "8/10 with activity, 4/10 at rest",
   "bmi": 34.2,
   "asa_classification": "ASA III",
   "validation": {

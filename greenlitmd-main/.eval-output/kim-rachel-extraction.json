@@ -54,41 +54,41 @@
   "denial_risk_flags": [
     {
       "id": "flag-1",
-      "label": "Physical Therapy Duration Below Typical Threshold",
+      "label": "Physical Therapy Duration Below Payer Threshold",
       "severity": "medium",
-      "explanation": "Physical therapy was documented for only 8 weeks. Many BCBS policies for CPT 29827 require a minimum of 6–12 weeks of formal PT, but reviewers may scrutinize whether 8 weeks is sufficient given the severity of the tear and the short duration relative to some payer thresholds.",
-      "recommendation": "Add documentation clarifying the number of PT sessions attended, the specific exercises performed, and objective measurements at start and end of PT to demonstrate a structured, supervised program was completed and failed.",
+      "explanation": "Physical therapy was documented for only 8 weeks. Many BCBS policies for CPT 29827 require a minimum of 6–12 weeks of formal PT, but the absence of specific session counts or a structured home exercise program may prompt a reviewer to question adequacy.",
+      "recommendation": "Addend the chart to specify the total number of PT sessions attended, the structured program content, and confirm that the 8-week course represents a full, supervised trial rather than a partial one.",
       "anchorText": "Physical Therapy: 8 weeks"
     },
     {
       "id": "flag-2",
       "label": "Corticosteroid Injection Duration Not Documented",
       "severity": "medium",
-      "explanation": "The corticosteroid injection entry does not include a duration of treatment or a follow-up interval, only a single administration date placeholder (11/05/2024). Payers may flag incomplete conservative care timelines as insufficient to establish failure.",
-      "recommendation": "Add a follow-up note dated after 11/05/2024 documenting the patient's return to baseline symptoms and confirming the injection provided only 2 weeks of partial relief before surgical planning was initiated.",
-      "anchorText": "Corticosteroid Injection - Kenalog"
+      "explanation": "The corticosteroid injection entry does not include a duration of treatment or a follow-up interval, only a single administration date placeholder (11/05/2024). Payers may flag incomplete injection records as insufficient evidence of a structured conservative care trial.",
+      "recommendation": "Document the follow-up interval after the 11/05/2024 injection, confirm it was a single injection attempt, and note whether a second injection was considered or contraindicated.",
+      "anchorText": "administered 11/05/2024"
     },
     {
       "id": "flag-3",
-      "label": "Work Injury Origin May Require Workers' Comp Coordination",
-      "severity": "medium",
-      "explanation": "The chart documents the injury as work-related, which may trigger a workers' compensation coordination-of-benefits review by BCBS before authorizing the procedure under the health plan.",
-      "recommendation": "Confirm whether a workers' compensation claim has been filed or denied. If denied or not applicable, include documentation of that determination in the prior authorization submission to prevent a COB-related denial.",
+      "label": "Work Injury — Payer Coordination Required",
+      "severity": "high",
+      "explanation": "The chart documents a work-related lifting injury as the mechanism of onset. BCBS may deny the claim if workers' compensation is the primary payer, as the injury may fall under a workers' comp policy rather than the group health plan.",
+      "recommendation": "Clarify in the chart whether a workers' compensation claim has been filed and confirm that BCBS is the appropriate primary payer for this procedure. Include a coordination of benefits statement if applicable.",
       "anchorText": "work-related lifting injury"
     },
     {
       "id": "flag-4",
-      "label": "Attending Provider Name Is a Placeholder",
-      "severity": "high",
-      "explanation": "The attending surgeon is listed as Dr. Michael Torres in the chart, which is a placeholder token rather than a verified provider name. Payers require a credentialed, identified requesting provider for prior authorization approval.",
-      "recommendation": "Ensure the attending surgeon's full legal name, NPI, and BCBS credentialing information are populated before submission. Confirm Dr. Michael Torres resolves to the correct provider on file.",
-      "anchorText": "Dr. Michael Torres"
+      "label": "Tear Size Supports Urgency — Document Retraction Risk",
+      "severity": "low",
+      "explanation": "The MRI documents a 2.1 cm full-thickness tear with retraction to the musculotendinous junction. Payers may not automatically recognize the clinical urgency; without explicit documentation of progression risk, reviewers may not prioritize surgical approval.",
+      "recommendation": "Add a chart note explicitly stating that further delay risks increased retraction, fatty infiltration, or irreparability, citing the current MRI findings dated 01/22/2025 as the basis for surgical urgency.",
+      "anchorText": "retraction to the musculotendinous junction"
     }
   ],
   "pa_strength": {
     "diagnosis_codes": {
       "score": 1,
-      "note": "M75.121 (full-thickness rotator cuff tear, right shoulder) is a clinically appropriate and direct medical necessity indication for CPT 29827 arthroscopic rotator cuff repair."
+      "note": "M75.121 (full-thickness rotator cuff tear, right shoulder) is a clinically appropriate and direct indication for CPT 29827 arthroscopic rotator cuff repair."
     },
     "conservative_treatments_named": {
       "score": 1,
@@ -108,7 +108,7 @@
     },
     "surgical_approach": {
       "score": 1,
-      "note": "The surgical approach is explicitly documented as 'Arthroscopic with mini-open rotator cuff repair,' which is a specific, procedure-appropriate technique for CPT 29827."
+      "note": "The surgical approach is explicitly documented as 'Arthroscopic with mini-open rotator cuff repair,' which is a specific, procedure-appropriate technique consistent with CPT 29827."
     },
     "cpt_code_valid": {
       "score": 1,
