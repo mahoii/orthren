@@ -44,9 +44,25 @@
 //     by the time the city sweep runs.
 // ─────────────────────────────────────────────────────────────────────────
 
+import { isSpanAllowlisted } from "./deid-allowlist";
+
+// Per-document de-id audit artifact. Counts/categories ONLY -- never a raw
+// redacted value, so this object is always safe to log. `byCategory` counts
+// DISTINCT tokens minted per category (derived from map KEYS, not values);
+// singleton categories like `phone`/`mrn` collapse many raw occurrences into
+// one token, so those counts are distinct-token counts, not occurrence counts.
+// A true per-occurrence/per-pass breakdown would require instrumenting the 24
+// passes, which is deliberately out of scope (must not touch them).
+export type DeidAudit = {
+  totalRedacted: number;
+  byCategory: Record<string, number>;
+  unclassifiedFlagged: number;
+};
+
 export type DeidentifyResult = {
   redacted: string;
   map: Record<string, string>;
+  audit: DeidAudit;
 };
 
 // Shared, mutable state that can be threaded through multiple deidentify()
@@ -715,13 +731,91 @@ const PASSES: ReadonlyArray<readonly [string, (text: string, state: DeidentifySt
   ["patientName", passPatientName],
 ];
 
+// ── Fail-closed residual pass (FINAL -- runs after all 24 passes) ─────────
+// Fixes the fail-open gap: any span the 24 passes never matched used to reach
+// the API as "confirmed not PHI." This pass masks anything left unredacted that
+// looks like a name or a PHI-length identifier, biasing aggressively toward
+// over-masking. The detector is intentionally dumb -- lib/deid-allowlist.ts
+// carries the exceptions, and growing it is the tuning path.
+//
+// The mask token is a SINGLETON, NON-REVERSIBLE [REDACTED]: it is deliberately
+// NOT written to state.map, so reidentify() leaves it in place forever. That is
+// the fail-closed property -- a name the passes missed can never round-trip
+// back. Cost: an over-masked clean term also stays [REDACTED] (the measured FP).
+//
+// Word token = one Titlecase segment, optionally camelCase-joined ("NexGen"),
+// but NEVER all-caps -- so clinical abbreviations (HPI, MRI, ACL, ROM) and ICD
+// codes (M17) are not name-shaped and are left alone.
+const RESIDUAL_TOKEN = String.raw`\[[A-Z][A-Z0-9_]*\]`;
+// A unit is Titlecase/camelCase, optionally prefixed by a single-letter+hyphen
+// so eponymic/imaging compounds ("X-Ray", "T-Score") match as one unit instead
+// of mis-parsing to their trailing word ("Ray", "Score").
+const RESIDUAL_WORD = String.raw`(?:[A-Z]-)?[A-Z][a-z]+(?:[A-Z][a-z]+)*`;
+const RESIDUAL_NAME = `${RESIDUAL_WORD}(?:['\\-]${RESIDUAL_WORD})*`;
+const RESIDUAL_MULTI = `${RESIDUAL_NAME}(?:[ \\t]+${RESIDUAL_NAME})+`;
+const RESIDUAL_DIGITS = String.raw`\d{5,}`;
+// Order matters: existing token first (leave alone), multi-word name before
+// single (so "John Smith" masks as one unit, not "John" + kept "Smith"), then
+// single name, then digit-dense.
+const RESIDUAL_RE = new RegExp(
+  `(${RESIDUAL_TOKEN})|(${RESIDUAL_MULTI})|(${RESIDUAL_NAME})|(${RESIDUAL_DIGITS})`,
+  "g"
+);
+
+function passResidualUnknowns(text: string): { text: string; flagged: string[] } {
+  const flagged: string[] = [];
+  const out = text.replace(
+    RESIDUAL_RE,
+    (match: string, gToken: string | undefined, _gMulti: string | undefined, _gName: string | undefined, gDigits: string | undefined) => {
+      // Branch 1: an already-redacted token -- never re-touch it.
+      if (gToken !== undefined) return match;
+      // Branch 2: digit-dense. A bare 5-digit run is CPT/ZIP-shaped (not
+      // date-shaped -- dates are already tokens -- and not SSN-shaped, which is
+      // 9) -> keep, so a billed CPT code is never masked. 6+ digits is
+      // phone/MRN/SSN-length -> mask. (ICD digit groups and clinical fractions
+      // n/n are short or slash-separated and never match a bare \d{5,} run.)
+      if (gDigits !== undefined) {
+        if (match.length === 5) return match;
+        flagged.push(match);
+        return "[REDACTED]";
+      }
+      // Branch 3/4: name-shaped (multi-word or single). Keep if the whole
+      // phrase is allowlisted or (multi-word) every token is; else mask.
+      if (isSpanAllowlisted(match)) return match;
+      flagged.push(match);
+      return "[REDACTED]";
+    }
+  );
+  return { text: out, flagged };
+}
+
+function buildAudit(map: Record<string, string>, unclassifiedFlagged: number): DeidAudit {
+  const byCategory: Record<string, number> = {};
+  for (const key of Object.keys(map)) {
+    const inner = key.replace(/^\[|\]$/g, "");
+    const cat = inner.replace(/_\d+$/, "").toLowerCase();
+    byCategory[cat] = (byCategory[cat] ?? 0) + 1;
+  }
+  if (unclassifiedFlagged > 0) byCategory.unclassified_flagged = unclassifiedFlagged;
+  return {
+    totalRedacted: Object.keys(map).length + unclassifiedFlagged,
+    byCategory,
+    unclassifiedFlagged,
+  };
+}
+
 export function deidentify(chartText: string, sharedState?: DeidentifyState): DeidentifyResult {
   const state = ensureStateShape(sharedState ?? createDeidentifyState());
   let text = preprocess(chartText);
   for (const [, run] of PASSES) {
     text = run(text, state);
   }
-  return { redacted: text, map: state.map };
+  const residual = passResidualUnknowns(text);
+  return {
+    redacted: residual.text,
+    map: state.map,
+    audit: buildAudit(state.map, residual.flagged.length),
+  };
 }
 
 // Inverse of reidentify(): re-applies a map of already-discovered

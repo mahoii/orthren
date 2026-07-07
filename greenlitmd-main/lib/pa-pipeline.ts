@@ -109,7 +109,9 @@ export async function extractChartDataFromText(
   chartText: string,
   requestDetails: RequestDetails
 ): Promise<ExtractedChartData & { validation: any; _phiMap: Record<string, string> }> {
-  const { redacted, map: phiMap } = deidentify(chartText);
+  const { redacted, map: phiMap, audit } = deidentify(chartText);
+  // Audit is counts/categories only -- no PHI -- so it is always safe to log.
+  console.info("[deid-audit] pa-pipeline.extraction", JSON.stringify(audit));
   assertDeidentified(redacted, phiMap, "pa-pipeline.extraction");
   const content = await callAnthropicWithRetry({
     system: extractionSystemPrompt,
@@ -196,8 +198,9 @@ export async function generateLetterFromExtraction(
   // would silently swap one patient's date/provider for another's at
   // reidentify() time. See seedCountersPastKnownMap doc comment.
   seedCountersPastKnownMap(phiState, phiMap);
-  const { redacted: redactedChartData } = deidentify(JSON.stringify(preMaskedData, null, 2), phiState);
+  const { redacted: redactedChartData, audit: letterAudit } = deidentify(JSON.stringify(preMaskedData, null, 2), phiState);
   const letterPhiMap = phiState.map;
+  console.info("[deid-audit] pa-pipeline.letter", JSON.stringify(letterAudit));
   assertDeidentified(redactedChartData, letterPhiMap, "pa-pipeline.letter");
 
   const letter = await callAnthropicWithRetry({

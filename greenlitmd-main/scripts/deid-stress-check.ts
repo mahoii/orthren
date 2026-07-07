@@ -60,7 +60,10 @@ const FIXTURES: FixtureConfig[] = [
   },
 ];
 
-const RESIDUAL_TOKEN_RE = /\[[A-Z][A-Z_]*(?:_\d+)?\]/;
+// [REDACTED] is the fail-closed residual-pass token: intentionally non-reversible
+// (never added to the map), so it is expected to remain after reidentify() and
+// must NOT count as an unrestored placeholder here.
+const RESIDUAL_TOKEN_RE = /\[(?!REDACTED\])[A-Z][A-Z_]*(?:_\d+)?\]/;
 
 async function runFixtureChecks(): Promise<void> {
   for (const fx of FIXTURES) {
@@ -177,21 +180,47 @@ const ADVERSARIAL_CASES: AdversarialCase[] = [
   },
   {
     name: "labeled-phone-variants",
-    // Each phone is individually labeled -- an unlabeled bare 10-digit run
-    // is deliberately NOT redacted by deidentify() (see the
-    // "unlabeled-bare-digits-verify-fails-closed" case below); that residual
-    // risk is caught by the fail-closed verifier instead.
+    // Each phone is individually labeled and captured as [PHONE]. An UNLABELED
+    // bare digit run is now masked by the fail-closed residual pass at redaction
+    // time (see the "unlabeled-bare-digits-residual-masks" case below).
     input: "Cell: 2125551234. Phone: +1 2125559999.",
     check: (r) => ({ pass: r.includes("[PHONE]") && !/\d{10}/.test(r) }),
   },
   {
-    name: "unlabeled-bare-digits-verify-fails-closed",
+    name: "unlabeled-bare-digits-residual-masks",
+    // Previously deidentify() left an unlabeled bare 10-digit run untouched and
+    // only the verifier flagged it. The fail-closed residual pass now masks any
+    // PHI-length (6+) bare digit run to [REDACTED] at REDACTION time -- strictly
+    // safer -- so the raw run is gone from `r` and verify passes clean.
+    //
+    // Also asserts the property the whole design depends on: [REDACTED] is
+    // NON-REVERSIBLE. If passResidualUnknowns() ever regressed to (incorrectly)
+    // register "[REDACTED]" -> the raw value in the map, `r` would still lack
+    // the raw digits and verify.pass would still be true -- neither of the
+    // original two assertions would catch that regression. Checking the map
+    // directly, and that reidentify() does NOT resurrect the raw digits, closes
+    // that gap.
     input: "Reference value: 2125551234 recorded without context.",
     check: (r, map) => {
       const verify = verifyDeidentified(r, map);
-      const hasDigitRunLeak = verify.leaks.some((l) => l.startsWith("digit_run"));
-      return { pass: !verify.pass && hasDigitRunLeak };
+      const notInMap = !("[REDACTED]" in map) && !Object.values(map).includes("2125551234");
+      const roundTrip = reidentify(r, map);
+      const staysNonReversible = roundTrip.includes("[REDACTED]") && !roundTrip.includes("2125551234");
+      return {
+        pass: !/2125551234/.test(r) && r.includes("[REDACTED]") && verify.pass && notInMap && staysNonReversible,
+        detail: !notInMap ? "map illegitimately contains the raw digits" : !staysNonReversible ? "reidentify() resurrected the raw digits" : undefined,
+      };
     },
+  },
+  {
+    name: "verifier-catches-raw-bare-digit-run-directly",
+    // Direct, deidentify()-bypassing check that verifyDeidentified()'s OWN
+    // digit-run detectors (DIGIT_RUN_RE / RESIDUAL_DIGIT_RE) still fail closed
+    // on their own -- feeds an unmasked bare digit run straight into the
+    // verifier, the way the "planted-leak-controls" case does for other
+    // categories, so this path doesn't silently go untested end-to-end.
+    input: "n/a", // handled specially below
+    check: () => ({ pass: true }),
   },
   {
     name: "ordinal-and-day-month-dates",
@@ -353,6 +382,12 @@ function runAdversarialCases(): void {
       const { redacted } = deidentify("Mr. Webb's denial letter dated 3/1/2025.", state);
       const pass = !/Webb/.test(redacted) && redacted.includes("[DATE_");
       safeReport(c.name, pass, pass ? [] : ["shared-state name inheritance failed"]);
+      continue;
+    }
+    if (c.name === "verifier-catches-raw-bare-digit-run-directly") {
+      const verify = verifyDeidentified("Reference value: 2125551234 recorded without context.", {});
+      const caught = !verify.pass && verify.leaks.some((l) => l.startsWith("unclassified_residue") || l.startsWith("digit_run"));
+      safeReport(c.name, caught, caught ? [] : ["verifier did not flag a raw unmasked bare digit run"]);
       continue;
     }
     if (c.name === "planted-leak-controls") {

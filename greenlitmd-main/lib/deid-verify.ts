@@ -14,6 +14,7 @@
 // log can never leak PHI.
 
 import { FIRST_NAME_STOPLIST } from "./deidentify";
+import { isSpanAllowlisted } from "./deid-allowlist";
 
 export type VerifyResult = { pass: boolean; leaks: string[] };
 
@@ -50,7 +51,7 @@ function scanNormalize(input: string): string {
 // unrecognized future token trips a detector instead of silently passing --
 // drift between deidentify.ts and this list fails closed, never silently.
 const TOKEN_RE =
-  /\[(?:PATIENT_NAME|AGE_90PLUS|MRN|PHONE|ADDRESS|FACILITY|DOB|AGE|SSN|FAX|MEMBERID|NPI|DEA|EMAIL|DATE|ZIP|PROVIDER|CONTACT|DEVICE|URL|IP|ACCOUNT|LICENSE|VEHICLE|CITY)(?:_\d+)?\]/g;
+  /\[(?:PATIENT_NAME|AGE_90PLUS|MRN|PHONE|ADDRESS|FACILITY|DOB|AGE|SSN|FAX|MEMBERID|NPI|DEA|EMAIL|DATE|ZIP|PROVIDER|CONTACT|DEVICE|URL|IP|ACCOUNT|LICENSE|VEHICLE|CITY|REDACTED)(?:_\d+)?\]/g;
 
 function maskPlaceholders(text: string): string {
   return text.replace(TOKEN_RE, (m) => " ".repeat(m.length));
@@ -167,6 +168,36 @@ const DIGIT_RUN_RE = /\d{9,}/g;
 // catching a real unredacted value directly after its label.
 const LABELED_RESIDUE_RE = /\b(SSN|MRN|DOB|Member[ \t]*ID|Medical[ \t]*Record)\b[ \t]{0,3}[:#][ \t]{0,3}\S/gi;
 
+// Independent (own-regex) mirror of deidentify.ts's fail-closed residual pass.
+// This is the verifier's OWN aggressive proper-noun/digit detector -- it shares
+// only the pure-data allowlist (permitted), never a regex. In normal operation
+// the residual pass already masked everything non-allowlisted, so this finds
+// nothing; it is defense-in-depth for the case where the residual pass is ever
+// bypassed, keeping verifyDeidentified() genuinely fail-closed on its own.
+//
+// KNOWN DUAL-MAINTENANCE POINT (accepted debt, see PR description): this regex
+// and RESIDUAL_RE in deidentify.ts are two implementations of the same heuristic
+// and can drift if only one is tuned. The shared allowlist keeps the DATA in one
+// place; the two regexes do not. Revisit only if their behavior diverges.
+const RESIDUAL_WORD = String.raw`(?:[A-Z]-)?[A-Z][a-z]+(?:[A-Z][a-z]+)*`;
+const RESIDUAL_NAME_RE = new RegExp(
+  `${RESIDUAL_WORD}(?:['\\-]${RESIDUAL_WORD})*(?:[ \\t]+${RESIDUAL_WORD}(?:['\\-]${RESIDUAL_WORD})*)*`,
+  "g"
+);
+// 6+ bare digits mirrors the residual pass, which keeps 5-digit CPT/ZIP-shaped
+// runs and masks 6+ (phone/MRN/SSN length).
+const RESIDUAL_DIGIT_RE = /\d{6,}/g;
+
+function detectUnclassifiedResidue(masked: string, leaks: string[]): void {
+  for (const m of Array.from(masked.matchAll(RESIDUAL_NAME_RE))) {
+    if (isSpanAllowlisted(m[0])) continue;
+    if (m.index !== undefined) leaks.push(`unclassified_residue@${m.index}`);
+  }
+  for (const m of Array.from(masked.matchAll(RESIDUAL_DIGIT_RE))) {
+    if (m.index !== undefined) leaks.push(`unclassified_residue@${m.index}`);
+  }
+}
+
 export function verifyDeidentified(redacted: string, map: Record<string, string>): VerifyResult {
   const normalized = scanNormalize(redacted);
   const masked = maskPlaceholders(normalized);
@@ -181,6 +212,7 @@ export function verifyDeidentified(redacted: string, map: Record<string, string>
   findAll(masked, ADDRESS_RE, "address_street", leaks);
   findAll(masked, DIGIT_RUN_RE, "digit_run", leaks);
   findAll(masked, LABELED_RESIDUE_RE, "labeled_identifier_residue", leaks);
+  detectUnclassifiedResidue(masked, leaks);
 
   return { pass: leaks.length === 0, leaks };
 }
