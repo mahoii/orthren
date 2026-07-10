@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { rateLimiter } from "@/lib/rate-limit";
+import { regenerationRateLimiter } from "@/lib/rate-limit";
 import { callAnthropicWithRetry } from "@/lib/anthropic";
 import { createDeidentifyState, deidentify } from "@/lib/deidentify";
 import { assertDeidentified, DeidVerificationError } from "@/lib/deid-verify";
@@ -7,6 +7,9 @@ import { captureEvent } from "@/lib/posthog";
 import { letterSystemPrompt } from "@/lib/letter-system-prompt";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import { finalizeLetter, computeDeterministicPaStrength, type RequestDetails } from "@/lib/pa-pipeline";
+import { isKnownCptCode } from "@/lib/known-cpt-codes";
+import { isSampleChartPatientName } from "@/lib/sample-charts";
+import { mergeSupplementsIntoExtraction } from "@/lib/merge-supplements";
 import {
   getPayerRule,
   normalizePayerName,
@@ -14,15 +17,38 @@ import {
   getPayerChecklist,
   deriveHardRequirementRiskFlags,
 } from "@/lib/payer-rules";
-import type { ExtractedChartData, ConservativeTreatment } from "@/lib/types";
+import type { ExtractedChartData } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function isValidRequestBody(body: unknown): body is {
+  extractionJson: ExtractedChartData;
+  currentLetter: string;
+  supplements: Record<string, string>;
+  requestDetails: RequestDetails;
+} {
+  if (!body || typeof body !== "object") return false;
+  const b = body as Record<string, unknown>;
+  if (typeof b.currentLetter !== "string") return false;
+  if (!b.extractionJson || typeof b.extractionJson !== "object") return false;
+  const extraction = b.extractionJson as Record<string, unknown>;
+  if (!Array.isArray(extraction.conservative_treatments_attempted)) return false;
+  if (!Array.isArray(extraction.denial_risk_flags)) return false;
+  if (!b.supplements || typeof b.supplements !== "object" || Array.isArray(b.supplements)) return false;
+  if (Object.values(b.supplements as Record<string, unknown>).some((v) => typeof v !== "string")) return false;
+  if (!b.requestDetails || typeof b.requestDetails !== "object") return false;
+  const rd = b.requestDetails as Record<string, unknown>;
+  if (typeof rd.cptCode !== "string" || typeof rd.payerName !== "string" || typeof rd.providerName !== "string") {
+    return false;
+  }
+  return true;
+}
+
 export async function POST(request: Request) {
   try {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "127.0.0.1";
-    const { success } = await rateLimiter.limit(ip);
+    const { success } = await regenerationRateLimiter.limit(ip);
     if (!success) {
       return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
     }
@@ -40,41 +66,69 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = (await request.json()) as {
-      extractionJson?: object;
-      currentLetter?: string;
-      supplements?: Record<string, string>;
-      requestDetails?: RequestDetails;
-    };
-
-    if (!body?.extractionJson || !body.currentLetter || !body.supplements || !body.requestDetails) {
-      return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
+    const body: unknown = await request.json();
+    if (!isValidRequestBody(body)) {
+      return NextResponse.json({ error: "Missing or malformed required fields." }, { status: 400 });
     }
 
     const { extractionJson, currentLetter, supplements, requestDetails } = body;
 
-    const supplementList = Object.entries(supplements)
-      .filter(([, v]) => v.trim())
-      .map(([k, v]) => `${k}: ${v.trim()}`)
-      .join("\n");
+    // Sandbox isolation: the client demo flow never calls a live route, but
+    // nothing previously stopped Regenerate from doing so against a demo
+    // profile's extraction. Zero live Anthropic calls from sandbox, ever.
+    if (isSampleChartPatientName(extractionJson.patient_name)) {
+      return NextResponse.json(
+        { error: "This is a demo chart — regeneration is disabled in sandbox mode." },
+        { status: 400 }
+      );
+    }
+
+    // cpt_code_valid is a corrected-CPT-code signal, not chart narrative — it
+    // never belongs in ExtractedChartData (see mergeSupplementsIntoExtraction
+    // below) and it shouldn't be sent to the letter model as free text either.
+    // Extract a valid 5-digit code from the physician's input (the fix-card
+    // placeholder invites text like "27447 — Total Knee Arthroplasty") and
+    // route it into requestDetails.cptCode instead, so the score, the Re:
+    // line, and every other CPT-derived field move together. See B1 in
+    // AUDIT-FINDINGS.md — previously this supplement was silently discarded
+    // both by the merge (which skipped the key) and the rescore (which reused
+    // the stale requestDetails.cptCode), so "Apply Fix" for this factor did
+    // nothing at all.
+    const cptSupplementRaw = supplements.cpt_code_valid?.trim();
+    let effectiveCptCode = requestDetails.cptCode;
+    let cptCorrectionNote: string | null = null;
+    if (cptSupplementRaw) {
+      const candidate = cptSupplementRaw.match(/\d{5}/)?.[0];
+      if (candidate && isKnownCptCode(candidate) && candidate !== requestDetails.cptCode) {
+        effectiveCptCode = candidate;
+        cptCorrectionNote = `cpt_code_valid: Corrected CPT code to ${candidate} (previously ${requestDetails.cptCode}).`;
+      }
+    }
+    const effectiveRequestDetails: RequestDetails = { ...requestDetails, cptCode: effectiveCptCode };
+
+    const supplementListLines = Object.entries(supplements)
+      .filter(([k, v]) => k !== "cpt_code_valid" && v.trim())
+      .map(([k, v]) => `${k}: ${v.trim()}`);
+    if (cptCorrectionNote) supplementListLines.push(cptCorrectionNote);
+    const supplementList = supplementListLines.join("\n");
 
     if (!supplementList) {
       return NextResponse.json({ error: "No supplemental data provided." }, { status: 400 });
     }
 
-    // Shared state so the second deidentify() call extends token numbering
-    // instead of restarting it — otherwise e.g. [DATE_1] could mean a
-    // different real date in each map, silently resolved in the letter
-    // map's favor by the old object-spread merge.
+    // Shared state so the second/third deidentify() calls extend token
+    // numbering instead of restarting it — otherwise e.g. [DATE_1] could mean
+    // a different real date in each map, silently resolved in the wrong
+    // field's favor. Supplements are physician-typed free text (the fix-card
+    // placeholders solicit dates, durations, dosages) and are PHI-bearing
+    // exactly like the extraction/letter text — they are redacted through
+    // this same state and the FULL assembled prompt is asserted below, not
+    // just the extraction/letter substrings. See A2 in AUDIT-FINDINGS.md.
     const phiState = createDeidentifyState();
     const { redacted: redactedExtraction } = deidentify(JSON.stringify(extractionJson, null, 2), phiState);
     const { redacted: redactedLetter } = deidentify(currentLetter, phiState);
+    const { redacted: redactedSupplementList } = deidentify(supplementList, phiState);
     const mergedPhiMap = phiState.map;
-    // Verify both redacted strings against the FINAL shared map -- a value
-    // discovered while redacting the letter but missed in the (already
-    // redacted) extraction JSON would otherwise go unchecked.
-    assertDeidentified(redactedExtraction, mergedPhiMap, "regenerate-denial-fix.extraction");
-    assertDeidentified(redactedLetter, mergedPhiMap, "regenerate-denial-fix.letter");
 
     const userMessage = `You are performing a surgical revision of an existing Letter of Medical Necessity.
 
@@ -87,7 +141,7 @@ ${redactedLetter}
 PHYSICIAN-SUPPLIED SUPPLEMENTAL DATA:
 The following clinical details were verified and supplied by the requesting physician to correct gaps in the original chart extraction:
 
-${supplementList}
+${redactedSupplementList}
 
 REVISION INSTRUCTIONS:
 1. Revise ONLY the letter sections directly affected by the supplemental data above.
@@ -96,11 +150,14 @@ REVISION INSTRUCTIONS:
    - functional_limitations → clinical presentation paragraph only
    - surgical_approach → procedure justification paragraph only
    - symptom_duration / diagnosis_codes → opening paragraph and Re: line only
+   - cpt_code_valid → CPT code references in the procedure justification paragraph only; the Re: line CPT is stamped separately, do not alter it
 2. All other sections: copy verbatim from CURRENT LETTER. No rewording, no additions.
 3. Treat supplemental data as physician-verified chart content. Integrate naturally.
 4. SOURCE LOCK: do not introduce any clinical content beyond what appears in ORIGINAL EXTRACTION DATA or PHYSICIAN-SUPPLIED SUPPLEMENTAL DATA above.
 5. Single signature block only. Do not add a second signature.
 6. Return the complete revised letter only. No preamble, no explanation, no markdown.`;
+
+    assertDeidentified(userMessage, mergedPhiMap, "regenerate-denial-fix.prompt");
 
     const today = new Date().toLocaleDateString("en-US", {
       year: "numeric",
@@ -116,10 +173,20 @@ REVISION INSTRUCTIONS:
       temperature: 0,
     });
 
-    const { letter: processedLetter, sourceLockWarning } = await finalizeLetter({
+    // Merge supplements into the extraction BEFORE finalizeLetter runs, so
+    // verifySourceLock's grounding haystack (built from `extracted`) already
+    // contains whatever the physician supplied. Previously this ran on the
+    // pre-merge extraction, so any supplied date/duration/dosage/approach term
+    // that the model dutifully echoed into the letter (per instruction 3
+    // above) was guaranteed to read as "ungrounded" — one wasted retry, then
+    // a false sourceLockWarning that blocks Download on a correctly
+    // supplemented letter. See A3 in AUDIT-FINDINGS.md.
+    const mergedExtraction = mergeSupplementsIntoExtraction(extractionJson, supplements);
+
+    const { letter: finalizedLetter, sourceLockWarning } = await finalizeLetter({
       rawLetter: rawLetterText,
-      extracted: extractionJson as ExtractedChartData,
-      requestDetails,
+      extracted: mergedExtraction,
+      requestDetails: effectiveRequestDetails,
       phiMap: mergedPhiMap,
       letterDate: today,
       regenerateRawLetter: () =>
@@ -131,22 +198,37 @@ REVISION INSTRUCTIONS:
         }),
     });
 
-    const mergedExtraction = mergeSupplementsIntoExtraction(
-      extractionJson as ExtractedChartData,
-      supplements
-    );
+    // The model is instructed NOT to touch the Re: line's CPT text (revision
+    // instruction 1 above) so it can't hallucinate a Re: line rewrite — but by
+    // regenerate time, sanitizeLetterPlaceholders' `[CPT Code]` bracket-fill
+    // (lib/letter-placeholders.ts) has long since resolved to the literal old
+    // code, and instruction 2 ("copy verbatim") preserves it verbatim. So a
+    // cpt_code_valid correction needs its own deterministic pass here,
+    // otherwise the DOCX cover page (stamped with effectiveCptCode below)
+    // diverges from the Re: line still showing the stale code. 5-digit CPT
+    // codes at a word boundary are distinctive enough in medical-necessity
+    // letter prose that this is safe.
+    const processedLetter =
+      effectiveCptCode !== requestDetails.cptCode
+        ? finalizedLetter.replace(new RegExp(`\\b${requestDetails.cptCode}\\b`, "g"), effectiveCptCode)
+        : finalizedLetter;
 
-    // Re-score deterministically against the merged (post-supplement) extraction
-    // instead of trusting a client-side force-set — see app/review/page.tsx
-    // handleRegenerate, which used to bump every supplemented factor to score 1
-    // regardless of the rubric or any validated-payer penalty. diagnosis_codes and
-    // surgical_approach fall back to presence checks here since there's no fresh
-    // extraction LLM call on this path (computeDeterministicPaStrength's 3rd arg
-    // is intentionally omitted).
-    const normalizedPayer = normalizePayerName(requestDetails.payerName);
-    const payerRule = normalizedPayer ? getPayerRule(normalizedPayer, requestDetails.cptCode) : null;
+    // Carry forward the PREVIOUS LLM judgment for the two clinically-scored
+    // factors (diagnosis_codes, surgical_approach) instead of omitting the 3rd
+    // arg entirely. There is no fresh extraction-scoring LLM call on this
+    // path, so omitting it fell through to computeDeterministicPaStrength's
+    // presence-check fallbacks ("any non-empty code list" / "any non-null
+    // string" ⇒ pass) — a factor the original extraction judged clinically
+    // inadequate (score 0) could flip to 1 on any unrelated regenerate, with
+    // no new clinical evidence. Carrying the previous score forward is
+    // strictly more conservative: it can't silently inflate, though a
+    // physician-supplied diagnosis_codes/surgical_approach correction won't
+    // be re-judged until the next full extraction. See B6 in
+    // AUDIT-FINDINGS.md.
+    const normalizedPayer = normalizePayerName(effectiveRequestDetails.payerName);
+    const payerRule = normalizedPayer ? getPayerRule(normalizedPayer, effectiveRequestDetails.cptCode) : null;
     const pa_strength = applyValidatedPayerDurationPenalty(
-      computeDeterministicPaStrength(mergedExtraction, requestDetails.cptCode),
+      computeDeterministicPaStrength(mergedExtraction, effectiveRequestDetails.cptCode, extractionJson.pa_strength),
       payerRule,
       mergedExtraction.conservative_treatments_attempted
     );
@@ -178,6 +260,7 @@ REVISION INSTRUCTIONS:
     return NextResponse.json({
       letter: processedLetter,
       extractionJson: updatedExtractionJson,
+      cptCode: effectiveRequestDetails.cptCode,
       sourceLockWarning,
     });
   } catch (error) {
@@ -197,97 +280,10 @@ REVISION INSTRUCTIONS:
         { status: 422 }
       );
     }
-    const message = error instanceof Error ? error.message : "Unable to regenerate the letter.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[regenerate-denial-fix] POST handler error:", error);
+    return NextResponse.json(
+      { error: "Unable to regenerate the letter. Please try again." },
+      { status: 500 }
+    );
   }
-}
-
-// Writes physician-supplied supplements back into the extraction record so the
-// letter, extraction JSON, review-page state, and export stop diverging after a
-// denial-fix regeneration. Pure function — never mutates `extracted` in place.
-function mergeSupplementsIntoExtraction(
-  extracted: ExtractedChartData,
-  supplements: Record<string, string>
-): ExtractedChartData {
-  const result: ExtractedChartData = { ...extracted };
-
-  for (const [key, rawValue] of Object.entries(supplements)) {
-    const supplement = rawValue.trim();
-    if (!supplement) continue;
-
-    switch (key) {
-      case "symptom_duration":
-        result.symptom_duration = appendOrSet(result.symptom_duration, supplement);
-        break;
-
-      case "surgical_approach":
-        result.surgical_approach_if_mentioned = appendOrSet(result.surgical_approach_if_mentioned, supplement);
-        break;
-
-      case "diagnosis_codes":
-        result.diagnosis_codes = pushDeduped(result.diagnosis_codes, supplement);
-        break;
-
-      case "functional_limitations":
-        result.functional_limitations = pushDeduped(result.functional_limitations, supplement);
-        break;
-
-      case "imaging_findings":
-        result.imaging_findings = result.imaging_findings
-          ? { ...result.imaging_findings, key_findings: appendOrSet(result.imaging_findings.key_findings, supplement) }
-          : { modality: null, key_findings: supplement };
-        break;
-
-      case "conservative_treatments_named":
-        result.conservative_treatments_attempted = [
-          ...result.conservative_treatments_attempted,
-          { treatment: supplement, duration: null, outcome: null, dates: null, relief_duration: null },
-        ];
-        break;
-
-      case "conservative_treatment_duration": {
-        const candidates = result.conservative_treatments_attempted.filter(
-          (t) => t.duration === null
-        );
-        if (candidates.length === 1) {
-          result.conservative_treatments_attempted = result.conservative_treatments_attempted.map((t) =>
-            t === candidates[0] ? { ...t, duration: supplement } : t
-          );
-        } else {
-          const synthetic: ConservativeTreatment = {
-            treatment: "Conservative care duration clarification",
-            duration: supplement,
-            outcome: null,
-            dates: null,
-            relief_duration: null,
-          };
-          result.conservative_treatments_attempted = [...result.conservative_treatments_attempted, synthetic];
-        }
-        break;
-      }
-
-      case "cpt_code_valid":
-        // Form-validation result (CPT-vs-payer-rules check), not chart-derived
-        // data — does not belong in ExtractedChartData. It already reaches the
-        // letter via the supplementList prompt injection above and already
-        // bumps pa_strength client-side (app/review/page.tsx handleRegenerate) —
-        // both paths are unchanged, so this key is intentionally skipped here.
-        break;
-
-      default:
-        break;
-    }
-  }
-
-  return result;
-}
-
-function appendOrSet(existing: string | null, supplement: string): string {
-  if (!existing || !existing.trim()) return supplement;
-  return `${existing}; physician-supplied clarification: ${supplement}`;
-}
-
-function pushDeduped(existing: string[], supplement: string): string[] {
-  const alreadyPresent = existing.some((e) => e.toLowerCase() === supplement.toLowerCase());
-  return alreadyPresent ? existing : [...existing, supplement];
 }

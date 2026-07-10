@@ -112,9 +112,14 @@ export async function getSignupEmailsByStage(stage: number): Promise<string[]> {
   return (data ?? []).map((signup) => signup.email);
 }
 
-export async function unsubscribeEmail(email: string): Promise<void> {
+export async function unsubscribeEmail(email: string): Promise<{ success: boolean }> {
   const supabase = createSupabaseServerClient();
-  await supabase.from("waitlist_signups").update({ unsubscribed: true }).eq("email", email);
+  const { error } = await supabase.from("waitlist_signups").update({ unsubscribed: true }).eq("email", email);
+  if (error) {
+    console.error("[unsubscribeEmail] Supabase update failed:", error);
+    return { success: false };
+  }
+  return { success: true };
 }
 
 export async function updateEmailStage(email: string, stage: number): Promise<void> {

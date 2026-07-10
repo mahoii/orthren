@@ -1,5 +1,4 @@
 "use client";
-export const dynamic = 'force-dynamic';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePostHog } from "posthog-js/react";
@@ -313,9 +312,18 @@ export default function ReviewPage() {
   // ─── Handlers ─────────────────────────────────────────────────────────────
 
   async function handleRegenerate() {
-    if (!data || !hasSupplements || isRegenerating) return;
+    if (!data || !hasSupplements || isRegenerating || data.isDemo) return;
 
-    prevLetterRef.current = editedLetter;
+    // Flush any pending contenteditable debounce so a regenerate fired within
+    // 300ms of the last keystroke sends the just-typed letter, not the
+    // pre-edit version.
+    if (inputDebounceRef.current) {
+      clearTimeout(inputDebounceRef.current);
+      inputDebounceRef.current = null;
+    }
+    const letterToSend = mode === 'edit' && editDivRef.current ? editDivRef.current.innerText : editedLetter;
+
+    prevLetterRef.current = letterToSend;
     setIsRegenerating(true);
     try {
       const res = await fetch('/api/regenerate-denial-fix', {
@@ -323,7 +331,7 @@ export default function ReviewPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           extractionJson: data.extracted,
-          currentLetter: editedLetter,
+          currentLetter: letterToSend,
           supplements: activeSupplements,
           requestDetails: {
             cptCode: data.cptCode,
@@ -336,6 +344,7 @@ export default function ReviewPage() {
       const json = await res.json() as {
         letter?: string;
         extractionJson?: Partial<ExtractedChartData>;
+        cptCode?: string;
         sourceLockWarning?: string[];
         error?: string;
       };
@@ -355,10 +364,18 @@ export default function ReviewPage() {
         // Merge the server-returned extractionJson — it already includes pa_strength
         // freshly recomputed server-side from the merged/supplemented fields (see
         // app/api/regenerate-denial-fix/route.ts), so review-page state / export stop
-        // diverging from what the regenerated letter actually says.
+        // diverging from what the regenerated letter actually says. cptCode is
+        // merged too — a cpt_code_valid supplement is routed server-side into an
+        // effective CPT (see B1 in AUDIT-FINDINGS.md), and the header pill / export
+        // payload / next regenerate request must all move to that corrected value,
+        // not silently keep sending the stale one.
         const supplementedKeys = Object.keys(activeSupplements);
         if (json.extractionJson) {
-          setData(prev => prev ? { ...prev, extracted: { ...prev.extracted, ...json.extractionJson } } : prev);
+          setData(prev => prev ? {
+            ...prev,
+            extracted: { ...prev.extracted, ...json.extractionJson },
+            cptCode: json.cptCode ?? prev.cptCode,
+          } : prev);
         }
 
         posthog?.capture("letter_regenerated_denial_fix", {
@@ -387,6 +404,13 @@ export default function ReviewPage() {
 
   async function handleDownload() {
     if (!data) return;
+    // Flush any pending contenteditable debounce so a download fired within
+    // 300ms of the last keystroke exports the just-typed letter.
+    if (inputDebounceRef.current) {
+      clearTimeout(inputDebounceRef.current);
+      inputDebounceRef.current = null;
+    }
+    const letterToExport = mode === 'edit' && editDivRef.current ? editDivRef.current.innerText : editedLetter;
     posthog?.capture("pa_packet_exported", { cpt_code: data.cptCode, payer: data.payerName });
     setIsDownloading(true);
     setDownloadError(null);
@@ -396,7 +420,7 @@ export default function ReviewPage() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           extracted: data.extracted,
-          letter: editedLetter,
+          letter: letterToExport,
           cptCode: data.cptCode,
           payerName: data.payerName,
           providerName: data.providerName,
@@ -535,7 +559,8 @@ export default function ReviewPage() {
             <button
               type="button"
               onClick={handleRegenerate}
-              disabled={!hasSupplements || isRegenerating}
+              disabled={!hasSupplements || isRegenerating || Boolean(data.isDemo)}
+              title={data.isDemo ? 'Regeneration is disabled for demo charts' : undefined}
               style={{
                 background: '#fff',
                 border: earnedScore === 100 && !hasRegeneratedAfterMax && hasSupplements ? '1.5px solid #22C55E' : '1px solid #e2e8f0',
@@ -543,13 +568,13 @@ export default function ReviewPage() {
                 padding: '9px 15px',
                 fontSize: 13,
                 fontWeight: 600,
-                color: hasSupplements && !isRegenerating ? '#1d4f7a' : '#cbd5e1',
-                cursor: hasSupplements && !isRegenerating ? 'pointer' : 'not-allowed',
+                color: hasSupplements && !isRegenerating && !data.isDemo ? '#1d4f7a' : '#cbd5e1',
+                cursor: hasSupplements && !isRegenerating && !data.isDemo ? 'pointer' : 'not-allowed',
                 fontFamily: 'inherit',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 7,
-                animation: earnedScore === 100 && !hasRegeneratedAfterMax && hasSupplements
+                animation: earnedScore === 100 && !hasRegeneratedAfterMax && hasSupplements && !data.isDemo
                   ? 'glow-pulse 1.6s ease-out infinite, breath-scale 1.6s ease-in-out infinite'
                   : 'none',
               }}
@@ -871,32 +896,62 @@ export default function ReviewPage() {
                   : { bg: '#fffbeb', border: '#fde68a', color: '#d97706' };
                 const statusText = isOk ? 'OK' : 'Gap';
                 const statusColor = isOk ? '#16a34a' : '#d97706';
+                // Gap rows delegate to the matching StreamCard (same id) via
+                // toggleCard, which also scrolls to its letter anchor. Pass
+                // rows have no StreamCard/anchor to open — they show their
+                // evidence note inline instead, using the same expandedFactors
+                // set (a factor is never both a pass and a gap, so the shared
+                // set never collides). Previously a passing row rendered only
+                // a checkmark with no way to see why it passed. See B2 in
+                // AUDIT-FINDINGS.md.
+                const isRowExpanded = expandedFactors.has(f.key);
                 return (
-                  <div
-                    key={f.key}
-                    style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 8, cursor: isGap ? 'pointer' : 'default' }}
-                    onClick={() => isGap && toggleCard(f.key)}
-                  >
-                    <span
-                      style={{
-                        flexShrink: 0,
-                        width: 18,
-                        height: 18,
-                        borderRadius: '50%',
-                        border: `1px solid ${iconBg.border}`,
-                        background: iconBg.bg,
-                        color: iconBg.color,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 10,
-                        fontWeight: 700,
+                  <div key={f.key}>
+                    <div
+                      style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 8, cursor: 'pointer' }}
+                      onClick={() => {
+                        if (isGap) {
+                          toggleCard(f.key);
+                        } else {
+                          setExpandedFactors(prev => {
+                            const next = new Set(prev);
+                            if (next.has(f.key)) next.delete(f.key); else next.add(f.key);
+                            return next;
+                          });
+                        }
                       }}
                     >
-                      {isOk ? '✓' : '!'}
-                    </span>
-                    <span style={{ flex: 1, fontSize: 12.5, fontWeight: 500, color: '#334155' }}>{f.label}</span>
-                    <span style={{ fontSize: 10.5, fontWeight: 700, color: statusColor }}>{statusText}</span>
+                      <span
+                        style={{
+                          flexShrink: 0,
+                          width: 18,
+                          height: 18,
+                          borderRadius: '50%',
+                          border: `1px solid ${iconBg.border}`,
+                          background: iconBg.bg,
+                          color: iconBg.color,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 10,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {isOk ? '✓' : '!'}
+                      </span>
+                      <span style={{ flex: 1, fontSize: 12.5, fontWeight: 500, color: '#334155' }}>{f.label}</span>
+                      <span style={{ fontSize: 10.5, fontWeight: 700, color: statusColor }}>{statusText}</span>
+                      {isOk && (
+                        <span style={{ color: '#cbd5e1', fontSize: 11, transform: isRowExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>
+                          ›
+                        </span>
+                      )}
+                    </div>
+                    {isOk && isRowExpanded && (
+                      <p style={{ margin: '0 10px 8px 37px', fontSize: 12, lineHeight: 1.5, color: '#64748b' }}>
+                        {f.note}
+                      </p>
+                    )}
                   </div>
                 );
               })}

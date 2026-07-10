@@ -13,7 +13,19 @@ export const serverPosthog = new PostHog(process.env.POSTHOG_API_KEY ?? "", {
 // physically sent before the response returns.
 type CaptureEventArgs = Parameters<typeof serverPosthog.capture>[0];
 
+// Never throws -- every call site awaits this between doing real work and
+// returning its response (e.g. generate-pa awaits it between a successful,
+// multi-Anthropic-call generation and its 200 response, and inside every
+// DeidVerificationError handler that builds a structured 422). A rejected
+// flush() previously escaped straight to the caller's catch block, discarding
+// a paid-for successful generation as a 500, or converting a clean 422 into
+// an unhandled 500. Analytics failing is never a reason to fail the request
+// it's describing. See C6 in AUDIT-FINDINGS.md.
 export async function captureEvent(event: CaptureEventArgs): Promise<void> {
-  serverPosthog.capture(event);
-  await serverPosthog.flush();
+  try {
+    serverPosthog.capture(event);
+    await serverPosthog.flush();
+  } catch (err) {
+    console.error("[posthog] captureEvent failed (non-fatal):", err);
+  }
 }

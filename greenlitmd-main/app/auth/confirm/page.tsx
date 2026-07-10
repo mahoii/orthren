@@ -1,6 +1,7 @@
 'use client';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { isSafeRelativeRedirect } from '@/lib/safe-redirect';
 import { useState, useEffect, Suspense } from 'react';
 
 function ConfirmInner() {
@@ -11,7 +12,7 @@ function ConfirmInner() {
 
   const redirectTo = (() => {
     const r = params.get('redirect');
-    return r && r.startsWith('/') ? r : '/builder';
+    return isSafeRelativeRedirect(r) ? r : '/builder';
   })();
 
   useEffect(() => {

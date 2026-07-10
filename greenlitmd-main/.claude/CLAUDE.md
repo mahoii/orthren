@@ -11,7 +11,7 @@
 - **AI:** Anthropic API (`claude-sonnet-4-6`) via `lib/anthropic.ts`
 - **Deployment:** Vercel → `orthren.com` (production) and `greenlitmd.app`
 - **Commands:** `npm run dev` · `npm run build` · `npm run typecheck`
-- **Env vars required:** `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `RESEND_API_KEY`, `ADMIN_SECRET`, `UNSUBSCRIBE_SECRET`, `ANTHROPIC_API_KEY`
+- **Env vars required:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (server-side service-role client, `lib/supabase/server.ts`), `RESEND_API_KEY`, `ADMIN_SECRET`, `UNSUBSCRIBE_SECRET`, `ANTHROPIC_API_KEY`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (rate limiting AND `/api/feedback` persistence — `Redis.fromEnv()` throws at module load if either is unset), `POSTHOG_API_KEY` (server-side capture; missing key silently no-ops all server analytics, including the `deid_verification_failed` audit event)
 
 ## Architecture Pointers
 - **File ingestion → PA packet:** `app/api/generate-pa/route.ts` — pdf-parse / mammoth extraction, then 2× Anthropic calls (extraction + letter). Must stay `export const runtime = "nodejs"` — Edge Runtime breaks pdf-parse/mammoth.
@@ -24,9 +24,9 @@
 
 ## Conventions
 - Server Actions over API routes for mutations
-- Strict Tailwind — no inline styles, no CSS modules
-- All Supabase calls server-side; never in `'use client'` components
-- API routes: `export const dynamic = "force-dynamic"` where needed; rate limiting via `lib/rate-limit.ts`
+- Strict Tailwind — no inline styles, no CSS modules (exception: `app/review/page.tsx` and `components/AnnotatedLetter.tsx` predate this rule and are inline-styled throughout; leave as-is until a dedicated conversion pass rather than mixing conventions mid-file)
+- All Supabase **data queries** server-side; never in `'use client'` components. Browser-side `createSupabaseBrowserClient()` calls that only exchange an auth session/OTP (`app/login`, `app/auth/confirm`, `app/builder/DemoModeBar.tsx`) are the one accepted exception — no data table is ever queried from the client.
+- API routes: `export const dynamic = "force-dynamic"` where needed; rate limiting via `lib/rate-limit.ts` — use the named limiter matching the route's cost (`generationRateLimiter` for generate-pa, `regenerationRateLimiter` for the single-Anthropic-call regenerate/appeal routes, `lightRateLimiter` for no-Anthropic-call routes, `adminRateLimiter` for ADMIN_SECRET-gated routes). Each has its own Redis key prefix — don't share one bucket across route classes again (see AUDIT-FINDINGS.md C7).
 
 ## Known Gotchas
 - **CSRF / origin validation:** `next.config.mjs` `serverActions.allowedOrigins` must include production domain + `*.vercel.app` for preview branches. Adding a new domain requires updating this list.

@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import type { ExtractedChartDataWithValidation } from "@/lib/types";
-import { rateLimiter } from "@/lib/rate-limit";
+import { regenerationRateLimiter } from "@/lib/rate-limit";
 import { letterSystemPrompt } from "@/lib/letter-system-prompt";
 import { buildBmiAsaPromptLines } from "@/lib/letter-postprocess";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import { callAnthropicWithRetry } from "@/lib/anthropic";
-import { deidentify } from "@/lib/deidentify";
+import { deidentify, createDeidentifyState } from "@/lib/deidentify";
 import { assertDeidentified, DeidVerificationError } from "@/lib/deid-verify";
 import { captureEvent } from "@/lib/posthog";
-import { finalizeLetter, type RequestDetails } from "@/lib/pa-pipeline";
+import { finalizeLetter, stripNonLetterFields, type RequestDetails } from "@/lib/pa-pipeline";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "127.0.0.1";
-    const { success } = await rateLimiter.limit(ip);
+    const { success } = await regenerationRateLimiter.limit(ip);
     if (!success) {
       return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
     }
@@ -55,13 +55,13 @@ export async function POST(request: Request) {
 
     const systemPromptWithContext = letterSystemPrompt.replace("[LETTER_DATE]", today);
 
-    const { validation, pa_strength, ...chartDataOnly } = extracted as any;
-    const objectiveMeasurementsStr = (extracted.objective_measurements ?? []).length
+    const chartDataOnly = stripNonLetterFields(extracted);
+    const objectiveMeasurementsRaw = (extracted.objective_measurements ?? []).length
       ? `\nObjective measurements: ${extracted.objective_measurements.join("; ")}`
       : "";
     // BMI/ASA trigger lines the prompt rules scan the user message for — the
     // initial-generation path injects these too, and they must match here.
-    const bmiAsaLines = buildBmiAsaPromptLines(extracted);
+    const bmiAsaLinesRaw = buildBmiAsaPromptLines(extracted);
 
     if (process.env.NODE_ENV === "development") {
       console.log("[regenerate-letter] BMI/ASA before letter call:", {
@@ -70,8 +70,26 @@ export async function POST(request: Request) {
       });
     }
 
-    const { redacted: redactedChartData, map: letterPhiMap } = deidentify(JSON.stringify(chartDataOnly, null, 2));
-    assertDeidentified(redactedChartData, letterPhiMap, "regenerate-letter");
+    // Shared state so the chart JSON and the two trailer strings below get
+    // consistent token numbering, so both are covered by one gate instead of
+    // just the JSON substring — see A1 in AUDIT-FINDINGS.md for the leak this
+    // closes.
+    //
+    // The assert below is scoped to PHI-bearing content only (chart JSON +
+    // the two trailers), NOT the full prompt: `requestDetails.providerName`/
+    // `practiceName`/`payerName` and the letter's own dateline (`today`) are
+    // never redacted and were never meant to be — they identify the
+    // REQUESTING clinician/payer/today's date, not the patient. Asserting the
+    // full assembled prompt was tried and produces false positives (the
+    // provider's real name reads as `unclassified_residue`, the letter's own
+    // dateline reads as `date_full`), since neither was ever in the PHI map.
+    const phiState = createDeidentifyState();
+    const { redacted: redactedChartData } = deidentify(JSON.stringify(chartDataOnly, null, 2), phiState);
+    const { redacted: objectiveMeasurementsStr } = deidentify(objectiveMeasurementsRaw, phiState);
+    const { redacted: bmiAsaLines } = deidentify(bmiAsaLinesRaw, phiState);
+    const letterPhiMap = phiState.map;
+
+    assertDeidentified(`${redactedChartData}${bmiAsaLines}${objectiveMeasurementsStr}`, letterPhiMap, "regenerate-letter");
 
     const buildPrompt = () => `Structured patient data:
 <document_to_analyze>
@@ -128,8 +146,8 @@ Letter date: ${today}${bmiAsaLines}${objectiveMeasurementsStr}${buildSoftWarning
         { status: 422 }
       );
     }
-    const message = error instanceof Error ? error.message : "Unable to regenerate the letter.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[regenerate-letter] POST handler error:", error);
+    return NextResponse.json({ error: "Unable to regenerate the letter. Please try again." }, { status: 500 });
   }
 }
 

@@ -10,7 +10,7 @@ import {
   TextRun
 } from "docx";
 import { formatLetterDate } from "@/lib/letter-placeholders";
-import { rateLimiter } from "@/lib/rate-limit";
+import { lightRateLimiter } from "@/lib/rate-limit";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import type { ExtractedChartData } from "@/lib/types";
 
@@ -32,7 +32,7 @@ type ExportRequest = {
 export async function POST(request: Request) {
   try {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "127.0.0.1";
-    const { success } = await rateLimiter.limit(ip);
+    const { success } = await lightRateLimiter.limit(ip);
     if (!success) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },

@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Logo from "@/components/Logo";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { isSafeRelativeRedirect } from "@/lib/safe-redirect";
 
 function AuthErrorBanner() {
   const searchParams = useSearchParams();
@@ -61,7 +62,7 @@ function LoginForm() {
     const base = `${window.location.origin}/auth/confirm`;
     const callbackUrl = new URL(base);
     const redirectParam = new URLSearchParams(window.location.search).get("redirect");
-    if (redirectParam && redirectParam.startsWith("/")) {
+    if (isSafeRelativeRedirect(redirectParam)) {
       callbackUrl.searchParams.set("redirect", redirectParam);
     }
     const redirectTo = callbackUrl.toString();

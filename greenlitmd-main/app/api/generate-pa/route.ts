@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import pdfParse from "pdf-parse";
 import mammoth from "mammoth";
-import { rateLimiter } from "@/lib/rate-limit";
+import { generationRateLimiter } from "@/lib/rate-limit";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import { validateExtraction } from "@/lib/extractionValidator";
 import { captureEvent } from "@/lib/posthog";
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   let distinctId = "server";
   try {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "127.0.0.1";
-    const { success } = await rateLimiter.limit(ip);
+    const { success } = await generationRateLimiter.limit(ip);
     if (!success) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
@@ -167,7 +167,7 @@ export async function POST(request: Request) {
     }
     console.error("[generate-pa] POST handler error:", error);
     await captureEvent({
-      distinctId: "server",
+      distinctId,
       event: "pa_generation_failed",
       properties: {
         error: error instanceof Error ? error.message : String(error),

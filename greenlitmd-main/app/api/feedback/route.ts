@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
-import { rateLimiter } from "@/lib/rate-limit";
+import { lightRateLimiter } from "@/lib/rate-limit";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
+import { deidentify } from "@/lib/deidentify";
+import { assertDeidentified, DeidVerificationError } from "@/lib/deid-verify";
+import { captureEvent } from "@/lib/posthog";
+
+const MAX_DENIAL_REASON_LENGTH = 5000;
 
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL!,
@@ -21,7 +26,7 @@ interface FeedbackPayload {
 export async function POST(request: Request) {
   try {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "127.0.0.1";
-    const { success } = await rateLimiter.limit(ip);
+    const { success } = await lightRateLimiter.limit(ip);
     if (!success) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
@@ -51,6 +56,28 @@ export async function POST(request: Request) {
     if (typeof paScore !== "number" || isNaN(paScore)) {
       return NextResponse.json({ error: "paScore is required and must be a number" }, { status: 400 });
     }
+    if (denialReason != null && typeof denialReason !== "string") {
+      return NextResponse.json({ error: "denialReason must be a string" }, { status: 400 });
+    }
+    if (denialReason && denialReason.length > MAX_DENIAL_REASON_LENGTH) {
+      return NextResponse.json(
+        { error: `denialReason must be ${MAX_DENIAL_REASON_LENGTH} characters or fewer.` },
+        { status: 400 }
+      );
+    }
+
+    // denialReason is clinician-pasted free text and routinely contains a
+    // patient name/DOB/MRN copied straight out of a denial letter — it must
+    // be de-identified before it's persisted, not just excluded from the
+    // record's other fields. Previously this was stored verbatim under a
+    // comment claiming "zero PHI storage." See A5 in AUDIT-FINDINGS.md.
+    const trimmedReason = outcome === "denied" ? (denialReason?.trim() || null) : null;
+    let redactedDenialReason: string | null = null;
+    if (trimmedReason) {
+      const { redacted, map } = deidentify(trimmedReason);
+      assertDeidentified(redacted, map, "feedback.denialReason");
+      redactedDenialReason = redacted;
+    }
 
     // Construct record — No Patient Name, No DOB to ensure zero PHI storage
     const record = {
@@ -59,7 +86,7 @@ export async function POST(request: Request) {
       cptCode: cptCode.trim(),
       payerName: payerName.trim(),
       outcome,
-      denialReason: outcome === "denied" ? (denialReason?.trim() || null) : null,
+      denialReason: redactedDenialReason,
       paScore,
     };
 
@@ -68,7 +95,18 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    if (error instanceof DeidVerificationError) {
+      await captureEvent({
+        distinctId: "server",
+        event: "deid_verification_failed",
+        properties: { seam: error.seam, route: "feedback", categories: error.categories, leak_count: error.leakCount },
+      });
+      return NextResponse.json(
+        { error: "DEID_VERIFICATION_FAILED", categories: error.categories },
+        { status: 422 }
+      );
+    }
+    console.error("[feedback] POST handler error:", error);
+    return NextResponse.json({ error: "Unable to submit feedback. Please try again." }, { status: 500 });
   }
 }

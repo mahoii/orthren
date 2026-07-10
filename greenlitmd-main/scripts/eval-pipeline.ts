@@ -44,6 +44,7 @@ import { letterSystemPrompt } from "../lib/letter-system-prompt";
 import { buildBmiAsaPromptLines } from "../lib/letter-postprocess";
 import { callAnthropicWithRetry } from "../lib/anthropic";
 import { createDeidentifyState, deidentify } from "../lib/deidentify";
+import { mergeSupplementsIntoExtraction } from "../lib/merge-supplements";
 
 interface FixtureChart {
   slug: string;
@@ -461,11 +462,12 @@ Letter date: ${today}${bmiAsaLines}${objectiveMeasurementsStr}`;
 }
 
 // Mirrors app/api/regenerate-denial-fix/route.ts's prompt construction
-// verbatim. Deliberately does NOT port that route's private
-// mergeSupplementsIntoExtraction() — the route calls finalizeLetter() with the
-// ORIGINAL (unmerged) extractionJson (see route source), so the merge only
-// affects the response's post-hoc pa_strength re-score, never the letter/
-// SOURCE LOCK check this eval cares about.
+// verbatim, and imports the route's own mergeSupplementsIntoExtraction()
+// rather than duplicating it. The route merges supplements into the
+// extraction BEFORE calling finalizeLetter (see A3 in AUDIT-FINDINGS.md) so
+// verifySourceLock's grounding haystack already contains whatever the
+// physician supplied — this eval must do the same or it cannot exercise that
+// fix at all.
 async function runRegenerateDenialFixRoute(
   extractionJson: ExtractedChartData & { validation?: any },
   currentLetter: string,
@@ -515,9 +517,11 @@ REVISION INSTRUCTIONS:
   const rawLetterText = await callAnthropicWithRetry({ system: systemPromptWithDate, prompt: userMessage, maxTokens: 6000, temperature: 0 });
   callTracker.record(systemPromptWithDate.length + userMessage.length, rawLetterText.length);
 
+  const mergedExtraction = mergeSupplementsIntoExtraction(extractionJson as ExtractedChartData, supplements);
+
   const { letter } = await finalizeLetter({
     rawLetter: rawLetterText,
-    extracted: extractionJson as ExtractedChartData,
+    extracted: mergedExtraction,
     requestDetails,
     phiMap: mergedPhiMap,
     letterDate: today,
@@ -528,7 +532,15 @@ REVISION INSTRUCTIONS:
     },
   });
 
-  return { letter, extracted: extractionJson };
+  // Return the MERGED extraction, not the pre-merge extractionJson param —
+  // this eval's own combinedSourceLockCheck() re-derives violations against
+  // whatever `extracted` comes back here, so returning the stale pre-merge
+  // object would silently re-introduce the exact false-positive this eval
+  // tier exists to catch, even though finalizeLetter above already used the
+  // correct merged extraction. The real route returns its merged/rescored
+  // extraction to clients the same way (updatedExtractionJson in
+  // app/api/regenerate-denial-fix/route.ts).
+  return { letter, extracted: mergedExtraction };
 }
 
 // Runs one fixture×route pair for baseRuns; if ANY run fails, extends to
@@ -837,7 +849,20 @@ async function runTieredSourceLockCheck() {
       pairSummaries.push({ fixtureSlug: fixture.slug, route: "regenerate-denial-fix", runsMade: 0, passCount: 0, failCount: 0, escalated: false });
       continue;
     }
-    const supplements = { conservative_treatments_attempted: "Added PT notes" };
+    // Realistic supplement: `conservative_treatments_attempted` was never a key
+    // mergeSupplementsIntoExtraction recognizes (the switch's default case is a
+    // silent no-op for unknown keys) — every prior run of this tier exercised
+    // the route's prompt/de-id path but left the extraction completely
+    // unmerged, so it could never have caught the pre-merge SOURCE LOCK
+    // verification bug (A3 in AUDIT-FINDINGS.md): a physician-supplied
+    // date/duration that the model dutifully echoes into the letter, per
+    // REVISION INSTRUCTIONS, would read as "ungrounded" against a haystack
+    // built from the wrong (pre-merge) extraction. This supplement uses a real
+    // recognized key and contains an explicit duration ("10 weeks") so a
+    // regression here is actually exercised. See C4 in AUDIT-FINDINGS.md.
+    const supplements = {
+      conservative_treatment_duration: "Physical therapy completed over 10 weeks with minimal improvement.",
+    };
     const { pairSummary, failDetails } = await runTieredPair({
       fixtureSlug: fixture.slug,
       route: "regenerate-denial-fix",

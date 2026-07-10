@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { type EmailOtpType } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { isSafeRelativeRedirect } from '@/lib/safe-redirect'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -8,9 +9,16 @@ export async function GET(request: NextRequest) {
   const token_hash = searchParams.get('token_hash')
   const type = searchParams.get('type') as EmailOtpType | null
   const redirectParam = searchParams.get('redirect')
-  const next = (redirectParam && redirectParam.startsWith('/'))
+  const nextParam = searchParams.get('next')
+  // Both params must pass the same same-origin check -- previously only
+  // `redirect` was validated and `next` fell through unchecked into the
+  // redirect URL, letting `?next=@evil.com` land on `https://orthren.com@evil.com`.
+  // See E1 in AUDIT-FINDINGS.md.
+  const next = isSafeRelativeRedirect(redirectParam)
     ? redirectParam
-    : (searchParams.get('next') ?? '/builder')
+    : isSafeRelativeRedirect(nextParam)
+    ? nextParam
+    : '/builder'
 
   // Build the success redirect first so we can attach cookies directly to it.
   // Using cookies() from next/headers here would set cookies on a different

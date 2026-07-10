@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { rateLimiter } from "@/lib/rate-limit";
+import { regenerationRateLimiter } from "@/lib/rate-limit";
 import { callAnthropicWithRetry } from "@/lib/anthropic";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
 import { getPayerRule, normalizePayerName, buildPayerInjectionBlock } from "@/lib/payer-rules";
@@ -114,7 +114,7 @@ function deidentifySanitizedChart(chart: SanitizedAppealChart, state: Deidentify
 export async function POST(request: Request) {
   try {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "127.0.0.1";
-    const { success } = await rateLimiter.limit(ip);
+    const { success } = await regenerationRateLimiter.limit(ip);
     if (!success) {
       return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
     }
@@ -257,7 +257,7 @@ Payer: ${payerName}`;
         { status: 422 }
       );
     }
-    const message = error instanceof Error ? error.message : "Unable to generate appeal talking points.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[generate-appeal-talking-points] POST handler error:", error);
+    return NextResponse.json({ error: "Unable to generate appeal talking points. Please try again." }, { status: 500 });
   }
 }

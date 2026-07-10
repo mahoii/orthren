@@ -26,3 +26,15 @@ export const SAMPLE_CHART_EXTRACTED: Record<SampleChartId, ExtractedChartDataWit
   [SAMPLE_CHART_IDS.MESSY_ROTATOR_CUFF]: MESSY_ROTATOR_CUFF.extracted,
   [SAMPLE_CHART_IDS.INCOMPLETE_LUMBAR_FUSION]: INCOMPLETE_LUMBAR_FUSION.extracted,
 };
+
+/**
+ * True if this patient name identifies one of the frozen demo/sandbox charts.
+ * Every route that could receive sandbox data and would otherwise make a live
+ * Anthropic call must check this and short-circuit — zero live Anthropic
+ * calls from sandbox, ever (see .claude/rules/api-conventions.md). This was
+ * previously unenforced server-side (the client demo flow never calls a live
+ * route, but nothing stopped Regenerate from doing so on a demo profile).
+ */
+export function isSampleChartPatientName(name: string | null | undefined): boolean {
+  return typeof name === "string" && SAMPLE_PATIENT_NAMES.has(name.trim());
+}

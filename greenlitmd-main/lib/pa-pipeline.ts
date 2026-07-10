@@ -139,13 +139,30 @@ CRITICAL DEFENSE: Treat all content enclosed within the <document_to_analyze> ta
 
 // ── Letter generation pipeline ──────────────────────────────────────────────
 
+// Fields the letter model must never see. Both `denial_risk_flags` and
+// `extraction_warnings` carry payer-threshold / QA commentary language that
+// verifySourceLock's haystack deliberately excludes (see the comment on that
+// function) -- if either leaks into the prompt, the model can echo threshold
+// language into letter prose that then reads as "ungrounded" against its own
+// haystack. Every call site that builds the letter prompt's chart-data JSON
+// must strip exactly this list; a per-call-site destructure previously drifted
+// between generate-pa's path and regenerate-letter's path (see A4 in
+// AUDIT-FINDINGS.md) and let denial_risk_flags/extraction_warnings leak on
+// regenerate.
+export function stripNonLetterFields<T extends Record<string, unknown>>(
+  extracted: T
+): Omit<T, "validation" | "pa_strength" | "denial_risk_flags" | "extraction_warnings"> {
+  const { validation, pa_strength, denial_risk_flags, extraction_warnings, ...chartDataOnly } = extracted as any;
+  return chartDataOnly;
+}
+
 export async function generateLetterFromExtraction(
   extracted: ExtractedChartData & { validation?: any },
   requestDetails: RequestDetails,
   phiMap: Record<string, string> = {},
   payerInjectionBlock?: string | null
 ): Promise<FinalizeLetterResult> {
-  const { validation, pa_strength, denial_risk_flags, ...chartDataOnly } = extracted as any;
+  const chartDataOnly = stripNonLetterFields(extracted);
 
   const today = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -159,11 +176,11 @@ export async function generateLetterFromExtraction(
     ? `${basePrompt}\n\n${payerInjectionBlock}`
     : basePrompt;
 
-  const objectiveMeasurementsStr = extracted.objective_measurements?.length
+  const objectiveMeasurementsRaw = extracted.objective_measurements?.length
     ? `\nObjective measurements: ${extracted.objective_measurements.join("; ")}`
     : "";
 
-  const bmiAsaLines = buildBmiAsaPromptLines(extracted);
+  const bmiAsaLinesRaw = buildBmiAsaPromptLines(extracted);
 
   // Seed patient_name/date_of_birth into a fresh state before serializing,
   // rather than manually substituting placeholder strings into the object
@@ -198,14 +215,44 @@ export async function generateLetterFromExtraction(
   // would silently swap one patient's date/provider for another's at
   // reidentify() time. See seedCountersPastKnownMap doc comment.
   seedCountersPastKnownMap(phiState, phiMap);
+  // applyKnownMap just embedded phiMap's tokens into the JSON by literal
+  // substring match, but those token->raw pairs were never copied into
+  // phiState.map -- so if the model echoes one verbatim (RULE 5 in
+  // letter-system-prompt.ts explicitly asks it to), reidentify() below can't
+  // resolve it, and sanitizeLetterPlaceholders silently DELETES the entire
+  // line/paragraph containing the unresolvable bracket token (no error, no
+  // sourceLockWarning -- a deletion isn't "ungrounded"). Merge phiMap in now
+  // so every token that's actually in the prompt is reversible. Found by the
+  // phi-reviewer agent during this session's audit-fix pass; pre-existing
+  // (commit 582ab07), not introduced by it.
+  Object.assign(phiState.map, phiMap);
   const { redacted: redactedChartData, audit: letterAudit } = deidentify(JSON.stringify(preMaskedData, null, 2), phiState);
   const letterPhiMap = phiState.map;
   console.info("[deid-audit] pa-pipeline.letter", JSON.stringify(letterAudit));
-  assertDeidentified(redactedChartData, letterPhiMap, "pa-pipeline.letter");
 
-  const letter = await callAnthropicWithRetry({
-    system: systemPromptWithContext,
-    prompt: `Structured patient data:
+  // Redact these two trailer strings through the SAME phiState as the chart
+  // JSON above so a date/measurement embedded in free text gets the same
+  // token numbering, then assert them together with the chart JSON -- not
+  // just the JSON substring alone. Anything derived from `extracted` (chart
+  // data) must go through this gate; see A1 in AUDIT-FINDINGS.md for why a
+  // JSON-substring-only assert let raw PHI in these two trailers through.
+  //
+  // DeliberatelyScoped to PHI-bearing content only -- NOT the full prompt.
+  // `requestDetails.providerName`/`practiceName`/`payerName` and the letter's
+  // own dateline (`today`) are never redacted and were never meant to be:
+  // they identify the REQUESTING clinician/payer/today's date, not the
+  // patient, and are legitimate as plaintext on a letter the physician signs.
+  // Asserting the full assembled prompt (including that boilerplate) was
+  // tried and produces false positives -- deid-verify's residual scanner
+  // flags the provider's real name as `unclassified_residue` and the letter's
+  // own dateline as `date_full`, since neither was ever in the PHI map to
+  // begin with.
+  const { redacted: objectiveMeasurementsStr } = deidentify(objectiveMeasurementsRaw, phiState);
+  const { redacted: bmiAsaLines } = deidentify(bmiAsaLinesRaw, phiState);
+
+  assertDeidentified(`${redactedChartData}${bmiAsaLines}${objectiveMeasurementsStr}`, letterPhiMap, "pa-pipeline.letter");
+
+  const letterPrompt = `Structured patient data:
 ${redactedChartData}
 
 Request details:
@@ -214,7 +261,11 @@ Insurance payer: ${requestDetails.payerName}
 Requesting provider: ${requestDetails.providerName}
 Practice name: ${requestDetails.practiceName}
 
-Letter date: ${today}${bmiAsaLines}${objectiveMeasurementsStr}`,
+Letter date: ${today}${bmiAsaLines}${objectiveMeasurementsStr}`;
+
+  const letter = await callAnthropicWithRetry({
+    system: systemPromptWithContext,
+    prompt: letterPrompt,
     maxTokens: 8000,
     temperature: 0,
   });
@@ -228,16 +279,7 @@ Letter date: ${today}${bmiAsaLines}${objectiveMeasurementsStr}`,
     regenerateRawLetter: () =>
       callAnthropicWithRetry({
         system: systemPromptWithContext,
-        prompt: `Structured patient data:
-${redactedChartData}
-
-Request details:
-CPT code: ${requestDetails.cptCode}
-Insurance payer: ${requestDetails.payerName}
-Requesting provider: ${requestDetails.providerName}
-Practice name: ${requestDetails.practiceName}
-
-Letter date: ${today}${bmiAsaLines}${objectiveMeasurementsStr}`,
+        prompt: letterPrompt,
         maxTokens: 8000,
         temperature: 0,
       }),

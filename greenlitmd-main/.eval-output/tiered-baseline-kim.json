@@ -1,0 +1,132 @@
+{
+  "extraction": {
+    "patient_name": "Kim, Rachel",
+    "date_of_birth": "04/15/1975",
+    "diagnosis_codes": [
+      "M75.121",
+      "M75.111"
+    ],
+    "primary_complaint": "Right shoulder pain and weakness following a work-related lifting injury",
+    "symptom_duration": "8 months",
+    "functional_limitations": [
+      "Unable to lift objects above shoulder height",
+      "Cannot perform overhead reaching for daily tasks",
+      "Disturbed sleep due to shoulder pain",
+      "Unable to return to work duties requiring arm elevation"
+    ],
+    "objective_measurements": [
+      "Active forward flexion: 95 degrees (limited by pain)",
+      "Active abduction: 80 degrees",
+      "Internal rotation: 40 degrees",
+      "External rotation: 55 degrees",
+      "Strength testing: 3/5 supraspinatus on empty can test",
+      "ASES Score: 35.2/100"
+    ],
+    "conservative_treatments_attempted": [
+      {
+        "treatment": "Physical Therapy",
+        "duration": "8 weeks",
+        "outcome": "minimal improvement, pain persisted with overhead activity",
+        "dates": "September-October 2024",
+        "relief_duration": null
+      },
+      {
+        "treatment": "Corticosteroid Injection - Kenalog 40mg",
+        "duration": "Unknown",
+        "outcome": "2 weeks of partial relief, then return to baseline symptoms",
+        "dates": "11/05/2024",
+        "relief_duration": "2 weeks"
+      },
+      {
+        "treatment": "NSAIDs - Meloxicam 15mg daily",
+        "duration": "3 months",
+        "outcome": "inadequate pain control, GI intolerance developed",
+        "dates": "July-October 2024",
+        "relief_duration": null
+      }
+    ],
+    "imaging_findings": {
+      "modality": "X-ray and MRI",
+      "key_findings": "X-ray (01/22/2025): AC joint arthrosis Grade II. No calcific deposits. No significant glenohumeral arthrosis.; MRI (01/22/2025): Full-thickness supraspinatus tear measuring 2.1 cm with retraction to the musculotendinous junction. Moderate subacromial bursitis. Intact subscapularis."
+    },
+    "imaging_status": "completed",
+    "requested_procedure": "Arthroscopic rotator cuff repair, right shoulder - CPT 29827",
+    "surgical_approach_if_mentioned": "Arthroscopic with mini-open rotator cuff repair",
+    "denial_risk_flags": [
+      {
+        "id": "flag-1",
+        "label": "Physical Therapy Duration Below Typical Threshold",
+        "severity": "medium",
+        "explanation": "Physical therapy was documented for only 8 weeks. Many BCBS policies for CPT 29827 require a minimum of 6–12 weeks of formal PT, but some regional plans require documentation of 12 weeks or a specific visit count to confirm failure.",
+        "recommendation": "Clarify the total number of PT sessions attended and confirm whether 8 weeks meets the specific BCBS plan threshold; if not, document clinical rationale for why extended PT was not appropriate given the structural tear size.",
+        "anchorText": "Physical Therapy: 8 weeks"
+      },
+      {
+        "id": "flag-2",
+        "label": "Corticosteroid Injection Duration Not Documented",
+        "severity": "medium",
+        "explanation": "The corticosteroid injection entry lacks a documented treatment duration or trial period, only a single administration date placeholder (11/05/2024). Payers may flag incomplete conservative care records when duration of any modality is absent.",
+        "recommendation": "Add a chart addendum specifying the intended trial period for the injection and confirming that follow-up at 11/05/2024 confirmed return to baseline, supporting failure of this modality.",
+        "anchorText": "administered 11/05/2024"
+      },
+      {
+        "id": "flag-3",
+        "label": "Work Injury Origin May Require Workers' Comp Coordination",
+        "severity": "medium",
+        "explanation": "The chart documents a work-related lifting injury as the mechanism of onset. BCBS may deny or pend the claim if a workers' compensation carrier is the primary payer for a work-related injury.",
+        "recommendation": "Confirm and document the payer coordination of benefits status. If workers' compensation has been denied or closed, include that documentation with the prior authorization submission.",
+        "anchorText": "work-related lifting injury"
+      },
+      {
+        "id": "flag-4",
+        "label": "Injury Date Placeholder May Delay Review",
+        "severity": "low",
+        "explanation": "The injury onset date is recorded as June 2024, a placeholder token. Payers may require a specific injury date to validate the timeline of conservative care and medical necessity.",
+        "recommendation": "Ensure the actual injury date is populated in the final submission to establish the full 8-month conservative care timeline and support medical necessity.",
+        "anchorText": "lifting injury in June 2024"
+      }
+    ],
+    "pa_strength": {
+      "diagnosis_codes": {
+        "score": 1,
+        "note": "M75.121 (full-thickness rotator cuff tear, right shoulder) is a clinically appropriate and direct indication for CPT 29827 arthroscopic rotator cuff repair."
+      },
+      "conservative_treatments_named": {
+        "score": 1,
+        "note": "3 distinct conservative treatment modalities documented."
+      },
+      "conservative_treatment_duration": {
+        "score": 1,
+        "note": "2 of 2 duration-eligible treatments have an explicit numeric duration (100%). Meets the 50% threshold."
+      },
+      "imaging_findings": {
+        "score": 1,
+        "note": "Completed imaging with documented findings."
+      },
+      "functional_limitations": {
+        "score": 1,
+        "note": "4 specific functional limitations documented."
+      },
+      "surgical_approach": {
+        "score": 1,
+        "note": "The surgical approach is explicitly documented as 'Arthroscopic with mini-open rotator cuff repair,' which is a specific, procedure-appropriate technique consistent with CPT 29827."
+      },
+      "cpt_code_valid": {
+        "score": 1,
+        "note": "CPT 29827 is a recognized orthopedic surgical code."
+      },
+      "symptom_duration": {
+        "score": 1,
+        "note": "Symptom duration (\"8 months\") is ≥ 12 weeks."
+      }
+    },
+    "pain_score": "7/10 at rest, 9/10 with overhead activity",
+    "bmi": 27.4,
+    "asa_classification": "ASA II",
+    "validation": {
+      "hard_blocks": [],
+      "soft_warnings": []
+    }
+  },
+  "letter": "July 9, 2026\nBlue Cross Blue Shield\nPrior Authorization Department\n\nRe: Kim, Rachel | DOB: 04/15/1975 | Arthroscopic Rotator Cuff Repair (CPT 29827) | M75.121, M75.111\nMember ID: See attached insurance card\nPatient: Kim, Rachel\nDate of Birth: 04/15/1975\nProcedure: Arthroscopic Rotator Cuff Repair\nCPT Code: 29827\n\nDear Prior Authorization Reviewer,\n\n**CLINICAL HISTORY AND PRESENTING COMPLAINT**\n\nThis patient presents with an eight-month history of right shoulder pain and weakness following a work-related lifting injury, reporting pain rated 7/10 at rest and 9/10 with overhead activity. Range of motion assessment demonstrates active forward flexion limited to 95 degrees, active abduction to 80 degrees, internal rotation to 40 degrees, and external rotation to 55 degrees, with strength testing revealing 3/5 supraspinatus strength on empty can test and an ASES Score of 35.2 out of 100. As a result of this condition, the patient is unable to lift objects above shoulder height, cannot perform overhead reaching for daily tasks, experiences disturbed sleep due to shoulder pain, and is unable to return to work duties requiring arm elevation.\n\n**DIAGNOSIS**\n\nThe patient carries a confirmed diagnosis of complete rotator cuff tear of the right shoulder (M75.121) and complete rotator cuff tear of the left shoulder (M75.111), supported by clinical examination and advanced imaging as detailed below.\n\n**FUNCTIONAL LIMITATIONS**\n\n1. Unable to lift objects above shoulder height\n2. Cannot perform overhead reaching for daily tasks\n3. Disturbed sleep due to shoulder pain\n4. Unable to return to work duties requiring arm elevation\n\n**CONSERVATIVE TREATMENT HISTORY**\n\n1. Physical Therapy (8 weeks): The patient underwent a course of physical therapy; however, the clinical response was minimal, with pain persisting with overhead activity, and therapy was ultimately discontinued without achieving treatment goals.\n\n2. Corticosteroid Injection — Kenalog 40mg: The patient received a corticosteroid injection, which provided two weeks of partial relief before symptoms returned to baseline.\n\n3. NSAIDs — Meloxicam 15mg daily (3 months): A three-month course of meloxicam 15mg daily provided inadequate pain control, and the patient subsequently developed gastrointestinal intolerance, necessitating discontinuation.\n\n**REQUESTED PROCEDURE**\n\nArthroscopic rotator cuff repair, right shoulder (CPT 29827). Surgical approach: Arthroscopic with mini-open rotator cuff repair. The patient's BMI of 27.4 and ASA II classification have been factored into the perioperative surgical plan.\n\n**MEDICAL NECESSITY SUMMARY**\n\nThis patient presents with a confirmed full-thickness supraspinatus tear measuring 2.1 cm with retraction to the musculotendinous junction, substantiated by MRI, and has failed to achieve meaningful or sustained improvement following eight weeks of physical therapy, corticosteroid injection, and a three-month course of anti-inflammatory medication. Objective findings including an ASES Score of 35.2/100, supraspinatus strength of 3/5, and significantly restricted range of motion across all planes collectively demonstrate the severity of functional compromise. The patient's inability to maintain activities of daily living, return to occupational duties, or achieve restorative sleep establishes the medical necessity of surgical intervention. Arthroscopic rotator cuff repair represents the appropriate and necessary next step to restore shoulder function, prevent further tendon retraction and muscle atrophy, and return this patient to a functional baseline.\n\nSincerely,\nMichael Torres, MD\nSummit Orthopedic Group"
+}

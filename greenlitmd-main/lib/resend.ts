@@ -34,7 +34,12 @@ export function verifyUnsubscribeToken(token: string): string | null {
 }
 
 function unsubscribeUrl(email: string): string {
-  return `${appUrl}/api/unsubscribe?token=${createUnsubscribeToken(email)}`;
+  // Points at a confirmation PAGE, not the API route directly — a bare GET
+  // must never have the unsubscribe side effect, since email-scanner
+  // prefetch (Outlook Safe Links, etc.) issues a GET against every link in
+  // an email before a human ever clicks it. The page requires an explicit
+  // button click, which fires a POST. See E3 in AUDIT-FINDINGS.md.
+  return `${appUrl}/unsubscribe?token=${createUnsubscribeToken(email)}`;
 }
 
 const baseHtml = (body: string, email: string) => `<!DOCTYPE html>

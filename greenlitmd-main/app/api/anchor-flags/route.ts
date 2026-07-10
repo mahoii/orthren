@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { rateLimiter } from "@/lib/rate-limit";
+import { lightRateLimiter } from "@/lib/rate-limit";
 import { callAnthropicWithRetry } from "@/lib/anthropic";
-import { deidentify } from "@/lib/deidentify";
+import { deidentify, reidentifyDeep } from "@/lib/deidentify";
 import { assertDeidentified, DeidVerificationError } from "@/lib/deid-verify";
 import { captureEvent } from "@/lib/posthog";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
@@ -20,7 +20,7 @@ const SYSTEM_PROMPT =
 export async function POST(request: Request) {
   try {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "127.0.0.1";
-    const { success } = await rateLimiter.limit(ip);
+    const { success } = await lightRateLimiter.limit(ip);
     if (!success) {
       return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
     }
@@ -53,9 +53,29 @@ export async function POST(request: Request) {
         maxTokens: 1000,
         useStructuredOutput: true,
       });
-      const parsed = JSON.parse(raw) as { anchors: { flagIndex: number; anchorText: string | null }[] };
-      anchors = parsed.anchors;
-    } catch {
+      const parsed = JSON.parse(raw) as { anchors?: unknown };
+      const rawAnchors = parsed.anchors;
+      const isValidAnchors =
+        Array.isArray(rawAnchors) &&
+        rawAnchors.every(
+          (a): a is { flagIndex: number; anchorText: string | null } =>
+            typeof a === "object" &&
+            a !== null &&
+            typeof (a as Record<string, unknown>).flagIndex === "number" &&
+            ((a as Record<string, unknown>).anchorText === null ||
+              typeof (a as Record<string, unknown>).anchorText === "string")
+        );
+      if (!isValidAnchors) {
+        throw new Error("Model response did not match the expected anchors shape.");
+      }
+      // The model quotes anchorText verbatim from the REDACTED letter it was
+      // given, so a quote overlapping a placeholder token (e.g. containing
+      // "[PATIENT_NAME]") must be reidentified before it's returned — otherwise
+      // it can never match the un-redacted letter the client displays. See C5
+      // in AUDIT-FINDINGS.md.
+      anchors = reidentifyDeep(rawAnchors, letterPhiMap);
+    } catch (err) {
+      console.error("[anchor-flags] Anchor generation failed, falling back to no anchors:", err);
       anchors = flags.map((_, i) => ({ flagIndex: i, anchorText: null }));
     }
 
@@ -72,7 +92,7 @@ export async function POST(request: Request) {
         { status: 422 }
       );
     }
-    const message = error instanceof Error ? error.message : "Unable to anchor flags.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[anchor-flags] POST handler error:", error);
+    return NextResponse.json({ error: "Unable to anchor flags. Please try again." }, { status: 500 });
   }
 }

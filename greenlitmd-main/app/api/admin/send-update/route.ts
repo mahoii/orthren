@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAllSignups } from "@/lib/supabase/server";
 import { sendUpdateEmail } from "@/lib/resend";
+import { adminRateLimiter } from "@/lib/rate-limit";
+import { isValidAdminSecret } from "@/lib/admin-auth";
 import crypto from "crypto";
 
 function hashEmail(email: string) {
@@ -17,8 +19,13 @@ function sleep(ms: number) {
 }
 
 export async function POST(request: Request) {
-  const secret = request.headers.get("x-admin-secret");
-  if (!secret || secret !== process.env.ADMIN_SECRET) {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "127.0.0.1";
+  const { success } = await adminRateLimiter.limit(ip);
+  if (!success) {
+    return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
+  }
+
+  if (!isValidAdminSecret(request.headers.get("x-admin-secret"))) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
@@ -71,7 +78,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, sent, failed, total: emails.length });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unexpected error.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[admin/send-update] POST handler error:", err);
+    return NextResponse.json({ error: "Unexpected error." }, { status: 500 });
   }
 }
