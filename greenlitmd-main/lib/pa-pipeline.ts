@@ -312,7 +312,8 @@ export async function finalizeLetter(params: {
 }): Promise<FinalizeLetterResult> {
   const { rawLetter, extracted, requestDetails, phiMap, letterDate, regenerateRawLetter } = params;
 
-  let letter = reidentify(postProcessLetter(rawLetter, extracted), phiMap);
+  let postProcessed = postProcessLetter(rawLetter, extracted);
+  let letter = reidentify(postProcessed.letter, phiMap);
 
   // The imaging-refusal path (CRITICAL RULE — MAJOR JOINT PROCEDURE WITHOUT
   // IMAGING) is a data validation gate, not a letter — RULE 1 explicitly says
@@ -327,7 +328,8 @@ export async function finalizeLetter(params: {
 
   if (violations.length > 0) {
     const rawRetry = await regenerateRawLetter();
-    letter = reidentify(postProcessLetter(rawRetry, extracted), phiMap);
+    postProcessed = postProcessLetter(rawRetry, extracted);
+    letter = reidentify(postProcessed.letter, phiMap);
     if (letter.startsWith(REFUSAL_PREFIX)) {
       return { letter };
     }
@@ -344,7 +346,22 @@ export async function finalizeLetter(params: {
     requestedProcedure: extracted.requested_procedure,
   });
 
-  return { letter: sanitized, sourceLockWarning: violations.length ? violations : undefined };
+  // The model emitted a duplicated draft and the signature-block boundary
+  // was determined heuristically (contiguous non-blank lines after
+  // "Sincerely,") rather than via a structural guarantee from the model —
+  // surface it so a reviewer double-checks the kept signature is complete
+  // before export, instead of silently shipping a letter whose sig block
+  // truncation point was a best-effort guess. Reuses the existing
+  // sourceLockWarning gate (blocks /api/export, shows the red banner on
+  // /review) rather than adding a second warning channel.
+  const warnings = violations.length ? [...violations] : [];
+  if (postProcessed.duplicateDraftRemoved) {
+    warnings.push(
+      "The AI generated a duplicated draft of this letter; the duplicate was removed automatically. Please verify the signature block (name, credentials, practice) is complete before submitting."
+    );
+  }
+
+  return { letter: sanitized, sourceLockWarning: warnings.length ? warnings : undefined };
 }
 
 // High-risk implant/fixation/guidance vocabulary — any occurrence in a letter

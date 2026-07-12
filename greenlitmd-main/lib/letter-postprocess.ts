@@ -21,16 +21,24 @@ export function buildBmiAsaPromptLines(extracted: ExtractedChartData): string {
   return lines.length ? `\n${lines.join("\n")}` : "";
 }
 
+export type PostProcessResult = {
+  letter: string;
+  /** True when a duplicated draft was detected and truncated — the caller
+   * should surface this to the reviewer rather than silently shipping a
+   * letter whose signature block was determined heuristically. */
+  duplicateDraftRemoved: boolean;
+};
+
 /**
  * Deterministic post-processing applied to every generated letter on every
  * path. The prompt asks the model to comply; this guarantees it regardless of
  * model temperature or per-attempt variance.
  */
-export function postProcessLetter(letter: string, extracted: ExtractedChartData): string {
-  let result = removeDuplicateSignatureBlocks(letter);
-  result = injectBmiAsa(result, extracted);
+export function postProcessLetter(letter: string, extracted: ExtractedChartData): PostProcessResult {
+  const { letter: deduped, removed } = removeDuplicateSignatureBlocks(letter);
+  let result = injectBmiAsa(deduped, extracted);
   result = removeNotDocumentedLanguage(result);
-  return result;
+  return { letter: result, duplicateDraftRemoved: removed };
 }
 
 // Programmatic safety net: inject BMI/ASA sentences if the model omitted them.
@@ -72,18 +80,43 @@ export function injectBmiAsa(letter: string, extracted: ExtractedChartData): str
 }
 
 // Remove duplicate signature blocks — keep only the FIRST "Sincerely," block,
-// truncating everything that follows the first complete signature (provider + practice).
-export function removeDuplicateSignatureBlocks(letter: string): string {
+// truncating everything that follows the first complete signature.
+export function removeDuplicateSignatureBlocks(letter: string): { letter: string; removed: boolean } {
   const re = /Sincerely,/gi;
   const occurrences: number[] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(letter)) !== null) occurrences.push(m.index);
-  if (occurrences.length <= 1) return letter;
+  if (occurrences.length <= 1) return { letter, removed: false };
 
-  // Keep the first signature block: take everything up to (but not including)
-  // the second "Sincerely," and strip any trailing blank lines before it.
+  // Truncating right before the second "Sincerely," (the old behavior) left
+  // everything between the first signature and that second occurrence intact
+  // — i.e. the entire body of a duplicated second draft, missing only its own
+  // trailing signature.
+  //
+  // A hardcoded "keep exactly 2 non-blank lines" (name + practice) is also
+  // wrong: a real signature block can legitimately run longer (credential
+  // line, NPI, phone) and that content isn't distinguishable from a
+  // duplicate by line count alone. Instead, use structure: a signature block
+  // is a CONTIGUOUS run of non-blank lines with no blank-line gaps. Whatever
+  // comes after the first blank-line gap following that run is a new
+  // paragraph — either the start of a duplicated draft, or (in the
+  // fallback case below) content we're not confident enough to keep — so
+  // stop there regardless of how many lines the run was.
+  const firstIdx = occurrences[0];
   const secondIdx = occurrences[1];
-  return letter.slice(0, secondIdx).trimEnd();
+  const lines = letter.slice(firstIdx, secondIdx).split("\n");
+
+  let kept = 0;
+  let sawSignatureLine = false;
+  for (let i = 0; i < lines.length; i++) {
+    const isBlank = lines[i].trim() === "";
+    if (i > 0 && isBlank && sawSignatureLine) break; // first gap after the contiguous signature run
+    kept += lines[i].length + (i < lines.length - 1 ? 1 : 0);
+    if (i === 0) continue; // the "Sincerely," line itself
+    if (!isBlank) sawSignatureLine = true;
+  }
+
+  return { letter: letter.slice(0, firstIdx + kept).trimEnd(), removed: true };
 }
 
 // Remove "not documented" language and sentences containing it.
