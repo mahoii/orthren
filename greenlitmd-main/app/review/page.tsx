@@ -197,21 +197,15 @@ export default function ReviewPage() {
     if (newMode === 'edit') {
       // Flush any pending debounce before entering edit so state is current
       if (inputDebounceRef.current) clearTimeout(inputDebounceRef.current);
-      setMode(newMode);
-      // After render, seed contenteditable with the annotated HTML
-      requestAnimationFrame(() => {
-        if (editDivRef.current && annotationSourceRef.current) {
-          editDivRef.current.innerHTML = annotationSourceRef.current.innerHTML;
-        }
-      });
+      // Seeding of contenteditable happens in useLayoutEffect after mount
     } else {
       // Leaving edit: flush innerText to state synchronously before re-render
       if (inputDebounceRef.current) clearTimeout(inputDebounceRef.current);
       if (editDivRef.current) {
         setEditedLetter(editDivRef.current.innerText);
       }
-      setMode(newMode);
     }
+    setMode(newMode);
   };
 
   function handleContentEditableInput() {
@@ -226,6 +220,12 @@ export default function ReviewPage() {
   useLayoutEffect(() => {
     if (letterRef.current) {
       letterRef.current.scrollTop = savedScrollRef.current;
+    }
+    // When entering edit mode, seed the freshly-mounted contenteditable with
+    // the annotated HTML. useLayoutEffect runs synchronously after React commits
+    // the DOM, so editDivRef.current is guaranteed to exist here.
+    if (mode === 'edit' && editDivRef.current && annotationSourceRef.current) {
+      editDivRef.current.innerHTML = annotationSourceRef.current.innerHTML;
     }
   }, [mode]);
 
@@ -660,7 +660,7 @@ export default function ReviewPage() {
             </div>
 
             {mode === 'review' ? (
-              <div style={{ position: 'relative' }}>
+              <div key="review-container" style={{ position: 'relative' }}>
                 {/* Regenerating pill badge */}
                 {isRegenerating && (
                   <div
@@ -750,6 +750,7 @@ export default function ReviewPage() {
               </div>
             ) : (
               <div
+                key="edit-container"
                 ref={editDivRef}
                 contentEditable
                 suppressContentEditableWarning
