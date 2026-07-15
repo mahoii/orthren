@@ -68,6 +68,15 @@ export default function ReviewPage() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [sourceLockWarning, setSourceLockWarning] = useState<string[] | null>(null);
+  // The letter's own dateline, round-tripped to /api/export so it can
+  // recompute verifySourceLock itself rather than trust a client-supplied
+  // sourceLockWarning (a direct POST could otherwise just send an empty array).
+  const [letterDate, setLetterDate] = useState<string>("");
+  // Structural human-accountability gate: must be re-checked after every
+  // regeneration or manual edit before Download unlocks, and is re-verified
+  // server-side in /api/export (a client-only gate is trivially bypassed by a
+  // direct POST — see AUDIT-FINDINGS.md / roast findings on this route).
+  const [reviewConfirmed, setReviewConfirmed] = useState(false);
 
   const [mode, setMode] = useState<'review' | 'edit'>('review');
   const [editedLetter, setEditedLetter] = useState("");
@@ -101,6 +110,7 @@ export default function ReviewPage() {
       setData(parsed);
       setEditedLetter(parsed.letter);
       setSourceLockWarning(parsed.sourceLockWarning ?? null);
+      setLetterDate(parsed.letterDate ?? "");
     } catch {
       sessionStorage.removeItem("pa-review-data");
     }
@@ -132,6 +142,11 @@ export default function ReviewPage() {
   const denialFlags: DenialRiskFlag[] = useMemo(
     () => data?.extracted.denial_risk_flags ?? [],
     [data?.extracted.denial_risk_flags]
+  );
+
+  const extractionWarnings: string[] = useMemo(
+    () => data?.extracted.extraction_warnings ?? [],
+    [data?.extracted.extraction_warnings]
   );
 
   const attentionItems: AttentionItem[] = useMemo(() => {
@@ -204,6 +219,7 @@ export default function ReviewPage() {
       if (editDivRef.current) {
         setEditedLetter(editDivRef.current.innerText);
       }
+      setReviewConfirmed(false);
     }
     setMode(newMode);
   };
@@ -346,6 +362,7 @@ export default function ReviewPage() {
         extractionJson?: Partial<ExtractedChartData>;
         cptCode?: string;
         sourceLockWarning?: string[];
+        letterDate?: string;
         error?: string;
       };
       if (!res.ok) throw new Error(json.error ?? 'Unable to regenerate the letter.');
@@ -360,6 +377,8 @@ export default function ReviewPage() {
 
         setEditedLetter(json.letter);
         setSourceLockWarning(json.sourceLockWarning ?? null);
+        setLetterDate(json.letterDate ?? letterDate);
+        setReviewConfirmed(false);
 
         // Merge the server-returned extractionJson — it already includes pa_strength
         // freshly recomputed server-side from the merged/supplemented fields (see
@@ -425,6 +444,8 @@ export default function ReviewPage() {
           payerName: data.payerName,
           providerName: data.providerName,
           practiceName: data.practiceName,
+          letterDate,
+          reviewConfirmed,
         }),
       });
       if (!res.ok) {
@@ -588,16 +609,44 @@ export default function ReviewPage() {
             </button>
           </div>
 
+          {/* Human sign-off — required before Download unlocks; re-verified
+              server-side in /api/export so a direct POST can't bypass it. */}
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#475569',
+              cursor: data.isDemo ? 'default' : 'pointer',
+              userSelect: 'none',
+              whiteSpace: 'nowrap',
+            }}
+            title="I have reviewed this letter against the source chart and confirm it is accurate before submission."
+          >
+            <input
+              type="checkbox"
+              checked={reviewConfirmed}
+              disabled={Boolean(data.isDemo)}
+              onChange={(e) => setReviewConfirmed(e.target.checked)}
+              style={{ width: 14, height: 14, cursor: data.isDemo ? 'default' : 'pointer' }}
+            />
+            Reviewed against chart
+          </label>
+
           {/* Download */}
           <button
             type="button"
             onClick={handleDownload}
-            disabled={isDownloading || Boolean(data.isDemo) || Boolean(sourceLockWarning?.length)}
+            disabled={isDownloading || Boolean(data.isDemo) || Boolean(sourceLockWarning?.length) || !reviewConfirmed}
             title={
               sourceLockWarning?.length
                 ? 'Export is blocked until this letter is regenerated or corrected — see warning below.'
                 : data.isDemo
                 ? 'Download available with a real chart'
+                : !reviewConfirmed
+                ? "Check \"Reviewed against chart\" to confirm you've verified this letter before downloading."
                 : undefined
             }
             style={{
@@ -608,8 +657,8 @@ export default function ReviewPage() {
               fontSize: 13,
               fontWeight: 600,
               border: 'none',
-              cursor: isDownloading || data.isDemo || sourceLockWarning?.length ? 'not-allowed' : 'pointer',
-              opacity: isDownloading || data.isDemo || sourceLockWarning?.length ? 0.5 : 1,
+              cursor: isDownloading || data.isDemo || sourceLockWarning?.length || !reviewConfirmed ? 'not-allowed' : 'pointer',
+              opacity: isDownloading || data.isDemo || sourceLockWarning?.length || !reviewConfirmed ? 0.5 : 1,
               fontFamily: 'inherit',
             }}
           >
@@ -628,6 +677,19 @@ export default function ReviewPage() {
           style={{ overflowY: 'auto', background: '#eef1f5', padding: '40px 32px 80px' }}
         >
           <div style={{ maxWidth: 768, margin: '0 auto' }}>
+            {extractionWarnings.length > 0 && (
+              <div style={{ marginBottom: 16, borderRadius: 8, border: '1px solid #fde68a', background: '#fffbeb', padding: '12px 14px', fontSize: 13, color: '#92400e' }}>
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                  Extraction QA found possible discrepancies against the source chart — verify before submission.
+                </div>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {extractionWarnings.map((warning, i) => (
+                    <li key={i} style={{ marginTop: i === 0 ? 0 : 4 }}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {sourceLockWarning && sourceLockWarning.length > 0 && (
               <div style={{ marginBottom: 16, borderRadius: 8, border: '1px solid #fecaca', background: '#fef2f2', padding: '12px 14px', fontSize: 13, color: '#dc2626' }}>
                 <div style={{ fontWeight: 600, marginBottom: 6 }}>

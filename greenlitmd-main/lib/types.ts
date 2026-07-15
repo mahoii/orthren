@@ -72,6 +72,10 @@ export type Validation = {
 
 export type ExtractedChartDataWithValidation = ExtractedChartData & {
   validation: Validation;
+  /** QA discrepancies between the extraction and the source chart text — deterministic
+   * date/code checks plus an LLM cross-check. Advisory only: never sent to the letter
+   * prompt (see stripNonLetterFields in lib/pa-pipeline.ts), surfaced in the review UI. */
+  extraction_warnings?: string[];
 };
 
 export type GeneratePaResponse = {
@@ -79,4 +83,10 @@ export type GeneratePaResponse = {
   letter: string;
   payerRule?: PayerRule | null;
   sourceLockWarning?: string[];
+  /** The exact dateline embedded in the letter header — round-tripped to
+   * /api/export so it can re-verify SOURCE LOCK server-side. See
+   * FinalizeLetterResult in lib/pa-pipeline.ts. Optional because the frozen
+   * /sandbox demo fixtures (lib/demo-data.ts) predate this field and must not
+   * be modified; /api/export rejects a request that omits it. */
+  letterDate?: string;
 };

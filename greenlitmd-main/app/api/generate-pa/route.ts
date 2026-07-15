@@ -9,6 +9,7 @@ import { DeidVerificationError } from "@/lib/deid-verify";
 import {
   extractChartDataFromText,
   generateLetterFromExtraction,
+  verifyExtractionAgainstChart,
   type RequestDetails,
 } from "@/lib/pa-pipeline";
 import {
@@ -98,7 +99,14 @@ export async function POST(request: Request) {
 
     const { _phiMap, ...extracted } = await extractChartDataFromText(chartText, requestDetails);
 
-    const discrepancies = await validateExtraction(chartText, extracted as Record<string, unknown>);
+    // Deterministic string-matching pass runs first — it's independent of the
+    // extraction model, unlike validateExtraction below (same model family
+    // grading its own sibling call). Both feed the same advisory list; neither
+    // blocks generation, since either can false-positive on paraphrased dates
+    // or reformatted codes. See lib/pa-pipeline.ts verifyExtractionAgainstChart.
+    const deterministicDiscrepancies = verifyExtractionAgainstChart(extracted, chartText);
+    const llmDiscrepancies = await validateExtraction(chartText, extracted as Record<string, unknown>);
+    const discrepancies = [...deterministicDiscrepancies, ...llmDiscrepancies];
     const extractedWithWarnings = extracted as typeof extracted & { extraction_warnings?: string[] };
     if (discrepancies.length > 0) {
       extractedWithWarnings.extraction_warnings = discrepancies;
@@ -126,7 +134,7 @@ export async function POST(request: Request) {
     ];
 
     stage = "narrative";
-    const { letter, sourceLockWarning } = await generateLetterFromExtraction(
+    const { letter, sourceLockWarning, letterDate } = await generateLetterFromExtraction(
       extractedWithWarnings,
       requestDetails,
       _phiMap,
@@ -152,6 +160,7 @@ export async function POST(request: Request) {
       payerRule,
       usedUnvalidatedPayerRule,
       sourceLockWarning,
+      letterDate,
     });
   } catch (error) {
     if (error instanceof DeidVerificationError) {

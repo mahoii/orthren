@@ -183,7 +183,7 @@ REVISION INSTRUCTIONS:
     // supplemented letter. See A3 in AUDIT-FINDINGS.md.
     const mergedExtraction = mergeSupplementsIntoExtraction(extractionJson, supplements);
 
-    const { letter: finalizedLetter, sourceLockWarning } = await finalizeLetter({
+    const { letter: finalizedLetter, sourceLockWarning, letterDate: finalizedLetterDate } = await finalizeLetter({
       rawLetter: rawLetterText,
       extracted: mergedExtraction,
       requestDetails: effectiveRequestDetails,
@@ -262,6 +262,7 @@ REVISION INSTRUCTIONS:
       extractionJson: updatedExtractionJson,
       cptCode: effectiveRequestDetails.cptCode,
       sourceLockWarning,
+      letterDate: finalizedLetterDate,
     });
   } catch (error) {
     if (error instanceof DeidVerificationError) {

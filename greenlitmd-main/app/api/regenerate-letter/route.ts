@@ -113,7 +113,7 @@ Letter date: ${today}${bmiAsaLines}${objectiveMeasurementsStr}${buildSoftWarning
       temperature: 0
     });
 
-    const { letter: sanitized, sourceLockWarning } = await finalizeLetter({
+    const { letter: sanitized, sourceLockWarning, letterDate } = await finalizeLetter({
       rawLetter,
       extracted,
       requestDetails,
@@ -128,7 +128,7 @@ Letter date: ${today}${bmiAsaLines}${objectiveMeasurementsStr}${buildSoftWarning
         }),
     });
 
-    return NextResponse.json({ letter: sanitized, sourceLockWarning });
+    return NextResponse.json({ letter: sanitized, sourceLockWarning, letterDate });
   } catch (error) {
     if (error instanceof DeidVerificationError) {
       await captureEvent({

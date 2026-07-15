@@ -12,6 +12,7 @@ import {
 import { formatLetterDate } from "@/lib/letter-placeholders";
 import { lightRateLimiter } from "@/lib/rate-limit";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
+import { verifySourceLock } from "@/lib/pa-pipeline";
 import type { ExtractedChartData } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -27,6 +28,8 @@ type ExportRequest = {
   payerName?: string;
   providerName?: string;
   practiceName?: string;
+  letterDate?: string;
+  reviewConfirmed?: boolean;
 };
 
 export async function POST(request: Request) {
@@ -50,6 +53,33 @@ export async function POST(request: Request) {
 
     if (!body.extracted || !body.letter || !body.cptCode) {
       return NextResponse.json({ error: "Letter, extracted chart data, and CPT code are required." }, { status: 400 });
+    }
+
+    // Server-side enforcement of the two gates the review UI otherwise only
+    // enforced client-side (disabled Download button) — a direct POST here
+    // must not be able to bypass either. Recomputes SOURCE LOCK itself rather
+    // than trusting a client-supplied sourceLockWarning, which a scripted
+    // caller could just send as `[]`. letterDate is the letter's own dateline
+    // (round-tripped from generation/regeneration, see FinalizeLetterResult
+    // in lib/pa-pipeline.ts) — required so the letter's dateline itself isn't
+    // misflagged as an ungrounded date.
+    if (!body.letterDate) {
+      return NextResponse.json({ error: "Missing letter date; cannot verify this letter for export." }, { status: 400 });
+    }
+
+    const sourceLockWarning = verifySourceLock(body.letter, body.extracted, body.letterDate);
+    if (sourceLockWarning.length > 0) {
+      return NextResponse.json(
+        { error: "This letter has unresolved SOURCE LOCK warnings and cannot be exported until it is regenerated or corrected." },
+        { status: 400 }
+      );
+    }
+
+    if (body.reviewConfirmed !== true) {
+      return NextResponse.json(
+        { error: "This letter must be confirmed as reviewed against the source chart before it can be exported." },
+        { status: 400 }
+      );
     }
 
     const patientName = body.extracted.patient_name ?? "Patient name not documented";

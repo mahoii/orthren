@@ -292,6 +292,15 @@ export type FinalizeLetterResult = {
   letter: string;
   /** Present only when the retry-once attempt still failed verification. */
   sourceLockWarning?: string[];
+  /**
+   * The exact dateline string embedded in the letter header (RULE 3 in
+   * letter-system-prompt.ts). Callers must round-trip this to /api/export so
+   * it can re-run verifySourceLock itself instead of trusting a client-
+   * supplied sourceLockWarning — recomputing with "now" instead would
+   * false-positive-flag the letter's own (correct, past) dateline on any
+   * export that happens on a later day than generation.
+   */
+  letterDate: string;
 };
 
 const REFUSAL_PREFIX = "Cannot generate authorization letter:";
@@ -321,7 +330,7 @@ export async function finalizeLetter(params: {
   // or sanitizeLetterPlaceholders (which would append a fabricated physician
   // signature via ensureSignatureBlock) against it.
   if (letter.startsWith(REFUSAL_PREFIX)) {
-    return { letter };
+    return { letter, letterDate };
   }
 
   let violations = verifySourceLock(letter, extracted, letterDate);
@@ -331,7 +340,7 @@ export async function finalizeLetter(params: {
     postProcessed = postProcessLetter(rawRetry, extracted);
     letter = reidentify(postProcessed.letter, phiMap);
     if (letter.startsWith(REFUSAL_PREFIX)) {
-      return { letter };
+      return { letter, letterDate };
     }
     violations = verifySourceLock(letter, extracted, letterDate);
   }
@@ -361,7 +370,7 @@ export async function finalizeLetter(params: {
     );
   }
 
-  return { letter: sanitized, sourceLockWarning: warnings.length ? warnings : undefined };
+  return { letter: sanitized, sourceLockWarning: warnings.length ? warnings : undefined, letterDate };
 }
 
 // High-risk implant/fixation/guidance vocabulary — any occurrence in a letter
@@ -606,6 +615,93 @@ function findUngroundedLimitationClaims(text: string, allowedLimitations: string
     }
   }
   return Array.from(new Set(flagged));
+}
+
+// ── Deterministic extraction-vs-source verification ─────────────────────────
+// validateExtraction (lib/extractionValidator.ts) asks the same model family
+// that produced the extraction to grade its own sibling call against the
+// source text — a correlated check, not an independent one. This function
+// verifies the highest-risk fields (dates, diagnosis codes, imaging status)
+// with plain string matching against the raw chart text instead, so at least
+// part of extraction_warnings doesn't depend on the LLM being right about its
+// own mistake. Supplements validateExtraction; does not replace it.
+
+const PLACEHOLDER_TOKEN_PATTERN = /^\[[A-Z_]+\]$/;
+
+const PENDING_IMAGING_LANGUAGE = ["pending", "scheduled", "awaiting", "not yet", "to be scheduled", "ordered but"];
+const IMAGING_TERMS = ["mri", "x-ray", "xray", "ct scan", "imaging"];
+
+function extractDateLikeSubstrings(text: string): string[] {
+  const found: string[] = [];
+  for (const pattern of HAYSTACK_DATE_PATTERNS) {
+    pattern.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = pattern.exec(text)) !== null) {
+      found.push(m[0]);
+    }
+  }
+  return found;
+}
+
+function isGroundedInChartText(value: string, chartText: string): boolean {
+  return chartText.includes(value) || isDateGroundedInHaystack(value, chartText);
+}
+
+// "MRI pending" read as imaging_status: "completed" is exactly the failure mode
+// a correlated LLM check is least likely to catch, since it's the same kind of
+// misreading the extraction call itself is prone to.
+function chartHasPendingImagingLanguage(chartText: string): boolean {
+  const sentences = chartText.split(/(?<=[.!?])\s+/);
+  return sentences.some((sentence) => {
+    const lower = sentence.toLowerCase();
+    return IMAGING_TERMS.some((term) => lower.includes(term)) &&
+      PENDING_IMAGING_LANGUAGE.some((phrase) => lower.includes(phrase));
+  });
+}
+
+export function verifyExtractionAgainstChart(
+  extracted: Pick<
+    ExtractedChartData,
+    "date_of_birth" | "diagnosis_codes" | "conservative_treatments_attempted" | "imaging_status"
+  >,
+  chartText: string
+): string[] {
+  const warnings: string[] = [];
+
+  if (extracted.date_of_birth && !PLACEHOLDER_TOKEN_PATTERN.test(extracted.date_of_birth)) {
+    if (!isGroundedInChartText(extracted.date_of_birth, chartText)) {
+      warnings.push(
+        `Extracted date of birth "${extracted.date_of_birth}" was not found verbatim in the source chart text — verify before submission.`
+      );
+    }
+  }
+
+  for (const code of extracted.diagnosis_codes ?? []) {
+    if (code && !chartText.toLowerCase().includes(code.toLowerCase())) {
+      warnings.push(
+        `Extracted diagnosis code "${code}" was not found verbatim in the source chart text — verify before submission.`
+      );
+    }
+  }
+
+  for (const treatment of extracted.conservative_treatments_attempted ?? []) {
+    if (!treatment.dates || treatment.dates === "Not documented") continue;
+    for (const dateLike of extractDateLikeSubstrings(treatment.dates)) {
+      if (!isGroundedInChartText(dateLike, chartText)) {
+        warnings.push(
+          `Extracted date "${dateLike}" for treatment "${treatment.treatment ?? "unknown treatment"}" was not found verbatim in the source chart text — verify before submission.`
+        );
+      }
+    }
+  }
+
+  if (extracted.imaging_status === "completed" && chartHasPendingImagingLanguage(chartText)) {
+    warnings.push(
+      `Imaging is extracted as "completed" but the source chart contains language suggesting imaging may still be pending or scheduled — verify before submission.`
+    );
+  }
+
+  return warnings;
 }
 
 // ── JSON parser ─────────────────────────────────────────────────────────────
