@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { SOLO_PRICE, GROUP_BASE_PRICE, GROUP_PRICE_PER_SURGEON } from "@/lib/pricing";
 
 const CALENDLY_URL =
   process.env.NEXT_PUBLIC_CALENDLY_URL ??
@@ -127,7 +129,8 @@ export default function PricingSection() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [surgeonCount, setSurgeonCount] = useState(1);
 
-  const price = surgeonCount === 1 ? 299 : 199 + 80 * surgeonCount;
+  const price =
+    surgeonCount === 1 ? SOLO_PRICE : GROUP_BASE_PRICE + GROUP_PRICE_PER_SURGEON * surgeonCount;
   const annualPrice = isAnnual ? Math.round((price * 10) / 12) : price;
   const roiResult = `$${Math.round(paPerWeek * 4.33 * 16).toLocaleString()}/mo`;
 
@@ -258,6 +261,12 @@ export default function PricingSection() {
             >
               Book a free demo
             </a>
+            <Link
+              href="/pricing"
+              className="mt-3 block text-center text-sm font-medium text-clinical-blue hover:underline"
+            >
+              Prefer to sign up directly? See self-serve plans
+            </Link>
           </div>
         </div>
       </section>

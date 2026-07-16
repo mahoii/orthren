@@ -19,7 +19,7 @@ Last updated: 2026-07-05
 | Payer rules engine | 8/12 rules `validated` in `lib/payer-rules.ts`; 3 UHC rules blocked (defer to licensed InterQual criteria); 1 Aetna rule blocked (no dedicated primary source exists) — see `scripts/payer-rules-status.ts` |
 | Appeal talking points | Route built 2026-07-05 (`app/api/generate-appeal-talking-points/route.ts`) — SOURCE LOCK + CITATION LOCK + de-id verification wired in. **Not called from any UI yet** — no `/review` or `/builder` surface exists for it |
 | Outreach infra | `[VERIFY: no outreach tooling (Streak, leave-behind materials, practice list) is tracked in this repo — status lives outside the codebase]` |
-| Billing | Not built in repo — no Stripe integration present |
+| Billing | Manual Stripe Payment Links live via `/pricing` (`lib/pricing.ts`) — static routing layer only, no Stripe API/SDK integration, no webhooks, no DB tables |
 | Congressional App Challenge | `[VERIFY: frozen-branch / submission-date status — not discoverable from repo state alone]` |
 
 ---
@@ -101,7 +101,12 @@ list are external tooling). `[VERIFY: current state with whoever owns that tooli
 
 ## Billing
 
-No Stripe or billing integration present in the codebase as of this commit.
+`/pricing` (`app/pricing/page.tsx` + `lib/pricing.ts`) routes to manually-created
+Stripe Payment Links (env vars `NEXT_PUBLIC_STRIPE_LINK_SOLO`,
+`NEXT_PUBLIC_STRIPE_LINK_GROUP`) — intentionally a static routing layer, not a
+billing integration. No Stripe SDK, no webhooks, no DB tables, no subscription
+gating on `/builder` or `/review`. If a Payment Link env var is unset, the CTA
+renders disabled with a `mailto:kamari@orthren.com` fallback.
 
 ## Congressional App Challenge
 

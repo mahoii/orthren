@@ -307,6 +307,9 @@ export default async function LandingPage() {
           </div>
 
           <nav className="flex flex-wrap justify-center gap-5 font-semibold" aria-label="Footer navigation">
+            <Link href="/pricing" className="hover:text-slate-800 transition-colors">
+              Pricing
+            </Link>
             <Link href="/privacy" className="hover:text-slate-800 transition-colors">
               Privacy Policy
             </Link>
