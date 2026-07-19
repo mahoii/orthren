@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push: {}
+  pull_request: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # Placeholder values only -- module-load-time clients (Redis.fromEnv()
+      # in lib/rate-limit.ts, Supabase/Resend clients, etc.) throw if these
+      # are unset, so the build needs *something* here even though no real
+      # network call happens during typecheck/build.
+      #
+      # POSTHOG_API_KEY is deliberately left unset: a missing key should
+      # make server-side analytics silently no-op (including the
+      # deid_verification_failed audit event) rather than fail the build --
+      # this is the intended test of that behavior, not an oversight.
+      UPSTASH_REDIS_REST_URL: https://placeholder.upstash.io
+      UPSTASH_REDIS_REST_TOKEN: placeholder
+      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+      SUPABASE_SERVICE_ROLE_KEY: placeholder
+      ANTHROPIC_API_KEY: placeholder
+      RESEND_API_KEY: placeholder
+      ADMIN_SECRET: placeholder
+      UNSUBSCRIBE_SECRET: placeholder
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Deid stress check
+        run: npx --yes tsx@4 scripts/deid-stress-check.ts
