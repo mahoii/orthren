@@ -1,5 +1,20 @@
 import { PostHog } from "posthog-node";
 
+// Without POSTHOG_API_KEY, the PostHog client either silently no-ops on
+// every capture() call or (depending on posthog-node version) throws at
+// construction time below -- either way there's no visibility into the
+// fact that analytics are dead. That includes the deid_verification_failed
+// audit event (fired when the de-id gate catches a PHI leak), which would
+// then vanish silently or crash module load with no indication why. Warn
+// once at module load (cold start), before construction, so it fires
+// regardless of which failure mode the installed client takes.
+if (!process.env.POSTHOG_API_KEY) {
+  console.warn(
+    "[posthog] POSTHOG_API_KEY is unset -- server-side analytics will be silently dropped, " +
+      "including the deid_verification_failed compliance audit event."
+  );
+}
+
 export const serverPosthog = new PostHog(process.env.POSTHOG_API_KEY ?? "", {
   host: "https://app.posthog.com",
 });
