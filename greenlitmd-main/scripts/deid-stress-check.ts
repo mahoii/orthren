@@ -372,6 +372,19 @@ const ADVERSARIAL_CASES: AdversarialCase[] = [
     input: "n/a", // handled specially below
     check: () => ({ pass: true }),
   },
+  {
+    name: "residual-name-beyond-bound",
+    // RESIDUAL_WORD/RESIDUAL_NAME_RE in deid-verify.ts were changed from
+    // unbounded `*` to bounded `{0,20}`/`{0,50}` repetition (ReDoS hardening).
+    // This proves the bound doesn't create a fail-open gap: a raw unmasked
+    // name chain far past every bound (25 hyphen-joined chunks inside a
+    // 60-word space-joined run) must still be caught. matchAll resumes
+    // scanning from where the previous match left off, so exceeding a bound
+    // should split into multiple flagged matches rather than silently
+    // passing -- this asserts that's actually true, not just assumed.
+    input: "n/a", // handled specially below
+    check: () => ({ pass: true }),
+  },
 ];
 
 function runAdversarialCases(): void {
@@ -388,6 +401,19 @@ function runAdversarialCases(): void {
       const verify = verifyDeidentified("Reference value: 2125551234 recorded without context.", {});
       const caught = !verify.pass && verify.leaks.some((l) => l.startsWith("unclassified_residue") || l.startsWith("digit_run"));
       safeReport(c.name, caught, caught ? [] : ["verifier did not flag a raw unmasked bare digit run"]);
+      continue;
+    }
+    if (c.name === "residual-name-beyond-bound") {
+      const chunks = Array.from({ length: 25 }, (_, i) => `Ab${i}cd`.replace(/\d/, "")).map(
+        (_, i) => `Chunk${String.fromCharCode(65 + (i % 26))}`
+      );
+      const hyphenChain = chunks.slice(0, 25).join("-"); // 25 > the 20-chunk bound
+      const words = Array.from({ length: 60 }, (_, i) => `Word${String.fromCharCode(65 + (i % 26))}`);
+      const spaceChain = words.join(" "); // 60 > the 50-word bound
+      const text = `Patient name on file: ${hyphenChain} ${spaceChain} end of note.`;
+      const verify = verifyDeidentified(text, {});
+      const caught = !verify.pass && verify.leaks.some((l) => l.startsWith("unclassified_residue"));
+      safeReport(c.name, caught, caught ? [] : ["verifier failed to flag a raw name chain exceeding the new bounds -- possible fail-open"]);
       continue;
     }
     if (c.name === "planted-leak-controls") {

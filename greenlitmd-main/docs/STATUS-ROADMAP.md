@@ -63,6 +63,7 @@ Webb bug class doesn't apply to it.
 - Carries the same SOURCE LOCK / CITATION LOCK / injection-guard discipline as the letter pipeline, plus field-whitelisting (`buildSanitizedChart`) and de-identification (`deidentifySanitizedChart`, gated by `assertDeidentified` per the de-id section above) before any chart data leaves the server.
 - Sandbox isolation: `isSampleChartPatientName` guard added to the route (mirrors `regenerate-denial-fix`), and the `AppealSupportPanel` client component in `app/review/page.tsx` short-circuits entirely for demo charts — the demo path builds a result from already-loaded chart fields with no `fetch` call at all.
 - Consumed by a new "Denial & Appeal Support" panel in the `/review` right rail: paste a denial reason, get rebuttal points, citations, and a suggested next step.
+- 2026-07-18: `isSampleChartPatientName` guard added to `app/api/regenerate-letter/route.ts` — it was the last live-Anthropic route missing the sandbox-isolation check its siblings (`regenerate-denial-fix`, `generate-appeal-talking-points`) already had.
 
 ## Security
 

@@ -11,7 +11,7 @@
 
 ## Hard Constraints
 - Never hardcode secrets or env vars.
-- All Supabase operations must execute server-side (Server Actions or Route Handlers). Never instantiate or call database clients inside a `'use client'` component.
+- All Supabase operations must execute server-side (Server Actions or Route Handlers). Never instantiate or call database clients inside a `'use client'` component. Exception: `app/login`, `app/auth/confirm`, `app/builder/DemoModeBar.tsx` use a browser Supabase client solely to exchange an auth session/OTP — no data table is ever queried from the client. See `.claude/CLAUDE.md` and `.claude/rules/auth-flow.md`.
 - Do not modify the Supabase database schema (`supabase_setup.sql`) without explicit human confirmation.
 - Do not modify Vercel deployment config without an explicit user instruction.
 - All PA packet generation logic routes through `/api/generate-pa` — do not duplicate this logic elsewhere.

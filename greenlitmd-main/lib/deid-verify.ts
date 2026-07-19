@@ -179,9 +179,14 @@ const LABELED_RESIDUE_RE = /\b(SSN|MRN|DOB|Member[ \t]*ID|Medical[ \t]*Record)\b
 // and RESIDUAL_RE in deidentify.ts are two implementations of the same heuristic
 // and can drift if only one is tuned. The shared allowlist keeps the DATA in one
 // place; the two regexes do not. Revisit only if their behavior diverges.
-const RESIDUAL_WORD = String.raw`(?:[A-Z]-)?[A-Z][a-z]+(?:[A-Z][a-z]+)*`;
+// Repetition counts are bounded (rather than unbounded `*`) so worst-case
+// backtracking on adversarial input is capped at a constant instead of
+// theoretically unbounded -- no real name/PHI chunk chain is anywhere near
+// 20 camelCase segments or 50 space-joined words, so this doesn't change
+// behavior on real input.
+const RESIDUAL_WORD = String.raw`(?:[A-Z]-)?[A-Z][a-z]+(?:[A-Z][a-z]+){0,20}`;
 const RESIDUAL_NAME_RE = new RegExp(
-  `${RESIDUAL_WORD}(?:['\\-]${RESIDUAL_WORD})*(?:[ \\t]+${RESIDUAL_WORD}(?:['\\-]${RESIDUAL_WORD})*)*`,
+  `${RESIDUAL_WORD}(?:['\\-]${RESIDUAL_WORD}){0,20}(?:[ \\t]+${RESIDUAL_WORD}(?:['\\-]${RESIDUAL_WORD}){0,20}){0,50}`,
   "g"
 );
 // 6+ bare digits mirrors the residual pass, which keeps 5-digit CPT/ZIP-shaped

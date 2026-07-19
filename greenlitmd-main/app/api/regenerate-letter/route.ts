@@ -4,6 +4,7 @@ import { regenerationRateLimiter } from "@/lib/rate-limit";
 import { letterSystemPrompt } from "@/lib/letter-system-prompt";
 import { buildBmiAsaPromptLines } from "@/lib/letter-postprocess";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
+import { isSampleChartPatientName } from "@/lib/sample-charts";
 import { callAnthropicWithRetry } from "@/lib/anthropic";
 import { deidentify, createDeidentifyState } from "@/lib/deidentify";
 import { assertDeidentified, DeidVerificationError } from "@/lib/deid-verify";
@@ -46,6 +47,14 @@ export async function POST(request: Request) {
 
     const extracted = body.extracted;
     const requestDetails = body.requestDetails;
+
+    // Sandbox isolation: mirrors regenerate-denial-fix — zero live Anthropic calls from sandbox, ever.
+    if (isSampleChartPatientName(extracted.patient_name)) {
+      return NextResponse.json(
+        { error: "This is a demo chart — regeneration is disabled in sandbox mode." },
+        { status: 400 }
+      );
+    }
 
     const today = new Date().toLocaleDateString("en-US", {
       year: "numeric",
