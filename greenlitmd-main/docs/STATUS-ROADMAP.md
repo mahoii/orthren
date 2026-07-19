@@ -5,16 +5,18 @@ roadmap doc kept outside the repository — this repo is the source of truth for
 project status. Keep it updated in the same PR as any change that closes or
 reopens an item below.
 
-Last updated: 2026-07-18
+Last updated: 2026-07-19
 
 ---
 
-## STATUS SNAPSHOT (as of 2026-07-18)
+## STATUS SNAPSHOT (as of 2026-07-19)
 
 | Track | State |
 |---|---|
-| Extraction/letter pipeline | SOURCE LOCK validated — 60/60 PASS (see below) |
-| De-identification | Strengthened 2026-07-05 — independent fail-closed verification layer (`lib/deid-verify.ts`) now gates every route that sends PHI-bearing text off-server; offline stress harness (`scripts/deid-stress-check.ts`) 30/30 PASS across 3 fixtures + adversarial cases (see below) |
+| Extraction/letter pipeline | SOURCE LOCK validated — 60/60 PASS baseline (see below); Anthropic client hardened and structured-outputs conversion pending live re-verification (see "API client hardening" below) |
+| De-identification | Strengthened 2026-07-05, extended 2026-07-19 — independent fail-closed verification layer (`lib/deid-verify.ts`) now gates every route that sends PHI-bearing text off-server; offline stress harness (`scripts/deid-stress-check.ts`) 39/39 PASS across 3 fixtures + adversarial cases, up from 30/30 (see "De-identification corpus extension" below) |
+| API client hardening | 2026-07-19 — `lib/anthropic.ts` rewritten: per-attempt timeout + cross-call deadline budget, full-jitter backoff honoring `Retry-After`, `stop_reason` truncation/refusal handling, multi-text-block concatenation, prompt caching (`cache_control: ephemeral`), configurable model via `ANTHROPIC_MODEL`. All 6 Anthropic-calling routes gained `maxDuration = 300`. Offline harness `scripts/anthropic-client-check.ts` 9/9 PASS. Live `/prompt-regression-check` still pending (batched with structured-outputs work). |
+| CSP / CI | 2026-07-19 — `Content-Security-Policy-Report-Only` staged in `next.config.mjs` (PostHog + Supabase origins; observation-only, not enforcing). New `.github/workflows/ci.yml`: typecheck + build + deid-stress-check on every push/PR, verified secretless with placeholder env. |
 | Security (auth/RLS) | Verified 2026-07-04 — `scripts/test-rls.mjs` PASS on all 7 tables (0 leaks). Only `waitlist`, `waitlist_signups` exist in the live project; both have RLS enabled with a `service_role_only` policy (added to `waitlist` this pass). `users`, `pa_cases`, `submissions`, `profiles`, `subscriptions`, `payer_rules` do not exist in the schema yet — no RLS risk, but also not yet real tables to secure. |
 | Payer rules engine | 8/12 rules `validated` in `lib/payer-rules.ts`; 3 UHC rules blocked (defer to licensed InterQual criteria); 1 Aetna rule blocked (no dedicated primary source exists) — see `scripts/payer-rules-status.ts` |
 | Appeal talking points | Route built 2026-07-05, wired to `/review` 2026-07-18 (`AppealSupportPanel` in `app/review/page.tsx`) — SOURCE LOCK + CITATION LOCK + de-id verification, plus a sandbox-isolation guard (`isSampleChartPatientName`) and a chart-grounded client-only demo path with zero live Anthropic calls |
@@ -22,6 +24,36 @@ Last updated: 2026-07-18
 | Outreach infra | `[VERIFY: no outreach tooling (Streak, leave-behind materials, practice list) is tracked in this repo — status lives outside the codebase]` |
 | Billing | Manual Stripe Payment Links live via `/pricing` (`lib/pricing.ts`) — static routing layer only, no Stripe API/SDK integration, no webhooks, no DB tables |
 | Congressional App Challenge | `[VERIFY: frozen-branch / submission-date status — not discoverable from repo state alone]` |
+
+---
+
+## 2026-07-19 hardening pass (Anthropic client, de-id corpus, CSP/CI, cleanup)
+
+Four parallel work packages, merged and cross-checked. Full context/evidence in the session's plan file; this is the durable summary.
+
+**Anthropic client (`lib/anthropic.ts` + all 6 Anthropic-calling routes):**
+- Per-attempt `AbortSignal.timeout`, plus a `deadlineMs` budget threaded through `callAnthropic`/`callAnthropicWithRetry` and now also through `lib/pa-pipeline.ts` (`extractChartDataFromText`, `generateLetterFromExtraction`) and `lib/extractionValidator.ts` (`validateExtraction`) — `generate-pa`'s route computes one shared deadline (`startTime + 280s`) across its up-to-4 Anthropic calls so the client's own retries can't blow the route's `maxDuration`.
+- Full-jitter exponential backoff, honors the `Retry-After` header on 429/529 (`computeBackoffDelayMs`, pure/testable).
+- `stop_reason` handling: `max_tokens` → one retry at up to 1.5× tokens (capped 8192) then `AnthropicTruncatedError`; `refusal` → immediate `AnthropicRefusalError`, no retry.
+- Text extraction now concatenates all `type: "text"` blocks instead of indexing `content[0]`.
+- System prompt sent as `[{type:"text", text, cache_control:{type:"ephemeral"}}]` — prompt-caching breakpoint, bytes-identical otherwise. Per-call `usage` (input/output/cache_read/cache_creation) logged.
+- Model configurable via `ANTHROPIC_MODEL` env var (defaults `claude-sonnet-4-6`).
+- `export const maxDuration = 300` on all 6 Anthropic routes (Vercel Pro + Fluid supports up to 800s).
+- `generate-pa`: upload cap corrected 10MB → 4.5MB (matches the Vercel body limit already mandated in `.claude/rules/api-conventions.md`); added PDF/DOCX magic-byte sniff before parsing.
+- `regenerate-letter`: added request-body shape validation (was an unchecked raw cast, malformed bodies threw raw 500s).
+- New offline harness `scripts/anthropic-client-check.ts` (mocked fetch, zero API calls) — 9/9 PASS, covers timeout/Retry-After/jitter/truncation/refusal/deadline/multi-block behavior.
+
+**De-identification corpus extension (`lib/deidentify.ts`, `scripts/deid-stress-check.ts`):** 30 → 39 passing cases. Two new additive passes: ALL-CAPS bare city names in relocation/origin context (Titlecase was already covered by the existing residual sweep; ALL-CAPS was not), and unlabeled bare alphanumeric identifiers with 3+ hyphen-joined segments (narrow enough to never collide with CPT modifiers, HCPCS codes, spine levels, or ICD-10 decimal codes — all separately tested as must-survive). `lib/deid-verify.ts` (the independent second layer) was deliberately left untouched. Residual risk accepted and documented (not fixed — no safe additive regex exists): unlabeled bare IDs with 0–1 hyphens or none, bare 17-char VINs, schemeless URLs. Each maps to a specific HIPAA Safe Harbor §164.514(b)(2) identifier category.
+
+**CSP + CI:** `Content-Security-Policy-Report-Only` added to `next.config.mjs` (PostHog `*.posthog.com`/`*.i.posthog.com`, Supabase host derived from `NEXT_PUBLIC_SUPABASE_URL` at build time — not hardcoded); the 4 existing enforcing headers unchanged; no enforcing CSP yet (deliberate staged rollout, pending an observation window). New `.github/workflows/ci.yml`: typecheck → build → `deid-stress-check` on push/PR, Node 20, rehearsed secretless with placeholder env vars (Redis/Supabase/Anthropic/Resend/admin secrets — `POSTHOG_API_KEY` deliberately left unset to exercise the new startup-warn path below).
+
+**Cleanup:**
+- Deleted `app/api/anchor-flags/route.ts` (zero runtime callers, confirmed by full repo grep both before and after this pass).
+- `lib/posthog.ts`: the installed `posthog-node` throws (not silently no-ops) at construction on an empty `POSTHOG_API_KEY`, which would crash cold start on every importing route. Now falls back to a no-op stub client + one-time `console.warn`, so server analytics (including the `deid_verification_failed` compliance audit event) degrade to silently-dropped rather than crashing. Found independently by two workers; fixed centrally during merge.
+- `app/api/feedback/route.ts`: `pa_outcomes` Redis list now trimmed to the most recent 10,000 entries after each `lpush` (was unbounded).
+- Removed a stray broken gitlink (`greenlitmd`, mode 160000) that had ended up tracked in the repo, unrelated to this pass.
+
+**Deferred, not attempted this pass:** real structured outputs (`output_config.format json_schema`) on the extraction/validator/appeal calls — capability confirmed live (`claude-sonnet-4-6` supports it), implementation pending as the run's one batched live-regression change. CSP enforcement flip. `lib/deid-verify.ts` changes. Sonnet 5 migration.
 
 ---
 

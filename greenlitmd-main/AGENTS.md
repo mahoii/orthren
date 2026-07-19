@@ -5,7 +5,7 @@
 - **Database:** Supabase (direct table inserts, server-side only — no Auth-based email)
 - **Email:** Resend via `hello@orthren.com`
 - **Deployment:** Vercel (production at `orthren.com`)
-- **Key Env Vars:** `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `RESEND_API_KEY`, `ADMIN_SECRET`, `UNSUBSCRIBE_SECRET`, `ANTHROPIC_API_KEY`
+- **Key Env Vars:** see `.claude/CLAUDE.md` "Env vars required/optional" — this list drifted from the real names in code (it's `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY`, not `SUPABASE_URL`/`SUPABASE_ANON_KEY`) and is kept here only as a pointer, not a source of truth
 - **Primary Domain:** Orthopedic prior authorization packet generation
 - **PDF/DOCX Parsing:** `pdf-parse` and `mammoth` (Node.js runtime required)
 

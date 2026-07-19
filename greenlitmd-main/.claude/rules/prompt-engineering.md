@@ -34,9 +34,10 @@ paths:
 - `denial_risk_flags` must be specific (specific treatment gap, specific missing modality) — generic flags like "insufficient documentation of medical necessity" are not useful to clinicians
 
 ## Anthropic API usage
-- Always use `callAnthropicWithRetry` from `lib/anthropic.ts` for generation calls — handles overload retries with backoff
-- Use `useStructuredOutput: true` (sets temperature=0) for JSON extraction calls; omit it for letter generation
-- Model is `claude-sonnet-4-6` — do not hardcode a different model in ad-hoc calls
+- Always use `callAnthropicWithRetry` from `lib/anthropic.ts` for generation calls — handles timeouts, jittered/Retry-After-aware backoff, and stop_reason truncation/refusal handling
+- Use `useStructuredOutput: true` (sets temperature=0) for JSON extraction calls; omit it for letter generation. (If a call site adopts real `output_config.format` structured outputs via a `jsonSchema` param, that is a prompt/request-shape change and requires the same `/prompt-regression-check` gate as any other prompt change.)
+- Pass `deadlineMs: Date.now() + <budget>` on every call so the client's retry loop can't exceed the route's `maxDuration` — see the route-level pattern in `app/api/generate-pa/route.ts`
+- Model defaults to `claude-sonnet-4-6` via `process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6"` in `lib/anthropic.ts` — override via env, do not hardcode a different model string in ad-hoc calls
 
 ## Regression gate
 - Before merging any change to the extraction system prompt or `lib/letter-system-prompt.ts`, run the `/prompt-regression-check` skill, which runs `scripts/eval-pipeline.ts` against the three DOCX fixture charts (Kim/CPT 29827, Webb/CPT 27447, Vance-Sandra/CPT 27130) via the live API. Note: `lib/demo-data.ts` (Delgado/Chen/Vance) is a frozen UI sandbox fixture and must never be used for prompt evaluation.
