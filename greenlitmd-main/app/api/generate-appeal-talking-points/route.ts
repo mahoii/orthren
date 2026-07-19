@@ -212,6 +212,16 @@ Payer: ${payerName}`;
       maxTokens: 2000,
       useStructuredOutput: true,
       deadlineMs: Date.now() + 280_000,
+      jsonSchema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["rebuttal_points", "criteria_citations", "suggested_next_step"],
+        properties: {
+          rebuttal_points: { type: "array", items: { type: "string" } },
+          criteria_citations: { type: "array", items: { type: "string" } },
+          suggested_next_step: { type: "string" },
+        },
+      },
     });
 
     const rawParsed = await parseJsonObject(content);

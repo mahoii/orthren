@@ -54,21 +54,30 @@ Check specifically:
 6. Are surgical approach details only what the source states?
 7. Is relief_duration for each injection/treatment exactly as stated?
 
-Return ONLY a JSON array of discrepancy strings.
-If no discrepancies found, return [].
-No markdown. No explanation. Only the JSON array.`;
+Return a JSON object with a "discrepancies" array of discrepancy strings.
+If no discrepancies found, return an empty array.
+No markdown. No explanation.`;
 
   try {
     const text = await callAnthropicWithRetry({
-      system: "You are a medical data auditor. Return only valid JSON arrays.",
+      system: "You are a medical data auditor. Return only valid JSON.",
       prompt,
       maxTokens: 1000,
       useStructuredOutput: true,
-      deadlineMs
+      deadlineMs,
+      jsonSchema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["discrepancies"],
+        properties: {
+          discrepancies: { type: "array", items: { type: "string" } },
+        },
+      },
     });
 
     const clean = text.replace(/```json|```/g, "").trim();
-    return JSON.parse(clean);
+    const parsed = JSON.parse(clean);
+    return Array.isArray(parsed?.discrepancies) ? parsed.discrepancies : [];
   } catch (err) {
     console.error("[extractionValidator] Failed to run or parse QA response:", err);
     return [];

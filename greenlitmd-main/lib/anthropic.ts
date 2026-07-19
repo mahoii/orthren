@@ -114,6 +114,17 @@ export interface CallAnthropicParams {
   fetchImpl?: typeof fetch;
   /** Per-attempt request timeout in ms. Defaults to 100s. */
   timeoutMs?: number;
+  /**
+   * A JSON Schema object. When present, sends `output_config.format` as a
+   * real `json_schema` structured-output request instead of relying on
+   * `useStructuredOutput`'s temperature-only behavior — the API then
+   * guarantees schema-valid JSON, eliminating the JSON.parse failure class.
+   * Schema must use `additionalProperties: false` and list every key as
+   * required (nullable fields use `["string", "null"]` etc.) per the
+   * structured-outputs API contract. Confirmed supported on
+   * claude-sonnet-4-6 via a live capability probe before this was added.
+   */
+  jsonSchema?: Record<string, unknown>;
 }
 
 interface CallAnthropicOnceResult {
@@ -127,7 +138,7 @@ async function callAnthropicOnce(
   fetchImpl: typeof fetch,
   timeoutMs: number
 ): Promise<CallAnthropicOnceResult> {
-  const { system, prompt, maxTokens = 2000, useStructuredOutput = false, temperature } = params;
+  const { system, prompt, maxTokens = 2000, useStructuredOutput = false, temperature, jsonSchema } = params;
   const effectiveMaxTokens = maxTokensOverride ?? maxTokens;
 
   const resolvedTemperature =
@@ -147,7 +158,8 @@ async function callAnthropicOnce(
         content: prompt
       }
     ],
-    ...(resolvedTemperature !== undefined ? { temperature: resolvedTemperature } : {})
+    ...(resolvedTemperature !== undefined ? { temperature: resolvedTemperature } : {}),
+    ...(jsonSchema ? { output_config: { format: { type: "json_schema", schema: jsonSchema } } } : {})
   };
 
   const response = await fetchImpl("https://api.anthropic.com/v1/messages", {
