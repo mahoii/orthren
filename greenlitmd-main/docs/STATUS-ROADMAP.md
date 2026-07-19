@@ -5,11 +5,11 @@ roadmap doc kept outside the repository — this repo is the source of truth for
 project status. Keep it updated in the same PR as any change that closes or
 reopens an item below.
 
-Last updated: 2026-07-05
+Last updated: 2026-07-18
 
 ---
 
-## STATUS SNAPSHOT (as of 2026-07-05)
+## STATUS SNAPSHOT (as of 2026-07-18)
 
 | Track | State |
 |---|---|
@@ -18,6 +18,7 @@ Last updated: 2026-07-05
 | Security (auth/RLS) | Verified 2026-07-04 — `scripts/test-rls.mjs` PASS on all 7 tables (0 leaks). Only `waitlist`, `waitlist_signups` exist in the live project; both have RLS enabled with a `service_role_only` policy (added to `waitlist` this pass). `users`, `pa_cases`, `submissions`, `profiles`, `subscriptions`, `payer_rules` do not exist in the schema yet — no RLS risk, but also not yet real tables to secure. |
 | Payer rules engine | 8/12 rules `validated` in `lib/payer-rules.ts`; 3 UHC rules blocked (defer to licensed InterQual criteria); 1 Aetna rule blocked (no dedicated primary source exists) — see `scripts/payer-rules-status.ts` |
 | Appeal talking points | Route built 2026-07-05, wired to `/review` 2026-07-18 (`AppealSupportPanel` in `app/review/page.tsx`) — SOURCE LOCK + CITATION LOCK + de-id verification, plus a sandbox-isolation guard (`isSampleChartPatientName`) and a chart-grounded client-only demo path with zero live Anthropic calls |
+| Case persistence (Auth/DB) | 🔴 DEFERRED (Roast KILL finding) — builder→review is sessionStorage only. No cross-session anchoring for appeals or audit trails; real fix requires full accounts/DB layer (deliberately deferred). |
 | Outreach infra | `[VERIFY: no outreach tooling (Streak, leave-behind materials, practice list) is tracked in this repo — status lives outside the codebase]` |
 | Billing | Manual Stripe Payment Links live via `/pricing` (`lib/pricing.ts`) — static routing layer only, no Stripe API/SDK integration, no webhooks, no DB tables |
 | Congressional App Challenge | `[VERIFY: frozen-branch / submission-date status — not discoverable from repo state alone]` |
@@ -66,7 +67,9 @@ Webb bug class doesn't apply to it.
 ## Security
 
 - Auth rate limiting: `lib/rate-limit.ts` (Upstash sliding window, 5 req/60s),
-  added in commit `11d6ee6`.
+  added in commit `11d6ee6`. Hardened in commit `1f806ce` with limits on `/api/unsubscribe` and test route GETs, plus try/catch blocks on test routes and auth/signout.
+- Data cleanup: Deleted committed junk including `mcp_client.mjs` (had a live-looking OAuth JWT), stray `.ps1` scripts, and shell-accident files (commit `1f806ce`).
+- Database schema: `supabase_setup.sql` updated to add `name`/`unsubscribed` columns to match actual writes.
 - RLS: `scripts/test-rls.mjs` run against the live Supabase project
   (`greenlitmd`, `zvarxrjfjxghclarvoux`) on 2026-07-04 with the anon key.
   Result: **0 leaks / 7 checked, all PASS.**
@@ -122,3 +125,21 @@ renders disabled with a `mailto:kamari@orthren.com` fallback.
 - **Phase 1 (in-person outreach): UNBLOCKED** as of this validation, per the
   SOURCE LOCK gate closing above. Execution status of Phase 1 itself lives in
   outreach tooling, not this repo — see note above.
+
+---
+
+## Case Persistence (Architectural Gap)
+
+**State: 🔴 DEFERRED (Roast KILL finding)**
+
+Currently, data passage from builder to `/review` relies entirely on `sessionStorage`. There is no cross-session case persistence. Consequently, the new appeal panel (and any future audit trail) has nothing to anchor to across sessions, breaking the long-term utility of the appeal feature. 
+
+This is a core architectural gap. A real fix requires building out an accounts and DB layer, which has been deliberately deferred for this run (payment-links-only, no dashboard yet). Flagged as a known gap for future prioritization.
+
+## Polish & Hardening (Commit `1f806ce`)
+
+- **Config & TS:** Updated `tsconfig.json` (es5 → ES2017, enabled `noUnusedLocals`/`noUnusedParameters`, removed all `any` casts). Clean `npm run typecheck` and `npm run build`.
+- **Builder Limits:** Fixed contradictory upload limits (enforcing the correct 4.5MB Vercel body limit) and removed stray `alert()` calls.
+- **Copy Updates:** Removed unsubstantiated "HIPAA compliant" badge from landing page (replaced with claim backed by the de-id pipeline) and qualified denial-cost stats as "industry estimates."
+- **Styling:** Migrated `Logo.tsx` and `PricingSection` off inline-styles/Calendly to use Tailwind and `/pricing`.
+- **Cleanup:** Deleted committed junk (`mcp_client.mjs` with leaked JWT, stray `.ps1` files, dev logs, 2 dead components).
