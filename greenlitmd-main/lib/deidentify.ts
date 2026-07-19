@@ -32,6 +32,29 @@
 //   22. contactNames
 //   23. patientName            (LAST — variant sweep touches everything else)
 //
+// Additive passes (HIPAA Safe Harbor gap sweep — inserted without renumbering
+// 0-23 above; see each pass's own comment for full rationale):
+//   24. locationContextCities  (inserted physically right after pass 21
+//                              nycMetroCities, before contactNames — catches
+//                              a bare city name, in ANY letter-case including
+//                              ALL-CAPS, immediately after a relocation/origin
+//                              preposition like "relocated from" / "moved to".
+//                              Titlecase bare cities elsewhere already fall
+//                              through to the fail-closed residual pass as a
+//                              non-reversible [REDACTED]; this pass instead
+//                              mints a proper reversible [CITY_n] token for
+//                              the common relocation phrasing, and is the
+//                              only thing that catches the ALL-CAPS case,
+//                              which the residual pass's Titlecase-only regex
+//                              structurally cannot match.)
+//   25. bareAlnumId            (inserted physically LAST — after pass 23
+//                              patientName, immediately before the residual
+//                              pass — catches an UNLABELED bare alphanumeric
+//                              identifier, e.g. a member/account number
+//                              mentioned in prose with no "Member ID:" /
+//                              "Account:" label for passMemberId /
+//                              passAccountLicenseVehicle to key off of.)
+//
 // Deviations from a naive reading of the spec (intentional, documented here):
 //   - Smart double-quotes normalize to a straight SINGLE quote, not `"` --
 //     mapping to `"` would inject unescaped quotes into JSON.stringify'd
@@ -226,6 +249,22 @@ export const FIRST_NAME_STOPLIST = new Set(
     "Chase", "Hunter", "Lane", "Amber", "Crystal", "Ginger", "Christian", "Wade", "Chip",
     "Norman", "Chuck", "Rob", "Skip", "Buck", "Hazel", "Olive", "Melody", "Harmony", "Faith",
   ].map((s) => s.toLowerCase())
+);
+
+// Clinical abbreviations that can legitimately appear ALL-CAPS immediately
+// after a transfer/origin preposition ("transferred from ICU", "returned to
+// OR") -- must never be mistaken by passLocationContextCities for a bare
+// relocation city just because they share the same surrounding phrasing.
+const LOCATION_CONTEXT_ABBREV_STOPLIST = new Set(
+  [
+    "ICU", "NICU", "PICU", "SICU", "MICU", "CCU", "PACU", "ER", "ED", "OR",
+    "IMC", "PT", "OT", "HPI", "ROM", "MRI", "CT", "XR", "EKG", "ECG", "DVT",
+    "PE", "BP", "HR", "RR", "WNL", "NPO", "PRN", "IV", "PO", "ADL", "ADLS",
+    "OA", "RA", "MD", "DO", "RN", "NP", "PA", "THA", "TKA", "TSA", "ORIF",
+    "ACL", "PCL", "MCL", "LCL", "CPT", "ICD", "HCPCS", "DX", "TX", "RX",
+    "HX", "SX", "FX", "BX", "CC", "ROS", "PMH", "PSH", "FH", "SH", "SNF",
+    "REHAB", "HOME", "FACILITY", "CLINIC",
+  ].map((s) => s.toUpperCase())
 );
 
 const NYC_METRO_CITIES = [
@@ -549,6 +588,44 @@ function passNycMetroCities(text: string, state: DeidentifyState): string {
   return text;
 }
 
+// ── Additive pass 24: location-context bare cities (any case, incl. ALL-CAPS) ──
+// Gap: passNycMetroCities only knows a fixed NYC-metro gazetteer, and the
+// fail-closed residual pass (passResidualUnknowns, run at the very end) only
+// matches Titlecase word shapes -- an ALL-CAPS bare city name (a real
+// transcription style some EHR exports use, e.g. "relocated from TULSA")
+// structurally cannot match the residual pass's [A-Z][a-z]+ word regex, so it
+// reaches the model unredacted. This pass closes that gap for the common
+// relocation/origin phrasing, in ANY letter case, and mints a proper
+// reversible [CITY_n] token instead of the residual pass's non-reversible
+// [REDACTED] mask for the Titlecase case too.
+//
+// Narrow by design: only fires directly after a small, explicit set of
+// relocation/origin prepositions -- never a bare capitalized word on its own
+// (that would re-implement the residual pass's much broader, deliberately
+// blunt catch-all here, with none of its allowlist tuning). A short stoplist
+// of ALL-CAPS clinical abbreviations that legitimately follow the same
+// phrasing ("transferred from ICU") is checked before minting a token.
+const LOCATION_CONTEXT_ALT =
+  "relocated\\s+(?:from|to)|moved\\s+(?:from|to)|resides?\\s+in|lives?\\s+in|living\\s+in|" +
+  "travel(?:ed|led)\\s+(?:from|to)|referred\\s+from|transferred\\s+(?:from|to)|commutes\\s+from|" +
+  "returned\\s+(?:from|to)|originally\\s+from|hails\\s+from|based\\s+in|located\\s+in";
+
+const LOCATION_CONTEXT_RE = new RegExp(
+  `\\b(?:${LOCATION_CONTEXT_ALT})\\s+([A-Z][A-Za-z]{2,}(?:\\s+[A-Z][A-Za-z]{2,}){0,2})\\b`,
+  "g"
+);
+
+function passLocationContextCities(text: string, state: DeidentifyState): string {
+  return text.replace(LOCATION_CONTEXT_RE, (match: string, cityCandidate: string) => {
+    const tokens = cityCandidate.split(/\s+/);
+    if (tokens.some((t) => LOCATION_CONTEXT_ABBREV_STOPLIST.has(t.toUpperCase()))) return match;
+    if (tokens.every((t) => CLINICAL_NAME_STOPLIST.has(t.toUpperCase()))) return match;
+    const prefix = match.slice(0, match.length - cityCandidate.length);
+    const ph = indexed(state, state.cityIndex, "city", "CITY", cityCandidate, cityCandidate.trim().toLowerCase());
+    return `${prefix}${ph}`;
+  });
+}
+
 function passContactNames(text: string, state: DeidentifyState): string {
   const stopword = NAME_STOPWORD;
   const namePattern = `([A-Z][A-Za-z'\\-]+(?:,)?(?:[ \\t]+${stopword}[A-Z][A-Za-z'.\\-]*){0,3})`;
@@ -701,6 +778,41 @@ function passPatientName(text: string, state: DeidentifyState): string {
   return sweepNameVariants(text, name, "[PATIENT_NAME]");
 }
 
+// ── Additive pass 25: unlabeled bare alphanumeric identifier ───────────────
+// Gap: passMrn / passMemberId / passAccountLicenseVehicle / passDevice all
+// require an explicit label ("MRN:", "Member ID:", "Account:", "Serial:", ...)
+// immediately before the value. A member/account/policy-shaped identifier
+// mentioned bare in free-text narrative with no label -- e.g. "Her account is
+// XJ4-889-21 on file" -- matches none of them, and (unlike a pure-digit run)
+// doesn't match the residual pass's digit branch either, since it mixes
+// letters and digits. Maps to HIPAA Safe Harbor identifier category 18: "any
+// other unique identifying number, characteristic, or code."
+//
+// Deliberately narrow shape -- 3+ hyphen-joined segments -- chosen specifically
+// so it can NEVER collide with real clinical/billing codes that must survive
+// unredacted:
+//   - CPT-with-modifier ("27447-59") and MRN/device IDs already tokenized by
+//     an earlier labeled pass use at most ONE hyphen.
+//   - HCPCS codes ("L1902") and spine levels ("L4-L5", "C5-C6") use ZERO or
+//     ONE hyphen and never reach a third segment.
+//   - ICD-10 codes ("M75.121") are dot-separated, never hyphenated, and are
+//     excluded structurally since "." is not in this pass's character class.
+//   - NDC drug-product codes ("12345-6789-01") DO commonly use two hyphens,
+//     but are all-digit -- excluded by the explicit "must contain a letter"
+//     check below, since an NDC identifies a drug product, not a patient, and
+//     isn't a Safe Harbor identifier.
+// Reuses the existing "account" counter/[ACCOUNT_n] token (rather than a new
+// prefix) so no change to lib/deid-verify.ts's independent token allowlist is
+// needed -- ACCOUNT is already a recognized placeholder category there.
+const BARE_ALNUM_ID_RE = /\b[A-Z0-9]{2,8}-[A-Z0-9]{2,8}-[A-Z0-9]{2,8}(?:-[A-Z0-9]{2,8})*\b/g;
+
+function passBareAlnumId(text: string, state: DeidentifyState): string {
+  return text.replace(BARE_ALNUM_ID_RE, (match: string) => {
+    if (!/[A-Z]/.test(match) || !/[0-9]/.test(match)) return match; // needs both a letter and a digit
+    return numbered(state, "account", "ACCOUNT", match);
+  });
+}
+
 // ── Ordered pass registry ───────────────────────────────────────────────
 
 const PASSES: ReadonlyArray<readonly [string, (text: string, state: DeidentifyState) => string]> = [
@@ -725,9 +837,11 @@ const PASSES: ReadonlyArray<readonly [string, (text: string, state: DeidentifySt
   ["providerDrPrefixed", passProviderDrPrefixed],
   ["providerCredentialed", passProviderCredentialed],
   ["nycMetroCities", passNycMetroCities],
+  ["locationContextCities", passLocationContextCities],
   ["contactNames", passContactNames],
   ["contactNamesSweep", sweepContactFullNames],
   ["patientName", passPatientName],
+  ["bareAlnumId", passBareAlnumId],
 ];
 
 // ── Fail-closed residual pass (FINAL -- runs after all 24 passes) ─────────

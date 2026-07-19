@@ -385,6 +385,87 @@ const ADVERSARIAL_CASES: AdversarialCase[] = [
     input: "n/a", // handled specially below
     check: () => ({ pass: true }),
   },
+  // ── Worker 2: HIPAA Safe Harbor gap sweep additions ────────────────────
+  {
+    name: "allcaps-city-relocation-context",
+    // Gap 1 (candidate weak spot flagged in the brief): a bare city name
+    // OUTSIDE the NYC-metro gazetteer, in ALL-CAPS, following a relocation
+    // preposition. The fail-closed residual pass's word regex is
+    // Titlecase-only ([A-Z][a-z]+), so it structurally cannot catch this --
+    // only the new passLocationContextCities pass can.
+    input: "The patient relocated from TULSA before her follow-up. Also moved to PHOENIX last year.",
+    check: (r) => ({
+      pass: excludesAll(r, ["TULSA", "PHOENIX"]) && (r.match(/\[CITY_\d+\]/g) ?? []).length >= 2,
+    }),
+  },
+  {
+    name: "titlecase-location-context-reversible-token",
+    // Same gap class, Titlecase form: previously fell through to the
+    // fail-closed residual pass's NON-reversible [REDACTED]. Now gets a
+    // proper [CITY_n] token via passLocationContextCities that round-trips.
+    input: "Patient moved to Denver after surgery.",
+    check: (r, map) => {
+      const rt = reidentify(r, map);
+      return { pass: r.includes("[CITY_") && !/\bDenver\b/.test(r) && rt.includes("Denver") };
+    },
+  },
+  {
+    name: "location-context-negative-clinical-abbrev",
+    // Negative test for the same new pass: "transferred from ICU to PACU"
+    // shares the exact preposition phrasing a relocation city would use --
+    // must NOT be swept up as a city, since ICU/PACU are core clinical
+    // context, not PHI.
+    input: "Patient transferred from ICU to PACU for recovery.",
+    check: (r) => ({ pass: includesAll(r, ["transferred from ICU to PACU"]) }),
+  },
+  {
+    name: "bare-alnum-multihyphen-id-redacted",
+    // Gap 2 (candidate weak spot flagged in the brief): an unlabeled bare
+    // alphanumeric identifier (member/account-ID-shaped) mentioned in free
+    // prose with no "Member ID:" / "Account:" label for the existing labeled
+    // passes to key off of. Maps to Safe Harbor category 18 ("any other
+    // unique identifying number, characteristic, or code").
+    input: "Her account is XJ4-889-21 on file without further context.",
+    check: (r) => ({ pass: r.includes("[ACCOUNT_") && !/XJ4-889-21/.test(r) }),
+  },
+  {
+    name: "bare-alnum-id-roundtrip-and-verify",
+    input: "The patient's member reference AB-1234-56 was noted.",
+    check: (r, map) => {
+      const verify = verifyDeidentified(r, map);
+      const rt = reidentify(r, map);
+      return {
+        pass: r.includes("[ACCOUNT_") && !/AB-1234-56/.test(r) && verify.pass && rt.includes("AB-1234-56"),
+      };
+    },
+  },
+  {
+    name: "spine-level-and-hcpcs-survive-bare-id-pass",
+    // Negative / must-survive test: the new bare-alnum-ID pass requires 3+
+    // hyphen-joined segments specifically so it can never eat a spine level
+    // (one hyphen) or an HCPCS code (zero hyphens) -- both are core clinical
+    // content the letter model must see accurately (SOURCE LOCK).
+    input: "Spine imaging shows disc herniation at L4-L5 and C5-C6 levels. HCPCS L1902 was billed for the orthotic.",
+    check: (r) => ({ pass: includesAll(r, ["L4-L5", "C5-C6", "L1902"]) }),
+  },
+  {
+    name: "icd-decimal-code-and-cpt-modifier-survive-bare-id-pass",
+    // Negative / must-survive test: ICD-10 decimal-form codes are
+    // dot-separated (never hyphenated) and a CPT-with-modifier uses only one
+    // hyphen -- neither should ever be touched by the new pass.
+    input: "ICD M75.121 and M17.11 documented. CPT 27447-59 was billed.",
+    check: (r) => ({ pass: includesAll(r, ["M75.121", "M17.11", "27447-59"]) }),
+  },
+  {
+    name: "ndc-allnumeric-multihyphen-survives",
+    // Negative / must-survive test: an NDC drug-product code commonly uses
+    // two hyphens (three segments) -- the same shape the new pass targets --
+    // but is all-digit. The pass's explicit "must contain a letter" check
+    // keeps it untouched, since an NDC identifies a drug product, not a
+    // patient, and isn't a Safe Harbor identifier.
+    input: "NDC 12345-6789-01 was documented.",
+    check: (r) => ({ pass: r.includes("12345-6789-01") && !r.includes("[ACCOUNT_") }),
+  },
 ];
 
 function runAdversarialCases(): void {
