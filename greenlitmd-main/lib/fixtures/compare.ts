@@ -1,12 +1,4 @@
-import type { ExtractedChartData } from "@/lib/types";
-
-type FixtureField =
-  | { exact: string; description?: string }
-  | { must_include: string[]; description?: string }
-  | { contains_ci: string; description?: string }
-  | { present: boolean; modality_contains_ci?: string; description?: string }
-  | { min_count: number; description?: string }
-  | { score: 0 | 1 };
+import type { ExtractedChartData, Validation } from "@/lib/types";
 
 export type FixtureSpec = {
   _meta: { chart: string; patient: string; scenario: string };
@@ -29,7 +21,7 @@ export type ComparisonResult = {
 };
 
 export function compareExtractionToFixture(
-  extraction: ExtractedChartData & { validation?: any },
+  extraction: ExtractedChartData & { validation?: Validation },
   fixture: FixtureSpec
 ): ComparisonResult[] {
   const results: ComparisonResult[] = [];

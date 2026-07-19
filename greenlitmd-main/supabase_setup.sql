@@ -1,9 +1,11 @@
 CREATE TABLE public.waitlist_signups (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   email text UNIQUE NOT NULL,
+  name text,
   phone text,
   practice_name text,
   email_stage integer DEFAULT 1,
+  unsubscribed boolean DEFAULT false,
   created_at timestamptz DEFAULT now()
 );
 

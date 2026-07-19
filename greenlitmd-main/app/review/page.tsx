@@ -478,7 +478,7 @@ export default function ReviewPage() {
           <p className="mt-3 text-sm leading-6 text-slate-600">
             Generate a packet from a chart PDF first. Patient data is not stored after this browser session.
           </p>
-          <Link href="/" className="mt-5 inline-flex rounded-md bg-[#1E3A5F] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1d4f7a]">
+          <Link href="/builder" className="mt-5 inline-flex rounded-md bg-[#1E3A5F] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1d4f7a]">
             Back to upload
           </Link>
         </div>
@@ -886,6 +886,16 @@ export default function ReviewPage() {
           {/* Payer Criteria Panel */}
           <PayerCriteriaPanel payerRule={data?.payerRule ?? null} extracted={data?.extracted ?? null} />
 
+          {/* Denial & Appeal Support */}
+          {data && (
+            <AppealSupportPanel
+              extracted={data.extracted}
+              cptCode={data.cptCode}
+              payerName={data.payerName}
+              isDemo={Boolean(data.isDemo)}
+            />
+          )}
+
           {/* Needs Attention Header */}
           <div style={{ margin: '26px 2px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <h2 style={{ fontSize: 14, fontWeight: 700, color: '#1E3A5F', margin: 0 }}>Needs attention</h2>
@@ -1205,6 +1215,209 @@ function PayerCriteriaPanel({
                 );
               })}
             </ul>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// ─── AppealSupportPanel ───────────────────────────────────────────────────────
+
+type AppealResult = {
+  rebuttal_points: string[];
+  criteria_citations: string[];
+  suggested_next_step: string;
+};
+
+// Demo mode never calls the live route (zero Anthropic calls from sandbox —
+// see .claude/CLAUDE.md Sandbox isolation). This builds a canned result
+// directly from the already-loaded chart fields so it stays chart-grounded
+// (no fabricated facts) across all three demo profiles, not just one.
+function buildDemoAppealResult(extracted: ExtractedChartData): AppealResult {
+  const points: string[] = [];
+
+  if (extracted.diagnosis_codes.length > 0) {
+    points.push(`Diagnosis is supported by ICD-10 code(s) ${extracted.diagnosis_codes.join(", ")}, documented in the chart.`);
+  }
+  const namedTreatments = extracted.conservative_treatments_attempted.filter(t => t.treatment);
+  if (namedTreatments.length > 0) {
+    points.push(
+      `Conservative care was attempted and exhausted: ${namedTreatments.map(t => t.treatment).join("; ")}.`
+    );
+  }
+  if (extracted.imaging_findings?.key_findings) {
+    points.push(`Imaging (${extracted.imaging_findings.modality ?? "study on file"}) documents: ${extracted.imaging_findings.key_findings}.`);
+  }
+  if (extracted.functional_limitations.length > 0) {
+    points.push(`Functional impact is documented: ${extracted.functional_limitations.join("; ")}.`);
+  }
+  if (points.length === 0) {
+    points.push("Review the chart for diagnosis codes, conservative treatment history, and imaging findings to rebut this denial.");
+  }
+
+  return {
+    rebuttal_points: points,
+    criteria_citations: [],
+    suggested_next_step: "Request a peer-to-peer review and reference the chart-documented conservative treatment history and imaging findings above.",
+  };
+}
+
+function AppealSupportPanel({
+  extracted,
+  cptCode,
+  payerName,
+  isDemo,
+}: {
+  extracted: ExtractedChartData;
+  cptCode: string;
+  payerName: string;
+  isDemo: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [denialReason, setDenialReason] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [result, setResult] = useState<AppealResult | null>(null);
+  const [wasDemo, setWasDemo] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const trimmedReason = denialReason.trim();
+  const canSubmit = trimmedReason.length > 0 && trimmedReason.length <= 5000 && !isGenerating;
+
+  async function handleGenerate() {
+    if (!canSubmit) return;
+    setError(null);
+
+    if (isDemo) {
+      setIsGenerating(true);
+      // Simulated delay so the sandbox interaction feels consistent with the
+      // real flow — no network call is made.
+      await new Promise(resolve => setTimeout(resolve, 600));
+      setResult(buildDemoAppealResult(extracted));
+      setWasDemo(true);
+      setIsGenerating(false);
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const res = await fetch('/api/generate-appeal-talking-points', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          extracted_chart: extracted,
+          cpt_code: cptCode,
+          payer_name: payerName,
+          denial_reason: trimmedReason,
+        }),
+      });
+      const json = await res.json() as AppealResult & { error?: string };
+      if (!res.ok) {
+        if (res.status === 429) throw new Error('AI service is busy — please wait a moment and try again');
+        if (res.status === 422) throw new Error("Couldn't safely process this denial text — remove any patient identifiers and retry");
+        if (res.status === 401) throw new Error('Sign in required to generate appeal talking points');
+        throw new Error(json.error ?? 'Unable to generate appeal talking points.');
+      }
+      setResult(json);
+      setWasDemo(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to generate appeal talking points.');
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 18, border: '1px solid #e2e8f0', borderRadius: 14, background: 'linear-gradient(180deg, #fbfdff, #f7fafc)', overflow: 'hidden' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '14px 16px', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+      >
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#94a3b8' }}>
+          Denial &amp; Appeal Support
+        </span>
+        <span style={{ color: '#94a3b8', fontSize: 11, flexShrink: 0, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s ease' }}>▶</span>
+      </button>
+
+      {open ? (
+        <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <p style={{ fontSize: 12, color: '#64748b', margin: 0, lineHeight: 1.5 }}>
+            Paste the payer&apos;s denial reason to get chart-grounded rebuttal points for a peer-to-peer call or written appeal.
+          </p>
+          <textarea
+            value={denialReason}
+            onChange={e => setDenialReason(e.target.value)}
+            placeholder="e.g. Denied — insufficient documentation of conservative treatment failure."
+            maxLength={5000}
+            rows={3}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              border: '1px solid #e2e8f0',
+              borderRadius: 8,
+              padding: '8px 10px',
+              fontSize: 12.5,
+              fontFamily: 'inherit',
+              resize: 'vertical',
+              color: '#334155',
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={!canSubmit}
+            style={{
+              alignSelf: 'flex-start',
+              background: canSubmit ? '#1E3A5F' : '#cbd5e1',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 8,
+              padding: '7px 14px',
+              fontSize: 12.5,
+              fontWeight: 600,
+              cursor: canSubmit ? 'pointer' : 'not-allowed',
+              fontFamily: 'inherit',
+            }}
+          >
+            {isGenerating ? 'Generating…' : 'Generate talking points'}
+          </button>
+
+          {error && (
+            <p style={{ fontSize: 12, color: '#dc2626', margin: 0 }}>{error}</p>
+          )}
+
+          {result && (
+            <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {wasDemo && (
+                <span style={{ alignSelf: 'flex-start', background: '#fef3c7', color: '#92400e', borderRadius: 999, padding: '2px 8px', fontSize: 10, fontWeight: 700 }}>
+                  Sample output — demo mode
+                </span>
+              )}
+              <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {result.rebuttal_points.map((p, i) => (
+                  <li key={i} style={{ fontSize: 12.5, color: '#334155', lineHeight: 1.5 }}>{p}</li>
+                ))}
+              </ol>
+              {result.criteria_citations.length > 0 && (
+                <div>
+                  <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#94a3b8', margin: '0 0 4px' }}>
+                    Payer criteria cited
+                  </p>
+                  <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {result.criteria_citations.map((c, i) => (
+                      <li key={i} style={{ fontSize: 12, fontStyle: 'italic', color: '#64748b', lineHeight: 1.4 }}>“{c}”</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <div style={{ background: '#eef2ff', borderRadius: 8, padding: '9px 11px' }}>
+                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#4338ca', margin: '0 0 3px' }}>
+                  Suggested next step
+                </p>
+                <p style={{ fontSize: 12.5, color: '#3730a3', margin: 0, lineHeight: 1.4 }}>{result.suggested_next_step}</p>
+              </div>
+            </div>
           )}
         </div>
       ) : null}

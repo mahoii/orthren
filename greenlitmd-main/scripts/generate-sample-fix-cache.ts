@@ -39,7 +39,6 @@ type FactorLabel = (typeof FACTOR_LABELS)[number];
 // we can run this script without a bundler.  The source of truth is still
 // demo-data.ts; update that file first, then re-run this script.
 
-const DEMO_DATA_PATH = path.join(__dirname, "../lib/demo-data.ts");
 const CACHE_OUTPUT_PATH = path.join(__dirname, "../lib/sample-fix-cache.json");
 
 // We extract the `extracted` blobs via a dynamic import of the compiled JS

@@ -26,7 +26,7 @@ export default async function LandingPage() {
         <div className="mx-auto max-w-4xl text-center">
           {/* Pill badge */}
           <div className="mx-auto mb-7 inline-flex items-center gap-2 rounded-full border border-green-100 bg-green-50 px-4 py-1.5 text-xs font-semibold tracking-wide text-green-700 shadow-sm">
-            ✓ HIPAA compliant &nbsp; ✓ No EHR required
+            ✓ PHI de-identified before AI processing &nbsp; ✓ No EHR required
           </div>
 
           <h1 className="text-4xl font-extrabold tracking-tight text-clinical-navy sm:text-5xl lg:text-6xl lg:leading-[1.1]">
@@ -184,12 +184,11 @@ export default async function LandingPage() {
                 title: "Lost Surgeon Revenue",
                 body: (
                   <>
-                    Each denied orthopedic surgery costs your practice{" "}
-                    <strong className="text-red-700 font-bold">$15,000 to $50,000</strong>{" "}
-                    in completely unrecoverable lost revenue.
+                    Industry estimates put unrecovered revenue from a denied orthopedic surgery at{" "}
+                    <strong className="text-red-700 font-bold">$15,000 to $50,000</strong>.
                   </>
                 ),
-                stat: "• $15k–$50k lost per denial",
+                stat: "• Industry est.: $15k–$50k lost per denial",
               },
               {
                 icon: "⏱",
@@ -197,12 +196,11 @@ export default async function LandingPage() {
                 title: "Staff Efficiency Drain",
                 body: (
                   <>
-                    Manual PA submissions burn{" "}
-                    <strong className="text-orange-700 font-bold">$13–$18</strong>{" "}
-                    in direct staff time costs — every single time, regardless of outcome.
+                    Industry estimates put direct staff time cost for a manual PA submission at{" "}
+                    <strong className="text-orange-700 font-bold">$13–$18</strong> — every single time, regardless of outcome.
                   </>
                 ),
-                stat: "• $13–$18 per submission",
+                stat: "• Industry est.: $13–$18 per submission",
               },
               {
                 icon: "!",
@@ -245,7 +243,7 @@ export default async function LandingPage() {
         <div className="relative z-10 mx-auto max-w-5xl">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              Zero training. Zero friction.
+No new software to learn.
             </h2>
             <p className="mt-3 max-w-xl mx-auto text-blue-200 text-sm sm:text-base">
               A three-step pipeline that slots directly into your current billing workflow — no IT setup, no EMR integration required.

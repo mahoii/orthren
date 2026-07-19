@@ -105,7 +105,7 @@ async function runFixtureChecks(): Promise<void> {
 
     const roundTrip = reidentify(redacted, map);
     let roundTripOk = true;
-    for (const [ph, raw] of Object.entries(map)) {
+    for (const [, raw] of Object.entries(map)) {
       if (raw === "90+") continue;
       if (!roundTrip.includes(raw)) roundTripOk = false;
     }
@@ -167,7 +167,7 @@ const ADVERSARIAL_CASES: AdversarialCase[] = [
   {
     name: "credentialed-provider-dedupe",
     input: "Sarah Chen, MD performed the exam. Later, Dr. Chen advised surgery.",
-    check: (r, map) => {
+    check: (r, _map) => {
       const providerTokens = Array.from(r.matchAll(/\[PROVIDER_\d+\]/g)).map((m) => m[0]);
       const unique = new Set(providerTokens);
       return { pass: unique.size === 1 && r.includes(", MD"), detail: JSON.stringify(providerTokens) };

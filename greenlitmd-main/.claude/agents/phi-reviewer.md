@@ -1,6 +1,6 @@
 ---
 name: phi-reviewer
-description: Reviews any diff touching chart ingestion, API routes, or DB writes for PHI leakage and access-control gaps. Run on changes to /api/generate-pa, /api/suggest-fix, /api/regenerate-denial-fix, /api/generate-appeal-talking-points, lib/deidentify.ts, or any Supabase query touching patient data.
+description: Reviews any diff touching chart ingestion, API routes, or DB writes for PHI leakage and access-control gaps. Run on changes to /api/generate-pa, /api/regenerate-denial-fix, /api/generate-appeal-talking-points, lib/deidentify.ts, or any Supabase query touching patient data.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---

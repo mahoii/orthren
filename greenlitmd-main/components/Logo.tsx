@@ -2,10 +2,10 @@ import Image from "next/image";
 
 type LogoSize = "sm" | "md" | "lg";
 
-const sizeMap: Record<LogoSize, { icon: number; text: string }> = {
-  sm: { icon: 24, text: "text-base" },
-  md: { icon: 32, text: "text-xl" },
-  lg: { icon: 48, text: "text-[28px]" },
+const sizeMap: Record<LogoSize, { icon: number; iconClass: string; text: string }> = {
+  sm: { icon: 24, iconClass: "h-6 w-6", text: "text-base" },
+  md: { icon: 32, iconClass: "h-8 w-8", text: "text-xl" },
+  lg: { icon: 48, iconClass: "h-12 w-12", text: "text-[28px]" },
 };
 
 export default function Logo({
@@ -15,7 +15,7 @@ export default function Logo({
   size?: LogoSize;
   showWordmark?: boolean;
 }) {
-  const { icon, text } = sizeMap[size];
+  const { icon, iconClass, text } = sizeMap[size];
   return (
     <span className="flex items-center gap-2">
       <Image
@@ -23,14 +23,10 @@ export default function Logo({
         alt="Orthren"
         width={icon}
         height={icon}
-        className="object-contain"
-        style={{ width: icon, height: icon }}
+        className={`object-contain ${iconClass}`}
       />
       {showWordmark && (
-        <span
-          className={`font-bold ${text}`}
-          style={{ color: "#1E3A5F", fontFamily: "'DM Sans', sans-serif" }}
-        >
+        <span className={`font-bold font-sans text-clinical-navy ${text}`}>
           Orthren
         </span>
       )}

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyUnsubscribeToken } from "@/lib/resend";
 import { unsubscribeEmail } from "@/lib/supabase/server";
+import { lightRateLimiter } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,6 +12,12 @@ export const dynamic = "force-dynamic";
 // page's explicit button click is what fires this POST. See E3 in
 // AUDIT-FINDINGS.md.
 export async function POST(request: Request) {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "127.0.0.1";
+  const { success: allowed } = await lightRateLimiter.limit(ip);
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
+  }
+
   const body = (await request.json().catch(() => null)) as { token?: string } | null;
   const token = body?.token;
 

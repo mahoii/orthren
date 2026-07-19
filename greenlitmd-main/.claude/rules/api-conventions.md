@@ -10,7 +10,7 @@ paths:
 - Add `export const dynamic = "force-dynamic"` on routes with user-specific or time-sensitive responses
 
 ## Request validation
-- Validate file size at the route boundary (`maxUploadSizeBytes = 10 * 1024 * 1024`)
+- Validate file size at the route boundary (`maxUploadSizeBytes = 4.5 * 1024 * 1024` — Vercel serverless request-body limit)
 - Apply `rateLimiter` from `lib/rate-limit.ts` on all user-facing generation endpoints
 - Never trust client-supplied CPT codes or payer names without basic sanitization
 

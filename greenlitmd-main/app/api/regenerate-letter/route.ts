@@ -65,8 +65,8 @@ export async function POST(request: Request) {
 
     if (process.env.NODE_ENV === "development") {
       console.log("[regenerate-letter] BMI/ASA before letter call:", {
-        bmi: (extracted as any).bmi ?? null,
-        asa_classification: (extracted as any).asa_classification ?? null
+        bmi: extracted.bmi ?? null,
+        asa_classification: extracted.asa_classification ?? null
       });
     }
 

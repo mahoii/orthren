@@ -17,7 +17,7 @@ Last updated: 2026-07-05
 | De-identification | Strengthened 2026-07-05 — independent fail-closed verification layer (`lib/deid-verify.ts`) now gates every route that sends PHI-bearing text off-server; offline stress harness (`scripts/deid-stress-check.ts`) 30/30 PASS across 3 fixtures + adversarial cases (see below) |
 | Security (auth/RLS) | Verified 2026-07-04 — `scripts/test-rls.mjs` PASS on all 7 tables (0 leaks). Only `waitlist`, `waitlist_signups` exist in the live project; both have RLS enabled with a `service_role_only` policy (added to `waitlist` this pass). `users`, `pa_cases`, `submissions`, `profiles`, `subscriptions`, `payer_rules` do not exist in the schema yet — no RLS risk, but also not yet real tables to secure. |
 | Payer rules engine | 8/12 rules `validated` in `lib/payer-rules.ts`; 3 UHC rules blocked (defer to licensed InterQual criteria); 1 Aetna rule blocked (no dedicated primary source exists) — see `scripts/payer-rules-status.ts` |
-| Appeal talking points | Route built 2026-07-05 (`app/api/generate-appeal-talking-points/route.ts`) — SOURCE LOCK + CITATION LOCK + de-id verification wired in. **Not called from any UI yet** — no `/review` or `/builder` surface exists for it |
+| Appeal talking points | Route built 2026-07-05, wired to `/review` 2026-07-18 (`AppealSupportPanel` in `app/review/page.tsx`) — SOURCE LOCK + CITATION LOCK + de-id verification, plus a sandbox-isolation guard (`isSampleChartPatientName`) and a chart-grounded client-only demo path with zero live Anthropic calls |
 | Outreach infra | `[VERIFY: no outreach tooling (Streak, leave-behind materials, practice list) is tracked in this repo — status lives outside the codebase]` |
 | Billing | Manual Stripe Payment Links live via `/pricing` (`lib/pricing.ts`) — static routing layer only, no Stripe API/SDK integration, no webhooks, no DB tables |
 | Congressional App Challenge | `[VERIFY: frozen-branch / submission-date status — not discoverable from repo state alone]` |
@@ -56,12 +56,12 @@ Webb bug class doesn't apply to it.
 
 ## Appeal talking points
 
-**Status: route implemented, not yet wired to any UI.** Commit `e8801e1`.
+**Status: wired to `/review`.** Route commit `e8801e1`; UI wiring 2026-07-18.
 
-- `app/api/generate-appeal-talking-points/route.ts` — new Anthropic-backed route that turns a denial reason + extracted chart into structured peer-to-peer/appeal rebuttal points (`rebuttal_points`, `criteria_citations`, `suggested_next_step`).
-- Carries the same SOURCE LOCK / CITATION LOCK / injection-guard discipline as the letter pipeline, plus field-whitelisting (`buildSanitizedChart`) and de-identification (`deidentifySanitizedChart`, now gated by `assertDeidentified` per the de-id section above) before any chart data leaves the server.
-- Explicit code comment flags the sandbox-isolation risk if this is ever wired up: must short-circuit for the Delgado/Chen/Vance sandbox demo profiles, zero live Anthropic calls from sandbox.
-- Not called from `/review`, `/builder`, or any other page yet — no product surface consumes it.
+- `app/api/generate-appeal-talking-points/route.ts` — Anthropic-backed route that turns a denial reason + extracted chart into structured peer-to-peer/appeal rebuttal points (`rebuttal_points`, `criteria_citations`, `suggested_next_step`).
+- Carries the same SOURCE LOCK / CITATION LOCK / injection-guard discipline as the letter pipeline, plus field-whitelisting (`buildSanitizedChart`) and de-identification (`deidentifySanitizedChart`, gated by `assertDeidentified` per the de-id section above) before any chart data leaves the server.
+- Sandbox isolation: `isSampleChartPatientName` guard added to the route (mirrors `regenerate-denial-fix`), and the `AppealSupportPanel` client component in `app/review/page.tsx` short-circuits entirely for demo charts — the demo path builds a result from already-loaded chart fields with no `fetch` call at all.
+- Consumed by a new "Denial & Appeal Support" panel in the `/review` right rail: paste a denial reason, get rebuttal points, citations, and a suggested next step.
 
 ## Security
 

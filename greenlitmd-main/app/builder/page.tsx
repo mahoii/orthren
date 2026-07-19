@@ -78,7 +78,7 @@ const progressSteps = [
   "Generating document..."
 ];
 
-const maxUploadSizeBytes = 10 * 1024 * 1024;
+const maxUploadSizeBytes = 4.5 * 1024 * 1024; // Vercel serverless request-body limit
 
 const commonOrthopedicCptCodes = [
   { code: "27447", description: "Total knee arthroplasty" },
@@ -160,7 +160,7 @@ function UploadPage() {
     }
 
     if (selectedFile.size > maxUploadSizeBytes) {
-      setError("File too large. Please upload a file under 10MB.");
+      setError("File too large. Please upload a file under 4.5MB.");
       return;
     }
 
@@ -244,9 +244,8 @@ function UploadPage() {
       return;
     }
 
-    const MAX_FILE_SIZE = 4.5 * 1024 * 1024; // 4.5MB Vercel Serverless Limit
-    if (file && file.size > MAX_FILE_SIZE) {
-      alert("File size exceeds the maximum 4.5MB limit for single-session demo validation.");
+    if (file && file.size > maxUploadSizeBytes) {
+      setError("File too large. Please upload a file under 4.5MB.");
       return;
     }
 

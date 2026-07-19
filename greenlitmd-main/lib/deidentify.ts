@@ -575,7 +575,6 @@ function sweepContactFullNames(text: string, state: DeidentifyState): string {
   return text;
 }
 
-const HONORIFIC_RE = "(?:Mr|Ms|Mrs|Mx)\\.?";
 const SUFFIX_RE = "(?:Jr|Sr|II|III|IV)\\.?";
 
 type NameParts = { first: string | null; middle: string | null; last: string; suffix: string | null };

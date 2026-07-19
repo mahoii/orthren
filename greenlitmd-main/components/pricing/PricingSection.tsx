@@ -2,12 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { SOLO_PRICE, GROUP_BASE_PRICE, GROUP_PRICE_PER_SURGEON } from "@/lib/pricing";
-
-const CALENDLY_URL =
-  process.env.NEXT_PUBLIC_CALENDLY_URL ??
-  // TODO: replace with real Calendly URL
-  "https://calendly.com/kamarishabazz/30min";
+import { SOLO_PRICE, GROUP_BASE_PRICE, GROUP_PRICE_PER_SURGEON, CONTACT_FALLBACK_EMAIL } from "@/lib/pricing";
 
 const PRICING_FEATURES = [
   "AI-assisted Letter of Medical Necessity",
@@ -111,14 +106,6 @@ function IconCheck() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-    </svg>
-  );
-}
-
-function IconPlus() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0 text-clinical-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
     </svg>
   );
 }
@@ -252,20 +239,12 @@ export default function PricingSection() {
                 ))}
               </ul>
             </div>
-            <a
-              href={CALENDLY_URL}
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              href="/pricing"
               id="pricing-practice-cta"
               className="mt-8 block w-full rounded-lg bg-clinical-navy px-4 py-2.5 text-center text-sm font-semibold text-white shadow transition hover:bg-clinical-blue"
             >
-              Book a free demo
-            </a>
-            <Link
-              href="/pricing"
-              className="mt-3 block text-center text-sm font-medium text-clinical-blue hover:underline"
-            >
-              Prefer to sign up directly? See self-serve plans
+              See plans &amp; start free
             </Link>
           </div>
         </div>
@@ -400,25 +379,21 @@ export default function PricingSection() {
         <p className="text-sm text-slate-600">
           Practice with 6–10 surgeons?{" "}
           <a
-            href={CALENDLY_URL}
-            target="_blank"
-            rel="noopener noreferrer"
+            href={`mailto:${CONTACT_FALLBACK_EMAIL}`}
             className="text-clinical-blue hover:underline"
           >
             Contact us for enterprise pricing.
           </a>
         </p>
         <p className="mt-2 text-sm text-slate-500">
-          Still deciding? Book a 15-minute demo — no commitment required.
+          Still deciding? See plans and pricing — no commitment required.
         </p>
-        <a
-          href={CALENDLY_URL}
-          target="_blank"
-          rel="noopener noreferrer"
+        <Link
+          href="/pricing"
           className="mt-6 inline-block rounded-lg border-2 border-clinical-navy px-6 py-2.5 text-sm font-medium text-clinical-navy transition hover:bg-slate-50"
         >
-          Book a free demo
-        </a>
+          See plans
+        </Link>
       </section>
 
     </div>

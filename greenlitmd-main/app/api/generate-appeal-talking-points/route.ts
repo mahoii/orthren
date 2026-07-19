@@ -7,15 +7,12 @@ import { parseJsonObject } from "@/lib/pa-pipeline";
 import { deidentify, createDeidentifyState, reidentifyDeep, type DeidentifyState } from "@/lib/deidentify";
 import { assertDeidentified, DeidVerificationError } from "@/lib/deid-verify";
 import { captureEvent } from "@/lib/posthog";
+import { isSampleChartPatientName } from "@/lib/sample-charts";
 import type { ExtractedChartData, ConservativeTreatment, ImagingFindings, DenialRiskFlag } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Not wired into any UI yet. If this route is ever called from /review or
-// /builder, it must short-circuit for the Delgado/Chen/Vance sandbox demo
-// profiles per the repo's sandbox-isolation rule (zero live Anthropic calls
-// from sandbox).
 const APPEAL_TALKING_POINTS_SYSTEM_PROMPT = `You are a prior authorization specialist preparing peer-to-peer call and written appeal talking points after a denial. You are not writing a letter — you are producing structured rebuttal guidance for the requesting physician.
 
 SOURCE LOCK — ABSOLUTE RULE: Every rebuttal point must be traceable to a specific field and value in the <chart_data> JSON below. If a clinical fact, treatment, finding, or detail is not present in that JSON, omit it entirely. Never infer, generalize, extrapolate, or supply outside clinical knowledge as if it were a fact drawn from this patient's chart. A rebuttal point that cannot be pointed back to a specific field in <chart_data> is invalid.
@@ -159,6 +156,16 @@ export async function POST(request: Request) {
 
     const cptCode = (cpt_code as string).trim();
     const payerName = (payer_name as string).trim();
+
+    // Sandbox isolation: zero live Anthropic calls from sandbox, ever — mirrors
+    // regenerate-denial-fix/route.ts.
+    const chartForGuard = extracted_chart as ExtractedChartData;
+    if (isSampleChartPatientName(chartForGuard.patient_name)) {
+      return NextResponse.json(
+        { error: "This is a demo chart — appeal support is disabled in sandbox mode." },
+        { status: 400 }
+      );
+    }
 
     // Shared state so placeholder numbering (e.g. [DATE_1], [PROVIDER_1]) stays
     // consistent across denial_reason and every chart field, instead of

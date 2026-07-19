@@ -37,7 +37,7 @@
 ## Which Agent/Skill When
 - Change to `lib/letter-system-prompt.ts` → `letter-prompt-logic-auditor` agent (static, no API calls, checks SOURCE LOCK/sig block/Re: line/pa_strength against the fixtures).
 - Change to `/api/export`, `/api/regenerate-denial-fix`, or `postProcessLetter` → `docx-export-verifier` agent.
-- Diff touching chart ingestion, `/api/generate-pa`, `/api/suggest-fix`, `lib/deidentify.ts`, or any Supabase query over patient data → `phi-reviewer` agent.
+- Diff touching chart ingestion, `/api/generate-pa`, `/api/regenerate-denial-fix`, `/api/generate-appeal-talking-points`, `lib/deidentify.ts`, or any Supabase query over patient data → `phi-reviewer` agent.
 - Any change to the extraction prompt, `lib/letter-system-prompt.ts`, or `lib/anthropic.ts` before merging → `/prompt-regression-check` skill (live API, runs against Kim/Webb/Vance).
 
 ## Windows Environment Notes
