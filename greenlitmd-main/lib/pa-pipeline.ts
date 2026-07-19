@@ -107,7 +107,8 @@ Return ONLY valid JSON. No markdown. No backticks. No preamble. No explanation. 
 
 export async function extractChartDataFromText(
   chartText: string,
-  requestDetails: RequestDetails
+  requestDetails: RequestDetails,
+  deadlineMs?: number
 ): Promise<ExtractedChartData & { validation: any; _phiMap: Record<string, string> }> {
   const { redacted, map: phiMap, audit } = deidentify(chartText);
   // Audit is counts/categories only -- no PHI -- so it is always safe to log.
@@ -115,6 +116,7 @@ export async function extractChartDataFromText(
   assertDeidentified(redacted, phiMap, "pa-pipeline.extraction");
   const content = await callAnthropicWithRetry({
     system: extractionSystemPrompt,
+    deadlineMs,
     prompt: `Request details:
 CPT code: ${requestDetails.cptCode}
 Insurance payer: ${requestDetails.payerName}
@@ -160,7 +162,8 @@ export async function generateLetterFromExtraction(
   extracted: ExtractedChartData & { validation?: any },
   requestDetails: RequestDetails,
   phiMap: Record<string, string> = {},
-  payerInjectionBlock?: string | null
+  payerInjectionBlock?: string | null,
+  deadlineMs?: number
 ): Promise<FinalizeLetterResult> {
   const chartDataOnly = stripNonLetterFields(extracted);
 
@@ -268,6 +271,7 @@ Letter date: ${today}${bmiAsaLines}${objectiveMeasurementsStr}`;
     prompt: letterPrompt,
     maxTokens: 8000,
     temperature: 0,
+    deadlineMs,
   });
 
   return finalizeLetter({
@@ -282,6 +286,7 @@ Letter date: ${today}${bmiAsaLines}${objectiveMeasurementsStr}`;
         prompt: letterPrompt,
         maxTokens: 8000,
         temperature: 0,
+        deadlineMs,
       }),
   });
 }

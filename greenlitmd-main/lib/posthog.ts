@@ -1,13 +1,13 @@
 import { PostHog } from "posthog-node";
 
-// Without POSTHOG_API_KEY, the PostHog client either silently no-ops on
-// every capture() call or (depending on posthog-node version) throws at
-// construction time below -- either way there's no visibility into the
-// fact that analytics are dead. That includes the deid_verification_failed
-// audit event (fired when the de-id gate catches a PHI leak), which would
-// then vanish silently or crash module load with no indication why. Warn
-// once at module load (cold start), before construction, so it fires
-// regardless of which failure mode the installed client takes.
+// The installed posthog-node version THROWS at construction time when given
+// an empty API key (not a silent no-op) -- so without a guard here, every
+// route that imports this module crashes at cold start in any environment
+// missing POSTHOG_API_KEY, including inside DeidVerificationError handlers
+// that need to fire the deid_verification_failed compliance audit event.
+// Fall back to a stub client that no-ops instead of constructing the real
+// one, and warn once so the silent-analytics-loss is at least visible in
+// logs. See W3/W4 findings during the 2026-07 hardening pass.
 if (!process.env.POSTHOG_API_KEY) {
   console.warn(
     "[posthog] POSTHOG_API_KEY is unset -- server-side analytics will be silently dropped, " +
@@ -15,9 +15,13 @@ if (!process.env.POSTHOG_API_KEY) {
   );
 }
 
-export const serverPosthog = new PostHog(process.env.POSTHOG_API_KEY ?? "", {
-  host: "https://app.posthog.com",
-});
+export const serverPosthog: PostHog = process.env.POSTHOG_API_KEY
+  ? new PostHog(process.env.POSTHOG_API_KEY, { host: "https://app.posthog.com" })
+  : (({
+      capture: () => {},
+      flush: async () => {},
+      shutdown: async () => {},
+    } as unknown) as PostHog);
 
 // posthog-node buffers capture() calls and only ships them on its background
 // flush interval. On Vercel, a serverless function's execution environment

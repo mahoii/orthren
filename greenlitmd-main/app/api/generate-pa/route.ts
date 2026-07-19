@@ -99,7 +99,8 @@ export async function POST(request: Request) {
     const payerInjectionBlock =
       payerRule && payerRule.validation_status === "validated" ? buildPayerInjectionBlock(payerRule) : null;
 
-    const { _phiMap, ...extracted } = await extractChartDataFromText(chartText, requestDetails);
+    const deadlineMs = startTime + 280_000;
+    const { _phiMap, ...extracted } = await extractChartDataFromText(chartText, requestDetails, deadlineMs);
 
     // Deterministic string-matching pass runs first — it's independent of the
     // extraction model, unlike validateExtraction below (same model family
@@ -107,7 +108,7 @@ export async function POST(request: Request) {
     // blocks generation, since either can false-positive on paraphrased dates
     // or reformatted codes. See lib/pa-pipeline.ts verifyExtractionAgainstChart.
     const deterministicDiscrepancies = verifyExtractionAgainstChart(extracted, chartText);
-    const llmDiscrepancies = await validateExtraction(chartText, extracted as Record<string, unknown>);
+    const llmDiscrepancies = await validateExtraction(chartText, extracted as Record<string, unknown>, deadlineMs);
     const discrepancies = [...deterministicDiscrepancies, ...llmDiscrepancies];
     const extractedWithWarnings = extracted as typeof extracted & { extraction_warnings?: string[] };
     if (discrepancies.length > 0) {
@@ -140,7 +141,8 @@ export async function POST(request: Request) {
       extractedWithWarnings,
       requestDetails,
       _phiMap,
-      payerInjectionBlock
+      payerInjectionBlock,
+      deadlineMs
     );
 
     const paScore = computeEarnedWeight(extractedWithWarnings.pa_strength) / 10;

@@ -7,7 +7,8 @@ import { assertDeidentified } from "@/lib/deid-verify";
 
 export async function validateExtraction(
   chartText: string,
-  extractedJson: Record<string, unknown>
+  extractedJson: Record<string, unknown>,
+  deadlineMs?: number
 ): Promise<string[]> {
   // Shared state so both calls extend the same token numbering — otherwise
   // a placeholder like [DATE_1] could refer to different real dates in the
@@ -62,7 +63,8 @@ No markdown. No explanation. Only the JSON array.`;
       system: "You are a medical data auditor. Return only valid JSON arrays.",
       prompt,
       maxTokens: 1000,
-      useStructuredOutput: true
+      useStructuredOutput: true,
+      deadlineMs
     });
 
     const clean = text.replace(/```json|```/g, "").trim();
