@@ -92,6 +92,9 @@ export async function POST(request: Request) {
 
     // Store in Upstash Redis list "pa_outcomes"
     await redis.lpush("pa_outcomes", JSON.stringify(record));
+    // lpush prepends, so index 0 is newest -- keep only the most recent
+    // 10,000 entries so this list doesn't grow unbounded forever.
+    await redis.ltrim("pa_outcomes", 0, 9999);
 
     return NextResponse.json({ success: true });
   } catch (error) {
