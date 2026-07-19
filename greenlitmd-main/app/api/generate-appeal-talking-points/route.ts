@@ -12,6 +12,7 @@ import type { ExtractedChartData, ConservativeTreatment, ImagingFindings, Denial
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 const APPEAL_TALKING_POINTS_SYSTEM_PROMPT = `You are a prior authorization specialist preparing peer-to-peer call and written appeal talking points after a denial. You are not writing a letter — you are producing structured rebuttal guidance for the requesting physician.
 
@@ -210,6 +211,7 @@ Payer: ${payerName}`;
       prompt: userPrompt,
       maxTokens: 2000,
       useStructuredOutput: true,
+      deadlineMs: Date.now() + 280_000,
     });
 
     const rawParsed = await parseJsonObject(content);

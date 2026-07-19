@@ -13,6 +13,23 @@ import { finalizeLetter, stripNonLetterFields, type RequestDetails } from "@/lib
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
+
+function isValidRequestBody(body: unknown): body is {
+  extracted: ExtractedChartDataWithValidation;
+  requestDetails: RequestDetails;
+  softWarningResolutions?: Record<string, 'unresolved' | 'resolved' | 'cant_resolve'>;
+} {
+  if (!body || typeof body !== "object") return false;
+  const b = body as Record<string, unknown>;
+  if (!b.extracted || typeof b.extracted !== "object") return false;
+  if (!b.requestDetails || typeof b.requestDetails !== "object") return false;
+  const rd = b.requestDetails as Record<string, unknown>;
+  if (typeof rd.cptCode !== "string" || typeof rd.payerName !== "string" || typeof rd.providerName !== "string") {
+    return false;
+  }
+  return true;
+}
 
 export async function POST(request: Request) {
   try {
@@ -35,13 +52,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = (await request.json()) as {
-      extracted?: ExtractedChartDataWithValidation;
-      requestDetails?: RequestDetails;
-      softWarningResolutions?: Record<string, 'unresolved' | 'resolved' | 'cant_resolve'>;
-    };
-
-    if (!body?.extracted || !body.requestDetails) {
+    const body: unknown = await request.json();
+    if (!isValidRequestBody(body)) {
       return NextResponse.json({ error: "Missing updated chart data or request details." }, { status: 400 });
     }
 
@@ -119,7 +131,8 @@ Letter date: ${today}${bmiAsaLines}${objectiveMeasurementsStr}${buildSoftWarning
       system: systemPromptWithContext,
       prompt: buildPrompt(),
       maxTokens: 6000,
-      temperature: 0
+      temperature: 0,
+      deadlineMs: Date.now() + 280_000
     });
 
     const { letter: sanitized, sourceLockWarning, letterDate } = await finalizeLetter({
@@ -133,7 +146,8 @@ Letter date: ${today}${bmiAsaLines}${objectiveMeasurementsStr}${buildSoftWarning
           system: systemPromptWithContext,
           prompt: buildPrompt(),
           maxTokens: 6000,
-          temperature: 0
+          temperature: 0,
+          deadlineMs: Date.now() + 280_000
         }),
     });
 

@@ -9,6 +9,7 @@ import { isValidAdminSecret } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 const FIXTURES: Record<string, FixtureSpec> = {
   "clean-tka": cleanTkaFixture as FixtureSpec,

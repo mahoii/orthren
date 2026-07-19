@@ -24,8 +24,10 @@ import { computeEarnedWeight } from "@/lib/pa-strength-weights";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
-const maxUploadSizeBytes = 10 * 1024 * 1024;
+// Vercel serverless body limit — see .claude/rules/api-conventions.md.
+const maxUploadSizeBytes = 4.5 * 1024 * 1024;
 
 export async function POST(request: Request) {
   const startTime = Date.now();
@@ -67,7 +69,7 @@ export async function POST(request: Request) {
     }
 
     if (chart.size > maxUploadSizeBytes) {
-      return NextResponse.json({ error: "File too large. Please upload a file under 10MB." }, { status: 400 });
+      return NextResponse.json({ error: "File too large. Please upload a file under 4.5MB." }, { status: 400 });
     }
 
     if (!cptCode || !payerName || !providerName) {
@@ -194,6 +196,19 @@ function stringField(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+// PDF magic bytes: "%PDF-" (0x25 0x50 0x44 0x46 0x2D).
+const PDF_MAGIC = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2d]);
+// DOCX (and any Office Open XML file) is a ZIP container — its local-file-header
+// magic is "PK\x03\x04" (0x50 0x4B 0x03 0x04). This only proves "this is a ZIP
+// container," not "this is a valid DOCX" — that's fine, it's defense-in-depth
+// (rejecting obviously-mislabeled uploads before we hand them to mammoth), not
+// full format validation.
+const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
+
+function hasMagicBytes(buffer: Buffer, magic: Buffer): boolean {
+  return buffer.length >= magic.length && buffer.subarray(0, magic.length).equals(magic);
+}
+
 async function extractPdfText(chart: File) {
   if (chart.type !== "application/pdf" && !chart.name.toLowerCase().endsWith(".pdf")) {
     throw new Error("Please upload a valid PDF chart.");
@@ -201,6 +216,11 @@ async function extractPdfText(chart: File) {
 
   try {
     const buffer = Buffer.from(await chart.arrayBuffer());
+    if (!hasMagicBytes(buffer, PDF_MAGIC)) {
+      throw new Error(
+        "The provided medical chart document could not be accurately parsed. Please verify the file integrity and try again."
+      );
+    }
     const parsed = await pdfParse(buffer);
     const text = parsed.text.trim();
 
@@ -230,6 +250,11 @@ async function extractDocxText(chart: File) {
 
   try {
     const buffer = Buffer.from(await chart.arrayBuffer());
+    if (!hasMagicBytes(buffer, ZIP_MAGIC)) {
+      throw new Error(
+        "Could not read the DOCX file. Please ensure it is not password protected and try again."
+      );
+    }
     const result = await mammoth.extractRawText({ buffer });
     return result.value.trim();
   } catch (error) {

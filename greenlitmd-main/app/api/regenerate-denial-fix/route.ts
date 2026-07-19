@@ -21,6 +21,7 @@ import type { ExtractedChartData } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 function isValidRequestBody(body: unknown): body is {
   extractionJson: ExtractedChartData;
@@ -171,6 +172,7 @@ REVISION INSTRUCTIONS:
       prompt: userMessage,
       maxTokens: 6000,
       temperature: 0,
+      deadlineMs: Date.now() + 280_000,
     });
 
     // Merge supplements into the extraction BEFORE finalizeLetter runs, so
@@ -195,6 +197,7 @@ REVISION INSTRUCTIONS:
           prompt: userMessage,
           maxTokens: 6000,
           temperature: 0,
+          deadlineMs: Date.now() + 280_000,
         }),
     });
 
