@@ -3,6 +3,7 @@ import Link from "next/link";
 import { DM_Sans } from "next/font/google";
 import { Suspense } from "react";
 import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
+import { getCurrentMembership } from "@/lib/auth/org";
 import SignOutButton from "@/components/SignOutButton";
 import Logo from "@/components/Logo";
 import { PHProvider, PostHogPageview } from "./providers";
@@ -30,11 +31,16 @@ export default async function RootLayout({
 }>) {
   let isAuthenticated = false;
   let userEmail: string | null = null;
+  let showTeamNav = false;
   try {
     const supabase = createSupabaseAuthServerClient();
     const { data: { user } } = await supabase.auth.getUser();
     isAuthenticated = !!user;
     userEmail = user?.email ?? null;
+    if (isAuthenticated) {
+      const current = await getCurrentMembership();
+      showTeamNav = current?.membership.role === "owner" || current?.membership.role === "coordinator";
+    }
   } catch {
     // cookies() unavailable in some static contexts — treat as unauthenticated
   }
@@ -65,6 +71,14 @@ export default async function RootLayout({
               <div className="flex items-center">
                 {isAuthenticated ? (
                   <div className="flex items-center gap-3">
+                    {showTeamNav ? (
+                      <Link
+                        href="/team"
+                        className="rounded-md border border-[#CBD5E1] px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                      >
+                        Team
+                      </Link>
+                    ) : null}
                     <Link
                       href="/pricing"
                       className="rounded-md bg-clinical-navy px-4 py-2 text-sm font-semibold text-white transition hover:bg-clinical-blue hover:shadow-md"

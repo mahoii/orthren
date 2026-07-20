@@ -38,6 +38,10 @@ const TABLES = [
   'profiles',
   'subscriptions',
   'payer_rules',
+  'organizations',
+  'memberships',
+  'surgeons',
+  'invitations',
 ]
 
 console.log('Testing RLS with anon key (unauthenticated)...\n')

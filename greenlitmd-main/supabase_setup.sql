@@ -23,3 +23,8 @@ CREATE POLICY "service_role_only" ON public.waitlist_signups
 -- "Allow public inserts" policy anon relies on for the signup form.
 CREATE POLICY "service_role_only" ON public.waitlist
   USING (auth.role() = 'service_role');
+
+-- Team-tier stack. See supabase/migrations/000*_team_tier*.sql for the applied
+-- migrations (source of truth); this file mirrors them for a fresh-DB setup.
+\i supabase/migrations/0001_team_tier.sql
+\i supabase/migrations/0002_team_tier_billing_drift.sql

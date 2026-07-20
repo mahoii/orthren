@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import pdfParse from "pdf-parse";
 import mammoth from "mammoth";
 import { generationRateLimiter } from "@/lib/rate-limit";
-import { createSupabaseAuthServerClient } from "@/lib/supabase/server";
+import { createSupabaseAuthServerClient, createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentMembership } from "@/lib/auth/org";
+import { hashPatientName } from "@/lib/hash-patient-name";
 import { validateExtraction } from "@/lib/extractionValidator";
 import { captureEvent } from "@/lib/posthog";
 import { DeidVerificationError } from "@/lib/deid-verify";
@@ -50,6 +52,11 @@ export async function POST(request: Request) {
     }
     distinctId = user.id;
 
+    // Team-tier usage metering: org members must attribute each PA to a
+    // surgeon (pa_cases.surgeon_id is NOT NULL). Solo users have no org
+    // membership and are skipped entirely below — metering is Team-tier only.
+    const membership = await getCurrentMembership();
+
     if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
         { error: "ANTHROPIC_API_KEY is not configured. Add it before generating a packet." },
@@ -63,6 +70,24 @@ export async function POST(request: Request) {
     const payerName = stringField(formData.get("payerName"));
     const providerName = stringField(formData.get("providerName"));
     const practiceName = stringField(formData.get("practiceName"));
+    const surgeonId = stringField(formData.get("surgeonId"));
+
+    if (membership && !surgeonId) {
+      return NextResponse.json({ error: "Select the surgeon this PA is for." }, { status: 400 });
+    }
+
+    if (membership && surgeonId) {
+      const db = createSupabaseServerClient();
+      const { data: surgeon } = await db
+        .from("surgeons")
+        .select("id")
+        .eq("id", surgeonId)
+        .eq("org_id", membership.organization.id)
+        .maybeSingle();
+      if (!surgeon) {
+        return NextResponse.json({ error: "Selected surgeon is not part of your practice." }, { status: 400 });
+      }
+    }
 
     if (!(chart instanceof File)) {
       return NextResponse.json({ error: "Upload a chart file before generating the packet." }, { status: 400 });
@@ -146,6 +171,28 @@ export async function POST(request: Request) {
     );
 
     const paScore = computeEarnedWeight(extractedWithWarnings.pa_strength) / 10;
+
+    // Team-tier usage metering — metadata only (see lib/hash-patient-name.ts),
+    // never the letter, chart text, or raw patient name. A metering failure
+    // must never fail the actual PA generation the user is waiting on.
+    if (membership && surgeonId) {
+      try {
+        const db = createSupabaseServerClient();
+        const rawPatientName = _phiMap["[PATIENT_NAME]"];
+        await db.from("pa_cases").insert({
+          org_id: membership.organization.id,
+          surgeon_id: surgeonId,
+          created_by_user_id: membership.userId,
+          cpt_code: cptCode,
+          payer: payerName,
+          pa_strength: paScore,
+          patient_name_hash: hashPatientName(rawPatientName ?? user.id)
+        });
+      } catch (meteringError) {
+        console.error("[generate-pa] usage metering insert failed:", meteringError);
+      }
+    }
+
     await captureEvent({
       distinctId,
       event: "pa_generation_succeeded",

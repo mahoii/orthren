@@ -47,3 +47,6 @@ jobs:
 
       - name: Deid stress check
         run: npx --yes tsx@4 scripts/deid-stress-check.ts
+
+      - name: Billing usage check
+        run: npx --yes tsx@4 scripts/billing-usage-check.ts
